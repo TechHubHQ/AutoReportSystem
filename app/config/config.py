@@ -5,7 +5,7 @@ class AppSettings:
 
     @property
     def db_url(self):
-        return "sqlite+aiosqlite:///ars.db" 
+        return "sqlite+aiosqlite:///ars.db"
 
 
 settings = AppSettings()

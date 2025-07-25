@@ -10,5 +10,6 @@ dependencies = [
     "asyncio>=3.4.3",
     "fastapi[all]>=0.116.1",
     "passlib[bcrypt]>=1.7.4",
+    "sqlalchemy>=2.0.41",
     "streamlit>=1.47.0",
 ]

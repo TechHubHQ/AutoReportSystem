@@ -16,6 +16,8 @@ with st.form("signup_form"):
     submitted = st.form_submit_button("Sign Up")
 
 # Async wrapper
+
+
 async def handle_signup():
     return await create_user(username, email, password)
 
@@ -29,7 +31,7 @@ if submitted:
                 "username": user.username,
                 "email": user.email
             }
-            st.experimental_rerun()  
+            st.experimental_rerun()
         else:
             st.error("Could not create user.")
     except Exception as e:

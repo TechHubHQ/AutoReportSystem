@@ -9,6 +9,7 @@ engine = create_async_engine(DATABASEURL)
 
 Base = declarative_base()
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -18,7 +19,9 @@ class User(Base):
     password = Column(String, nullable=False)
 
     # One-to-many: User → Tasks
-    tasks = relationship("Task", back_populates="creator", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="creator",
+                         cascade="all, delete-orphan")
+
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -26,11 +29,13 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     task = Column(String, index=True, nullable=False)
     status = Column(String, default="pending", nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Many-to-one: Task → User
     creator = relationship("User", back_populates="tasks")
+
 
 async def init_db():
     async with engine.begin() as conn:

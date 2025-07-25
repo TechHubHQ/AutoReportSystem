@@ -18,4 +18,4 @@ if submitted:
         else:
             st.error("Invalid email or password")
     except Exception as e:
-        st.error(f"An error occurred: {e}") 
+        st.error(f"An error occurred: {e}")

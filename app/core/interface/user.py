@@ -1,6 +1,6 @@
 from database.models import User
 from database.db_connector import get_db
-from security.auth.auth_handler import hash_password,verify_password
+from security.auth.auth_handler import hash_password, verify_password
 from sqlalchemy import select
 
 
@@ -18,6 +18,7 @@ async def create_user(username: str, email: str, password: str):
         raise e
     finally:
         await db.close()
+
 
 async def get_user(user_id: int):
     try:
@@ -51,6 +52,7 @@ async def update_user(user_id: int, username: str = None, email: str = None, pas
         raise e
     finally:
         await db.close()
+
 
 async def authenticate_user(email: str, plain_password: str):
     try:
