@@ -4,8 +4,8 @@ class AppSettings:
     """
 
     @property
-    def db_url():
-        return "sqlite3:///ars.db"
+    def db_url(self):
+        return "sqlite+aiosqlite:///ars.db" 
 
 
 settings = AppSettings()

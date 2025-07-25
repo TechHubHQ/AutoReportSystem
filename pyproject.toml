@@ -5,6 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.21.0",
+    "asyncio>=3.4.3",
     "fastapi[all]>=0.116.1",
+    "passlib[bcrypt]>=1.7.4",
     "streamlit>=1.47.0",
 ]
