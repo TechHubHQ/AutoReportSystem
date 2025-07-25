@@ -2,11 +2,10 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
 from config.config import settings
-import asyncio
+
 
 DATABASEURL = settings.db_url
 engine = create_async_engine(DATABASEURL)
-
 Base = declarative_base()
 
 
@@ -37,9 +36,17 @@ class Task(Base):
     creator = relationship("User", back_populates="tasks")
 
 
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+class SMTPConf(Base):
+    __tablename__ = "smtp_conf"
 
-# Call it once during app startup
-asyncio.run(init_db())
+    id = Column(Integer, primary_key=True, index=True)
+    smtp_server = Column(String, nullable=False, default="smtp.gmail.com")
+    smtp_port = Column(Integer, nullable=False, default=587)
+    smtp_username = Column(String, nullable=False)
+    smtp_password = Column(String, nullable=False)
+    sender_email = Column(String, ForeignKey("users.email"), nullable=False)
+    is_active = Column(String, default="True", nullable=False)
+
+    # Many-to-one: SMTPConf → User
+    user = relationship("User", backref="smtp_confs",
+                        primaryjoin="SMTPConf.sender_email==User.email")
