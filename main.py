@@ -1,3 +1,3 @@
-from app.ui import *
+from app.ui.st_ui import *
 
 start()
