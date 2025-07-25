@@ -1,4 +1,5 @@
 # AutomateReportSystem
+
 ```
 AutomateReportSystem
 ├─ .python-version
@@ -8,26 +9,40 @@ AutomateReportSystem
 │  │  ├─ config.py
 │  │  └─ __init__.py
 │  ├─ core
-│  │  ├─ views.py
+│  │  ├─ interface
+│  │  │  ├─ task.py
+│  │  │  ├─ template.py
+│  │  │  ├─ user.py
+│  │  │  └─ __init__.py
+│  │  ├─ services
+│  │  │  ├─ report_generator.py
+│  │  │  └─ __init__.py
 │  │  └─ __init__.py
-│  ├─ domain
+│  ├─ database
+│  │  ├─ db_connector.py
 │  │  ├─ models.py
 │  │  └─ __init__.py
-│  ├─ ui.py
-│  ├─ __init__.py
-│  └─ __pycache__
-│     ├─ ui.cpython-312.pyc
-│     └─ __init__.cpython-312.pyc
-├─ infra
-│  ├─ Dockerfile
-│  ├─ email_sender.py
+│  ├─ Home.py
+│  ├─ integrations
+│  │  ├─ email
+│  │  │  ├─ email_service.py
+│  │  │  ├─ templates
+│  │  │  └─ __init__.py
+│  │  └─ __init__.py
+│  ├─ pages
+│  │  ├─ dashboard.py
+│  │  ├─ login.py
+│  │  ├─ signup.py
+│  │  └─ __init__.py
+│  ├─ security
+│  │  └─ auth
+│  │     ├─ auth_handler.py
+│  │     └─ __init__.py
 │  └─ __init__.py
-├─ main.py
+├─ infra
+│  └─ Dockerfile
 ├─ pyproject.toml
 ├─ README.md
-├─ services
-│  ├─ report_generator.py
-│  └─ __init__.py
 └─ uv.lock
 
 ```
