@@ -1,8 +1,7 @@
-from database.models import User
-from database.db_connector import get_db
-from security.auth.auth_handler import hash_password, verify_password
 from sqlalchemy import select
-
+from app.database.models import User
+from app.database.db_connector import get_db
+from app.security.auth.auth_handler import hash_password, verify_password
 
 async def create_user(username: str, email: str, password: str):
     try:

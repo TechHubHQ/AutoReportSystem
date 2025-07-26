@@ -1,6 +1,6 @@
 import os
 from cryptography.fernet import Fernet
-from config.config import settings
+from app.config.config import settings
 
 
 class EncryptionService:

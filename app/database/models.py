@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
-from config.config import settings
+from app.config.config import settings
 
 
 DATABASEURL = settings.db_url
@@ -40,7 +40,7 @@ class SMTPConf(Base):
     __tablename__ = "smtp_conf"
 
     id = Column(Integer, primary_key=True, index=True)
-    smtp_server = Column(String, nullable=False, default="smtp.gmail.com")
+    smtp_host = Column(String, nullable=False, default="smtp.gmail.com")
     smtp_port = Column(Integer, nullable=False, default=587)
     smtp_username = Column(String, nullable=False)
     smtp_password = Column(String, nullable=False)

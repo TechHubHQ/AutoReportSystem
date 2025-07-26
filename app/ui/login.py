@@ -1,6 +1,6 @@
 import asyncio
 import streamlit as st
-from core.interface.user import authenticate_user
+from app.core.interface.user_interface import authenticate_user
 
 st.title("Login Page")
 

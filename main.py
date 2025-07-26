@@ -1,6 +1,6 @@
 import streamlit as st
 import asyncio
-from database.db_connector import init_db
+from app.database.db_connector import init_db
 
 
 def initialize_database():
