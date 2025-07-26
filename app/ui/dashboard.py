@@ -11,9 +11,9 @@ def dashboard(go_to_page):
 
     col1, col2 = st.columns(2)
     with col1:
-        st.info("🔧 Dashboard Section 1 — Customize this area.")
+        st.info("Cheppa Kadha Anna Saturday work chestha ani")
     with col2:
-        st.success("📑 Dashboard Section 2 — Add your analytics or reports here.")
+        st.success("Bagundhi ila work chesthe self improvement kosam.")
 
     st.divider()
     st.button(
