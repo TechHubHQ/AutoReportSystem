@@ -8,6 +8,7 @@ dependencies = [
     "aiosmtplib>=4.0.1",
     "aiosqlite>=0.21.0",
     "asyncio>=3.4.3",
+    "bcrypt==3.2.0",
     "cryptography>=45.0.5",
     "fastapi[all]>=0.116.1",
     "passlib[bcrypt]>=1.7.4",
