@@ -15,7 +15,8 @@ class ScheduledJob:
         repeat: Optional[float] = None,
         day_of_week: Optional[int] = None,
         hour: Optional[int] = None,
-        minute: Optional[int] = None
+        minute: Optional[int] = None,
+        next_run: Optional[Callable[[], float]] = None,
     ):
         self.run_at = run_at
         self.coro = coro
@@ -25,6 +26,7 @@ class ScheduledJob:
         self.day_of_week = day_of_week
         self.hour = hour
         self.minute = minute
+        self.custom_next_run = next_run
 
     def __lt__(self, other):
         return self.run_at < other.run_at
@@ -73,24 +75,23 @@ class AsyncScheduler:
         repeat: Optional[float] = None,
         day_of_week: Optional[int] = None,
         hour: Optional[int] = None,
-        minute: Optional[int] = None
+        minute: Optional[int] = None,
+        next_run: Optional[Callable[[], float]] = None
     ):
-        """
-        Schedule a coroutine to run:
-        - after `delay` seconds
-        - OR at a specific day_of_week/hour/minute (cron-style)
-        - Optionally repeat every `repeat` seconds or weekly for cron
-        """
         if day_of_week is not None and hour is not None and minute is not None:
             delay = self._seconds_until(day_of_week, hour, minute)
-            repeat = 7 * 24 * 60 * 60  # weekly repetition
+            repeat = 7 * 86400
+        elif next_run:
+            delay = next_run() - time.time()
+
         run_at = time.monotonic() + delay
-        job = ScheduledJob(run_at, coro, args, kwargs,
-                           repeat, day_of_week, hour, minute)
+        job = ScheduledJob(run_at, coro, args, kwargs, repeat,
+                        day_of_week, hour, minute, next_run)
         async with self._lock:
             heapq.heappush(self._jobs, job)
         await self.start()
         return job
+
 
     async def _run(self):
         while self._running:
@@ -102,10 +103,13 @@ class AsyncScheduler:
                     job = None
             if job:
                 asyncio.create_task(self._execute_job(job))
-                if job.repeat:
+                if job.next_run:
+                    job.run_at = job.next_run()
+                elif job.repeat:
                     job.run_at = time.monotonic() + job.repeat
-                    async with self._lock:
-                        heapq.heappush(self._jobs, job)
+                async with self._lock:
+                    heapq.heappush(self._jobs, job)
+
             else:
                 async with self._lock:
                     sleep_time = (
