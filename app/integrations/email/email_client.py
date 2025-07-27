@@ -23,3 +23,23 @@ class EmailService:
             password=self.pwd,
             start_tls=True,
         )
+
+# Example Usage
+# import asyncio
+#
+# async def main():
+#     email_service = EmailService(
+#         email="your_email@example.com",
+#         host="smtp.example.com",
+#         pwd="your_password",
+#         port=587
+#     )
+#     await email_service.send_email(
+#         to_address="recipient@example.com",
+#         subject="Test Email",
+#         content="<h1>Hello, this is a test email!</h1>",
+#         html=True
+#     )
+#
+# # To run the example:
+# # asyncio.run(main())

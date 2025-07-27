@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "aiosmtplib>=4.0.1",
     "aiosqlite>=0.21.0",
+    "alembic>=1.16.4",
     "asyncio>=3.4.3",
     "bcrypt==3.2.0",
     "cryptography>=45.0.5",

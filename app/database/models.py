@@ -28,6 +28,7 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     task = Column(String, index=True, nullable=False)
     status = Column(String, default="pending", nullable=False)
+    category = Column(String, default="in progress", nullable=False)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
