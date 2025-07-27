@@ -1,10 +1,12 @@
 import asyncio
 import heapq
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Awaitable, Optional, Tuple
 
 
+@dataclass
 class ScheduledJob:
     def __init__(
         self,
@@ -32,7 +34,7 @@ class ScheduledJob:
         return self.run_at < other.run_at
 
 
-class AsyncScheduler:
+class JobScheduler:
     def __init__(self):
         self._jobs = []
         self._lock = asyncio.Lock()
@@ -127,3 +129,6 @@ class AsyncScheduler:
     async def clear(self):
         async with self._lock:
             self._jobs.clear()
+
+
+scheduler = JobScheduler()
