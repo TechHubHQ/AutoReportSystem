@@ -39,4 +39,3 @@ async def run_tasks():
 if __name__ == "__main__":
     print("Entering main execution block...\n")
     asyncio.run(run_tasks())
-    print("Execution completed. Shutting down...")

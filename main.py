@@ -4,21 +4,26 @@ from app.database.db_connector import init_db
 from app.ui.login import login
 from app.ui.signup import signup
 from app.ui.dashboard import dashboard
+from app.ui.user_settings import settings
+from app.ui.template_designer import template_designer
+from app.ui.smtp_conf import smtp_conf
+
 
 st.set_page_config(page_title="Automate Report System", layout="wide")
+
 
 # Initialize DB only once
 if "db_initialized" not in st.session_state:
     asyncio.run(init_db())
     st.session_state.db_initialized = True
 
+
 # Page state manager
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
+
 # Page router
-
-
 def go_to_page(page_name):
     st.session_state.page = page_name
     st.rerun()
@@ -51,3 +56,12 @@ elif st.session_state.page == "signup":
 
 elif st.session_state.page == "dashboard":
     dashboard(go_to_page)
+
+elif st.session_state.page == "settings":
+    settings(go_to_page)
+
+elif st.session_state.page == "template_designer":
+    template_designer(go_to_page)
+
+elif st.session_state.page == "smtp_conf":
+    smtp_conf(go_to_page)
