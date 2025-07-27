@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class AppSettings:
     """
     settings module for ARS
@@ -16,7 +17,6 @@ class AppSettings:
     @property
     def SMTP_ENV_KEY(self):
         return os.getenv("SMTP_ENV_KEY")
-
 
 
 settings = AppSettings()

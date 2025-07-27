@@ -35,5 +35,3 @@ async def send_m_report():
         subject="Monthly Update",
         content=m_report_content
     )
-
-

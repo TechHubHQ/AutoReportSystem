@@ -17,13 +17,17 @@ if "page" not in st.session_state:
     st.session_state.page = "home"
 
 # Page router
+
+
 def go_to_page(page_name):
     st.session_state.page = page_name
     st.rerun()
 
+
 # Show selected page
 if st.session_state.page == "home":
-    st.markdown("<h1 style='text-align: center;'>🏠 Automate Report System</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🏠 Automate Report System</h1>",
+                unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Welcome to the <b>Automate Report System</b>. Choose an option below to proceed.</p>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 1, 1])

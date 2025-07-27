@@ -13,4 +13,3 @@ async def load_template(content, template):
     context = content
 
     return template.render(**context)
-

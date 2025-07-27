@@ -3,6 +3,7 @@ from app.database.models import User
 from app.database.db_connector import get_db
 from app.security.auth.auth_handler import hash_password, verify_password
 
+
 async def create_user(username: str, email: str, password: str):
     try:
         db = await get_db()
