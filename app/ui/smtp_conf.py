@@ -182,7 +182,7 @@ def smtp_conf(go_to_page):
                     <li>Username: your-email@gmail.com</li>
                     <li>Password: [Generated App Password]</li>
                 </ul>
-                <p style="margin-bottom: 0;"><a href="https://support.google.com/accounts/answer/185833" target="_blank" style="color: #4285f4; text-decoration: none;">🔗 Official Gmail App Password Guide</a></p>
+                <p style="margin-bottom: 0;"><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: #4285f4; text-decoration: none;">🔗 Official Gmail App Password Guide</a></p>
             </div>
             """, unsafe_allow_html=True)
         if st.button("❌ Close Instructions"):
