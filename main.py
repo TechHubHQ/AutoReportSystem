@@ -32,10 +32,6 @@ def go_to_page(page_name):
     st.rerun()
 
 
-# Initialize session management
-from app.security.session_manager import SessionManager
-SessionManager.is_session_valid()
-
 # Enhanced page state manager with security
 query_params = st.query_params
 requested_page = query_params.get("page", None)

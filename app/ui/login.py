@@ -69,9 +69,6 @@ def login(navigate):
                                     "username": user.username
                                 }
                                 st.session_state.user = user_data
-                                # Save session for persistence
-                                from app.security.session_manager import SessionManager
-                                SessionManager.save_session(user_data)
                                 # Redirect to intended destination or dashboard
                                 intended_destination = RouteProtection.get_intended_destination()
                                 navigate(intended_destination)
