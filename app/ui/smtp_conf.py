@@ -150,39 +150,35 @@ def smtp_conf(go_to_page):
         with st.container():
             st.markdown("""
             <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #4285f4; max-height: 400px; overflow-y: auto;">
-                <h4 style="color: #4285f4; margin-top: 0;">How to Generate Gmail App Password:</h4>
+                <h4 style="color: #4285f4; margin-top: 0;">Gmail App Password Setup:</h4>
                 <ol style="line-height: 1.6;">
-                    <li><strong>Enable 2-Factor Authentication:</strong>
+                    <li><strong>Visit App Passwords:</strong>
                         <ul>
-                            <li>Go to your Google Account settings</li>
-                            <li>Navigate to Security > 2-Step Verification</li>
-                            <li>Follow the setup process if not already enabled</li>
+                            <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: #4285f4;">myaccount.google.com/apppasswords</a></li>
+                            <li>Sign in to your Google account if prompted</li>
                         </ul>
                     </li>
-                    <li><strong>Generate App Password:</strong>
+                    <li><strong>Create App Password:</strong>
                         <ul>
-                            <li>In Security settings, find "App passwords"</li>
-                            <li>Select "Mail" as the app</li>
-                            <li>Choose "Other" and enter "Automate Report System"</li>
-                            <li>Click "Generate"</li>
+                            <li>Enter "Automate Report System" in the app name field</li>
+                            <li>Click "Create" to generate a 16-character password</li>
                         </ul>
                     </li>
-                    <li><strong>Use the Generated Password:</strong>
+                    <li><strong>Configure SMTP:</strong>
                         <ul>
-                            <li>Copy the 16-character password</li>
-                            <li>Use this password in the SMTP configuration above</li>
-                            <li>Use your full Gmail address as username</li>
+                            <li>Copy the generated app password</li>
+                            <li>Use it in the password field above (not your regular Gmail password)</li>
                         </ul>
                     </li>
                 </ol>
-                <p><strong>SMTP Settings for Gmail:</strong></p>
+                <p><strong>Gmail SMTP Settings:</strong></p>
                 <ul>
                     <li>Host: smtp.gmail.com</li>
-                    <li>Port: 587 (TLS) or 465 (SSL)</li>
+                    <li>Port: 587</li>
                     <li>Username: your-email@gmail.com</li>
-                    <li>Password: [Generated App Password]</li>
+                    <li>Password: [16-character app password]</li>
                 </ul>
-                <p style="margin-bottom: 0;"><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: #4285f4; text-decoration: none;">🔗 Official Gmail App Password Guide</a></p>
+                <p style="margin-bottom: 0; color: #666;"><em>Note: 2-Factor Authentication must be enabled on your Google account to use app passwords.</em></p>
             </div>
             """, unsafe_allow_html=True)
         if st.button("❌ Close Instructions"):
