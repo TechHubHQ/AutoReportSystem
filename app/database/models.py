@@ -30,7 +30,7 @@ class Task(Base):
     description = Column(String, nullable=True)
     status = Column(String, default="todo", nullable=False)  # todo, inprogress, completed, pending
     priority = Column(String, default="medium", nullable=False)  # low, medium, high, urgent
-    category = Column(String, default="general", nullable=False)
+    category = Column(String, default="in progress", nullable=False)  # accomplishments, in progress
     due_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)

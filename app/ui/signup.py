@@ -70,11 +70,15 @@ def signup(navigate):
                             user = asyncio.run(handle_signup())
                             if user:
                                 st.success(f"✅ Welcome {user.email}!")
-                                st.session_state.user = {
+                                user_data = {
                                     "id": user.id,
                                     "username": user.username,
                                     "email": user.email
                                 }
+                                st.session_state.user = user_data
+                                # Save session for persistence
+                                from app.security.session_manager import SessionManager
+                                SessionManager.save_session(user_data)
                                 navigate("dashboard")
                             else:
                                 st.error("❌ Could not create user.")

@@ -99,7 +99,8 @@ def navbar(go_to_page, current_page="dashboard"):
         
         # Logout button
         if st.button("🚪 Logout", use_container_width=True, type="secondary"):
-            # Clear session state using RouteProtection
-            RouteProtection.clear_session()
+            # Clear session using SessionManager
+            from app.security.session_manager import SessionManager
+            SessionManager.clear_session()
             st.success("👋 Successfully logged out!")
             go_to_page("home")

@@ -63,11 +63,15 @@ def login(navigate):
                                 authenticate_user(email, password))
                             if user:
                                 st.success(f"✅ Welcome {user.email}!")
-                                st.session_state.user = {
+                                user_data = {
                                     "id": user.id,
                                     "email": user.email,
                                     "username": user.username
                                 }
+                                st.session_state.user = user_data
+                                # Save session for persistence
+                                from app.security.session_manager import SessionManager
+                                SessionManager.save_session(user_data)
                                 # Redirect to intended destination or dashboard
                                 intended_destination = RouteProtection.get_intended_destination()
                                 navigate(intended_destination)

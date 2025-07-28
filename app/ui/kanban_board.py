@@ -12,6 +12,9 @@ from typing import List, Dict, Optional
 from app.core.interface.task_interface import (
     get_tasks_by_status, create_task, update_task, delete_task, get_task_statistics
 )
+from app.core.utils.datetime_utils import (
+    get_due_date_status, format_datetime_for_display, get_current_utc_datetime
+)
 from app.security.route_protection import RouteProtection
 
 
@@ -305,9 +308,9 @@ def create_task_form(user_id: int):
                                     options=["low", "medium",
                                              "high", "urgent"],
                                     index=1)
-            category = st.text_input("🏷️ Category",
-                                     value="general",
-                                     placeholder="e.g., development, design, testing")
+            category = st.selectbox("🏷️ Category",
+                                   options=["in progress", "accomplishments"],
+                                   index=0)
 
         with col2:
             description = st.text_area("📄 Description",
@@ -381,19 +384,17 @@ def render_kanban_column(status: str, title: str, color: str, user_id: int):
 def render_task_card(task, current_status: str):
     """Render a single task card"""
 
-    # Calculate due date status
-    due_status = ""
-    if task.due_date:
-        now = datetime.now(timezone.utc)
-        if task.due_date < now and task.status != 'completed':
-            due_status = "overdue"
-        elif task.due_date < now + timedelta(days=3):
-            due_status = "due-soon"
+    # Calculate due date status using utility function
+    due_status = get_due_date_status(task.due_date, task.status)
 
     # Format due date
     due_date_str = ""
     if task.due_date:
-        due_date_str = task.due_date.strftime("%m/%d")
+        try:
+            due_date_str = format_datetime_for_display(task.due_date, "%m/%d")
+        except Exception:
+            # Fallback if formatting fails
+            due_date_str = "Invalid date"
 
     # Create unique key for this task
     task_key = f"task_{task.id}_{current_status}"
@@ -472,8 +473,10 @@ def edit_task_modal(task):
                                             options=["low", "medium",
                                                      "high", "urgent"],
                                             index=["low", "medium", "high", "urgent"].index(task.priority))
-                new_category = st.text_input(
-                    "🏷️ Category", value=task.category)
+                new_category = st.selectbox(
+                    "🏷️ Category", 
+                    options=["in progress", "accomplishments"],
+                    index=0 if task.category == "in progress" else 1)
 
             with col2:
                 new_description = st.text_area(
@@ -569,14 +572,18 @@ def view_task_details_modal(task):
 
         with col2:
             st.markdown(
-                f"**📅 Created:** {task.created_at.strftime('%Y-%m-%d %H:%M')}")
+                f"**📅 Created:** {format_datetime_for_display(task.created_at, '%Y-%m-%d %H:%M')}")
             st.markdown(
-                f"**🔄 Updated:** {task.updated_at.strftime('%Y-%m-%d %H:%M')}")
-            if task.due_date:
-                st.markdown(
-                    f"**⏰ Due Date:** {task.due_date.strftime('%Y-%m-%d')}")
-            else:
-                st.markdown("**⏰ Due Date:** Not set")
+                f"**🔄 Updated:** {format_datetime_for_display(task.updated_at, '%Y-%m-%d %H:%M')}")
+            st.markdown(
+                f"**⏰ Due Date:** {format_datetime_for_display(task.due_date, '%Y-%m-%d')}")
+            
+            # Show due date status if applicable
+            due_status = get_due_date_status(task.due_date, task.status)
+            if due_status == "overdue":
+                st.error("🚨 This task is overdue!")
+            elif due_status == "due-soon":
+                st.warning("⚠️ This task is due soon!")
 
         if task.description:
             st.markdown("**📄 Description:**")

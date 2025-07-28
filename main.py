@@ -32,6 +32,10 @@ def go_to_page(page_name):
     st.rerun()
 
 
+# Initialize session management
+from app.security.session_manager import SessionManager
+SessionManager.is_session_valid()
+
 # Enhanced page state manager with security
 query_params = st.query_params
 requested_page = query_params.get("page", None)
@@ -140,7 +144,7 @@ if st.session_state.page == "home":
             <p style="margin: 0.5rem 0 0 0; color: #666;">You are securely logged in. Access your dashboard to continue.</p>
         </div>
         """, unsafe_allow_html=True)
-        
+
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
             if st.button("📊 Go to Dashboard", use_container_width=True, type="primary"):

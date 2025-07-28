@@ -3,11 +3,14 @@ from typing import List, Optional
 from sqlalchemy import select, update, delete
 from app.database.db_connector import get_db
 from app.database.models import Task
+from app.core.utils.datetime_utils import (
+    ensure_timezone_aware, get_current_utc_datetime, safe_datetime_compare
+)
 
 
-async def create_task(title: str, description: str = "", status: str = "todo", 
-                     priority: str = "medium", category: str = "general", 
-                     due_date: Optional[datetime] = None, created_by: int = None):
+async def create_task(title: str, description: str = "", status: str = "todo",
+                      priority: str = "medium", category: str = "in progress",
+                      due_date: Optional[datetime] = None, created_by: int = None):
     """Create a new task"""
     try:
         db = await get_db()
@@ -40,7 +43,7 @@ async def get_tasks(user_id: Optional[int] = None) -> List[Task]:
         if user_id:
             query = query.where(Task.created_by == user_id)
         query = query.order_by(Task.created_at.desc())
-        
+
         result = await db.execute(query)
         tasks = result.scalars().all()
         return tasks
@@ -59,12 +62,31 @@ async def get_tasks_by_status(status: str, user_id: Optional[int] = None) -> Lis
         if user_id:
             query = query.where(Task.created_by == user_id)
         query = query.order_by(Task.created_at.desc())
-        
+
         result = await db.execute(query)
         tasks = result.scalars().all()
         return tasks
     except Exception as e:
         print(f"Error while fetching tasks by status: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
+async def get_tasks_by_category(category: str, user_id: Optional[int] = None) -> List[Task]:
+    """Get tasks filtered by category"""
+    try:
+        db = await get_db()
+        query = select(Task).where(Task.category == category)
+        if user_id:
+            query = query.where(Task.created_by == user_id)
+        query = query.order_by(Task.created_at.desc())
+
+        result = await db.execute(query)
+        tasks = result.scalars().all()
+        return tasks
+    except Exception as e:
+        print(f"Error while fetching tasks by category: {e}")
         raise e
     finally:
         await db.close()
@@ -84,13 +106,13 @@ async def get_task(task_id: int) -> Optional[Task]:
         await db.close()
 
 
-async def update_task(task_id: int, title: str = None, description: str = None, 
-                     status: str = None, priority: str = None, category: str = None,
-                     due_date: datetime = None):
+async def update_task(task_id: int, title: str = None, description: str = None,
+                      status: str = None, priority: str = None, category: str = None,
+                      due_date: datetime = None):
     """Update an existing task"""
     try:
         db = await get_db()
-        
+
         # Build update dictionary with only provided values
         update_data = {}
         if title is not None:
@@ -105,13 +127,13 @@ async def update_task(task_id: int, title: str = None, description: str = None,
             update_data['category'] = category
         if due_date is not None:
             update_data['due_date'] = due_date
-        
-        update_data['updated_at'] = datetime.now(timezone.utc)
-        
+
+        update_data['updated_at'] = get_current_utc_datetime()
+
         query = update(Task).where(Task.id == task_id).values(**update_data)
         await db.execute(query)
         await db.commit()
-        
+
         # Return updated task
         return await get_task(task_id)
     except Exception as e:
@@ -142,8 +164,8 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
     """Get tasks for the current week"""
     try:
         db = await get_db()
-        ist = timezone(timedelta(hours=5, minutes=30))
-        today = datetime.now(ist)
+        # Use UTC for database comparison
+        today = datetime.now(timezone.utc)
         # Find Monday of the current week
         start_of_week = today - timedelta(days=today.weekday())
         start_of_week = start_of_week.replace(
@@ -153,13 +175,17 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
             timedelta(days=4, hours=23, minutes=59,
                       seconds=59, microseconds=999999)
 
+        # Convert to naive datetime for database comparison
+        start_naive = start_of_week.replace(tzinfo=None)
+        end_naive = end_of_week.replace(tzinfo=None)
+
         query = select(Task).where(
-            Task.created_at >= start_of_week,
-            Task.created_at <= end_of_week
+            Task.created_at >= start_naive,
+            Task.created_at <= end_naive
         )
         if user_id:
             query = query.where(Task.created_by == user_id)
-        
+
         result = await db.execute(query)
         tasks = result.scalars().all()
         return tasks
@@ -174,8 +200,8 @@ async def get_monthly_tasks(user_id: Optional[int] = None):
     """Get tasks for the current month"""
     try:
         db = await get_db()
-        ist = timezone(timedelta(hours=5, minutes=30))
-        today = datetime.now(ist)
+        # Use UTC for database comparison
+        today = datetime.now(timezone.utc)
         # Get the first day of the current month
         start_of_month = today.replace(
             day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -188,13 +214,17 @@ async def get_monthly_tasks(user_id: Optional[int] = None):
                 month=today.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
         end_of_month = next_month - timedelta(microseconds=1)
 
+        # Convert to naive datetime for database comparison
+        start_naive = start_of_month.replace(tzinfo=None)
+        end_naive = end_of_month.replace(tzinfo=None)
+
         query = select(Task).where(
-            Task.created_at >= start_of_month,
-            Task.created_at <= end_of_month
+            Task.created_at >= start_naive,
+            Task.created_at <= end_naive
         )
         if user_id:
             query = query.where(Task.created_by == user_id)
-        
+
         result = await db.execute(query)
         tasks = result.scalars().all()
         return tasks
@@ -209,16 +239,16 @@ async def get_task_statistics(user_id: Optional[int] = None):
     """Get task statistics for dashboard"""
     try:
         db = await get_db()
-        
+
         # Base query
         base_query = select(Task)
         if user_id:
             base_query = base_query.where(Task.created_by == user_id)
-        
+
         # Get all tasks
         result = await db.execute(base_query)
         all_tasks = result.scalars().all()
-        
+
         # Calculate statistics
         stats = {
             'total': len(all_tasks),
@@ -228,9 +258,11 @@ async def get_task_statistics(user_id: Optional[int] = None):
             'pending': len([t for t in all_tasks if t.status == 'pending']),
             'high_priority': len([t for t in all_tasks if t.priority == 'high']),
             'urgent': len([t for t in all_tasks if t.priority == 'urgent']),
-            'overdue': len([t for t in all_tasks if t.due_date and t.due_date < datetime.now(timezone.utc) and t.status != 'completed'])
+            'overdue': len([t for t in all_tasks if t.due_date and safe_datetime_compare(ensure_timezone_aware(t.due_date), get_current_utc_datetime()) and t.status != 'completed']),
+            'in_progress_category': len([t for t in all_tasks if t.category == 'in progress']),
+            'accomplishments_category': len([t for t in all_tasks if t.category == 'accomplishments'])
         }
-        
+
         return stats
     except Exception as e:
         print(f"Error while fetching task statistics: {e}")
