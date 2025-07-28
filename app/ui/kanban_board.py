@@ -309,8 +309,8 @@ def create_task_form(user_id: int):
                                              "high", "urgent"],
                                     index=1)
             category = st.selectbox("🏷️ Category",
-                                   options=["in progress", "accomplishments"],
-                                   index=0)
+                                    options=["in progress", "accomplishments"],
+                                    index=0)
 
         with col2:
             description = st.text_area("📄 Description",
@@ -474,7 +474,7 @@ def edit_task_modal(task):
                                                      "high", "urgent"],
                                             index=["low", "medium", "high", "urgent"].index(task.priority))
                 new_category = st.selectbox(
-                    "🏷️ Category", 
+                    "🏷️ Category",
                     options=["in progress", "accomplishments"],
                     index=0 if task.category == "in progress" else 1)
 
@@ -577,7 +577,7 @@ def view_task_details_modal(task):
                 f"**🔄 Updated:** {format_datetime_for_display(task.updated_at, '%Y-%m-%d %H:%M')}")
             st.markdown(
                 f"**⏰ Due Date:** {format_datetime_for_display(task.due_date, '%Y-%m-%d')}")
-            
+
             # Show due date status if applicable
             due_status = get_due_date_status(task.due_date, task.status)
             if due_status == "overdue":

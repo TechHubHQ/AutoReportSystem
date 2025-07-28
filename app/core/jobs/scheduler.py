@@ -88,12 +88,11 @@ class JobScheduler:
 
         run_at = time.monotonic() + delay
         job = ScheduledJob(run_at, coro, args, kwargs, repeat,
-                        day_of_week, hour, minute, next_run)
+                           day_of_week, hour, minute, next_run)
         async with self._lock:
             heapq.heappush(self._jobs, job)
         await self.start()
         return job
-
 
     async def _run(self):
         while self._running:

@@ -28,9 +28,12 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True, nullable=False)
     description = Column(String, nullable=True)
-    status = Column(String, default="todo", nullable=False)  # todo, inprogress, completed, pending
-    priority = Column(String, default="medium", nullable=False)  # low, medium, high, urgent
-    category = Column(String, default="in progress", nullable=False)  # accomplishments, in progress
+    # todo, inprogress, completed, pending
+    status = Column(String, default="todo", nullable=False)
+    # low, medium, high, urgent
+    priority = Column(String, default="medium", nullable=False)
+    # accomplishments, in progress
+    category = Column(String, default="in progress", nullable=False)
     due_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)

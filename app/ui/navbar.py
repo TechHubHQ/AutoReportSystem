@@ -94,9 +94,9 @@ def navbar(go_to_page, current_page="dashboard"):
 
         # Show security status
         show_security_status()
-        
+
         st.divider()
-        
+
         # Logout button
         if st.button("🚪 Logout", use_container_width=True, type="secondary"):
             st.success("👋 Successfully logged out!")
