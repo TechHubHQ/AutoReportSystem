@@ -7,68 +7,91 @@ from app.integrations.email.email_client import EmailService
 
 def smtp_conf(go_to_page):
     """SMTP configuration page with navbar"""
+    st.markdown("""
+    <style>
+    .smtp-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        color: white;
+        text-align: center;
+    }
+    .smtp-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    .stForm {
+        background: rgba(102, 126, 234, 0.05);
+        padding: 2rem;
+        border-radius: 15px;
+        border: 1px solid rgba(102, 126, 234, 0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     navbar(go_to_page, "smtp_conf")
 
-    st.markdown("# 📧 SMTP Configuration")
-    st.markdown(
-        "Configure your email server settings for sending automated reports.")
-
-    st.divider()
+    st.markdown("""
+    <div class="smtp-header">
+        <h1 style="margin: 0; font-size: 2.5rem;">📧 SMTP Configuration</h1>
+        <p style="margin: 0.5rem 0 0 0; font-size: 1.1rem; opacity: 0.9;">Configure your email server settings for sending automated reports</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Get current user
     user = st.session_state.get("user", {})
     user_email = user.get("email", "")
 
     with st.form("smtp_form"):
-        st.subheader("🔧 Server Configuration")
+        st.markdown("### 🔧 Server Configuration")
 
         col1, col2 = st.columns(2)
 
         with col1:
             smtp_host = st.text_input(
-                "SMTP Host *",
+                "🌐 SMTP Host *",
                 placeholder="smtp.gmail.com",
                 help="Your email provider's SMTP server address"
             )
             smtp_username = st.text_input(
-                "Username *",
+                "👤 Username *",
                 placeholder="your-email@domain.com",
                 help="Your email address or username"
             )
 
         with col2:
             smtp_port = st.number_input(
-                "Port *",
+                "🔌 Port *",
                 min_value=1,
                 max_value=65535,
                 value=587,
                 help="Common ports: 587 (TLS), 465 (SSL), 25 (unsecured)"
             )
             smtp_password = st.text_input(
-                "Password *",
+                "🔒 Password *",
                 type="password",
                 help="Your email password or app-specific password"
             )
 
-        st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### 🔑 App Password Instructions")
+        st.markdown("Click on your email provider for setup instructions:")
 
-        # Common SMTP presets
-        st.subheader("📨 Quick Setup")
-        st.markdown("Select a common email provider:")
-
-        col3, col4, col5, col6 = st.columns(4)
+        col3, col4 = st.columns(2)
 
         with col3:
-            if st.form_submit_button("📧 Gmail", use_container_width=True):
-                st.session_state.preset_host = "smtp.gmail.com"
-                st.session_state.preset_port = 587
+            if st.form_submit_button("📧 Gmail Setup", use_container_width=True):
+                st.session_state.show_gmail_instructions = True
 
         with col4:
-            if st.form_submit_button("📧 Outlook", use_container_width=True):
-                st.session_state.preset_host = "smtp-mail.outlook.com"
-                st.session_state.preset_port = 587
+            if st.form_submit_button("📧 Outlook Setup", use_container_width=True):
+                st.session_state.show_outlook_instructions = True
 
-        st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
 
         # Form submission
         col7, col8, col9 = st.columns([1, 1, 1])
@@ -95,7 +118,7 @@ def smtp_conf(go_to_page):
     # Handle form submissions
     if test_connection:
         if smtp_host and smtp_username and smtp_password:
-            with st.spinner("Testing connection..."):
+            with st.spinner("🔍 Testing SMTP connection..."):
                 try:
                     email_service = EmailService(
                         smtp_username, smtp_host, smtp_password, smtp_port)
@@ -107,19 +130,106 @@ def smtp_conf(go_to_page):
 
     if save_config:
         if smtp_host and smtp_username and smtp_password:
-            try:
-                asyncio.run(setup_smtp(smtp_host, smtp_port,
-                            smtp_username, smtp_password))
-                st.success("✅ SMTP configuration saved successfully!")
-                st.info("📧 You can now send automated email reports")
-            except Exception as e:
-                st.error(f"❌ Error saving configuration: {str(e)}")
+            with st.spinner("💾 Saving SMTP configuration..."):
+                try:
+                    asyncio.run(setup_smtp(smtp_host, smtp_port,
+                                smtp_username, smtp_password))
+                    st.success("✅ SMTP configuration saved successfully!")
+                    st.info("📧 You can now send automated email reports")
+                except Exception as e:
+                    st.error(f"❌ Error saving configuration: {str(e)}")
         else:
             st.error("⚠️ Please fill in all required fields")
 
     if clear_form:
         st.rerun()
 
-    # Apply presets if selected
-    if "preset_host" in st.session_state:
-        st.rerun()
+    # Show Gmail instructions if requested
+    if st.session_state.get("show_gmail_instructions", False):
+        st.markdown("### 📧 Gmail App Password Setup")
+        with st.container():
+            st.markdown("""
+            <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #4285f4; max-height: 400px; overflow-y: auto;">
+                <h4 style="color: #4285f4; margin-top: 0;">How to Generate Gmail App Password:</h4>
+                <ol style="line-height: 1.6;">
+                    <li><strong>Enable 2-Factor Authentication:</strong>
+                        <ul>
+                            <li>Go to your Google Account settings</li>
+                            <li>Navigate to Security > 2-Step Verification</li>
+                            <li>Follow the setup process if not already enabled</li>
+                        </ul>
+                    </li>
+                    <li><strong>Generate App Password:</strong>
+                        <ul>
+                            <li>In Security settings, find "App passwords"</li>
+                            <li>Select "Mail" as the app</li>
+                            <li>Choose "Other" and enter "Automate Report System"</li>
+                            <li>Click "Generate"</li>
+                        </ul>
+                    </li>
+                    <li><strong>Use the Generated Password:</strong>
+                        <ul>
+                            <li>Copy the 16-character password</li>
+                            <li>Use this password in the SMTP configuration above</li>
+                            <li>Use your full Gmail address as username</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p><strong>SMTP Settings for Gmail:</strong></p>
+                <ul>
+                    <li>Host: smtp.gmail.com</li>
+                    <li>Port: 587 (TLS) or 465 (SSL)</li>
+                    <li>Username: your-email@gmail.com</li>
+                    <li>Password: [Generated App Password]</li>
+                </ul>
+                <p style="margin-bottom: 0;"><a href="https://support.google.com/accounts/answer/185833" target="_blank" style="color: #4285f4; text-decoration: none;">🔗 Official Gmail App Password Guide</a></p>
+            </div>
+            """, unsafe_allow_html=True)
+        if st.button("❌ Close Instructions"):
+            st.session_state.show_gmail_instructions = False
+            st.rerun()
+
+    # Show Outlook instructions if requested
+    if st.session_state.get("show_outlook_instructions", False):
+        st.markdown("### 📧 Outlook App Password Setup")
+        with st.container():
+            st.markdown("""
+            <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #0078d4; max-height: 400px; overflow-y: auto;">
+                <h4 style="color: #0078d4; margin-top: 0;">How to Generate Outlook App Password:</h4>
+                <ol style="line-height: 1.6;">
+                    <li><strong>Enable 2-Factor Authentication:</strong>
+                        <ul>
+                            <li>Sign in to your Microsoft account</li>
+                            <li>Go to Security > Advanced security options</li>
+                            <li>Turn on two-step verification if not enabled</li>
+                        </ul>
+                    </li>
+                    <li><strong>Generate App Password:</strong>
+                        <ul>
+                            <li>In Security settings, find "App passwords"</li>
+                            <li>Click "Create a new app password"</li>
+                            <li>Enter "Automate Report System" as the name</li>
+                            <li>Click "Next" to generate</li>
+                        </ul>
+                    </li>
+                    <li><strong>Use the Generated Password:</strong>
+                        <ul>
+                            <li>Copy the generated password</li>
+                            <li>Use this password in the SMTP configuration above</li>
+                            <li>Use your full Outlook email as username</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p><strong>SMTP Settings for Outlook:</strong></p>
+                <ul>
+                    <li>Host: smtp-mail.outlook.com</li>
+                    <li>Port: 587 (TLS)</li>
+                    <li>Username: your-email@outlook.com</li>
+                    <li>Password: [Generated App Password]</li>
+                </ul>
+                <p style="margin-bottom: 0;"><a href="https://support.microsoft.com/en-us/account-billing/manage-app-passwords-for-two-step-verification-d6dc8c6d-4bf7-4851-ad95-6d07799387e9" target="_blank" style="color: #0078d4; text-decoration: none;">🔗 Official Outlook App Password Guide</a></p>
+            </div>
+            """, unsafe_allow_html=True)
+        if st.button("❌ Close Instructions", key="close_outlook"):
+            st.session_state.show_outlook_instructions = False
+            st.rerun()

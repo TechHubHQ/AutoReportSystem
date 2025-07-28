@@ -1,4 +1,6 @@
 import streamlit as st
+from app.security.route_protection import RouteProtection
+from app.ui.security_dashboard import show_security_status
 
 
 def navbar(go_to_page, current_page="dashboard"):
@@ -8,39 +10,45 @@ def navbar(go_to_page, current_page="dashboard"):
     if "sidebar_collapsed" not in st.session_state:
         st.session_state.sidebar_collapsed = False
 
-    # Custom CSS for navbar styling
+    # Custom CSS for enhanced navbar styling
     st.markdown("""
     <style>
     .nav-header {
-        background: linear-gradient(90deg, #1f4e79, #2e6da4);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .nav-header h3 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+    .nav-header p {
+        margin: 0.5rem 0 0 0;
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .user-welcome {
+        background: rgba(102, 126, 234, 0.1);
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 10px;
         margin-bottom: 1rem;
         text-align: center;
+        border: 1px solid rgba(102, 126, 234, 0.2);
     }
-    .nav-item {
-        padding: 0.5rem 1rem;
-        margin: 0.2rem 0;
-        border-radius: 6px;
-        cursor: pointer;
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
         transition: all 0.3s ease;
-    }
-    .nav-item:hover {
-        background-color: #f0f2f6;
-    }
-    .nav-item.active {
-        background-color: #e8f4fd;
-        border-left: 4px solid #1f4e79;
-    }
-    .logout-btn {
-        background-color: #dc3545;
-        color: white;
         border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        width: 100%;
-        margin-top: 2rem;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -54,11 +62,14 @@ def navbar(go_to_page, current_page="dashboard"):
         </div>
         """, unsafe_allow_html=True)
 
-        # User info
+        # Enhanced user info
         user = st.session_state.get("user", {})
         username = user.get("username", "User")
-        st.markdown(f"**Welcome, {username}!**")
-        st.divider()
+        st.markdown(f"""
+        <div class="user-welcome">
+            <strong>👋 Welcome, {username}!</strong>
+        </div>
+        """, unsafe_allow_html=True)
 
         # Navigation items
         nav_items = [
@@ -81,10 +92,14 @@ def navbar(go_to_page, current_page="dashboard"):
 
         st.divider()
 
+        # Show security status
+        show_security_status()
+        
+        st.divider()
+        
         # Logout button
         if st.button("🚪 Logout", use_container_width=True, type="secondary"):
-            # Clear session state
-            for key in list(st.session_state.keys()):
-                if key not in ["db_initialized"]:
-                    del st.session_state[key]
+            # Clear session state using RouteProtection
+            RouteProtection.clear_session()
+            st.success("👋 Successfully logged out!")
             go_to_page("home")

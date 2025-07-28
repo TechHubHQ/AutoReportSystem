@@ -4,13 +4,34 @@ from app.ui.navbar import navbar
 
 def template_designer(go_to_page):
     """Template designer page with navbar"""
+    st.markdown("""
+    <style>
+    .template-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        color: white;
+        text-align: center;
+    }
+    .template-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     navbar(go_to_page, "template_designer")
 
-    st.markdown("# 🎨 Template Designer")
-    st.markdown(
-        "Create and customize report templates for your automated reports.")
-
-    st.divider()
+    st.markdown("""
+    <div class="template-header">
+        <h1 style="margin: 0; font-size: 2.5rem;">🎨 Template Designer</h1>
+        <p style="margin: 0.5rem 0 0 0; font-size: 1.1rem; opacity: 0.9;">Create and customize report templates for your automated reports</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Template selection
     col1, col2 = st.columns([1, 2])

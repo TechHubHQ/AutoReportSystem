@@ -26,11 +26,16 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    task = Column(String, index=True, nullable=False)
-    status = Column(String, default="pending", nullable=False)
-    category = Column(String, default="in progress", nullable=False)
+    title = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    status = Column(String, default="todo", nullable=False)  # todo, inprogress, completed, pending
+    priority = Column(String, default="medium", nullable=False)  # low, medium, high, urgent
+    category = Column(String, default="general", nullable=False)
+    due_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), onupdate=func.now(), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Many-to-one: Task → User
