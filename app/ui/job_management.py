@@ -13,7 +13,7 @@ def job_management(go_to_page):
         go_to_page("login")
         return
 
-    navbar(go_to_page)
+    navbar(go_to_page, "job_management")
 
     st.title("⚙️ Job Management")
 
