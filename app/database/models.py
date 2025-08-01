@@ -20,9 +20,10 @@ class User(Base):
     # One-to-many: User → Tasks
     tasks = relationship("Task", back_populates="creator",
                          cascade="all, delete-orphan")
+
     # One-to-many: User → EmailTemplates
-    templates = relationship("EmailTemplate", back_populates="creator",
-                           cascade="all, delete-orphan")
+    templates = relationship(
+        "EmailTemplate", back_populates="creator", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -64,17 +65,38 @@ class SMTPConf(Base):
                         primaryjoin="SMTPConf.sender_email==User.email")
 
 
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    description = Column(Text, nullable=True)
+    function_name = Column(String, nullable=False)
+    module_path = Column(String, nullable=False)
+    schedule_type = Column(String, nullable=False)  # weekly, monthly, daily, custom
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_run = Column(DateTime(timezone=True), nullable=True)
+    next_run = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class EmailTemplate(Base):
     __tablename__ = "email_templates"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     subject = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String, default="General", nullable=False)
     html_content = Column(Text, nullable=False)
+    file_path = Column(String, nullable=True)  # Path to template file
     is_active = Column(Boolean, default=True, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(
+    ), onupdate=func.now(), nullable=False)
 
     # Many-to-one: EmailTemplate → User
-    creator = relationship("User", backref="email_templates")
+    creator = relationship("User", back_populates="templates")

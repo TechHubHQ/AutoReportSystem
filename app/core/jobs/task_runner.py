@@ -2,10 +2,16 @@ import asyncio
 from app.core.jobs.scheduler import scheduler
 from app.core.jobs.report_sender import *
 from app.core.jobs.utils.dateutils import *
+from app.core.jobs.discovery import initialize_jobs
 
 
 async def run_tasks():
     print("Initializing task scheduling sequence...")
+    
+    # Initialize job discovery and registration
+    print("Discovering and registering jobs...")
+    await initialize_jobs()
+    print("Job registration complete.")
 
     print("Preparing to schedule weekly report task...")
     # 9:50 p.m. IST is 16:20 UTC (IST is UTC+5:30)
@@ -24,7 +30,6 @@ async def run_tasks():
     print("Preparing to schedule monthly report task...")
     await scheduler.schedule_task(
         send_m_report,
-        "monthly",
         next_run=next_monthly_run,
     )
     print("Monthly report task scheduled successfully based on calculated date.")

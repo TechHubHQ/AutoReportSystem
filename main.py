@@ -7,6 +7,7 @@ from app.ui.dashboard import dashboard
 from app.ui.user_settings import settings
 from app.ui.template_designer import template_designer
 from app.ui.smtp_conf import smtp_conf
+from app.ui.job_management import job_management
 from app.security.route_protection import RouteProtection, session_timeout_check
 from app.security.middleware import apply_security_middleware
 
@@ -213,6 +214,10 @@ elif st.session_state.page == "template_designer":
 elif st.session_state.page == "smtp_conf":
     # This route is protected by RouteProtection.check_route_access()
     smtp_conf(go_to_page)
+
+elif st.session_state.page == "job_management":
+    # This route is protected by RouteProtection.check_route_access()
+    job_management(go_to_page)
 
 else:
     # Unknown page - redirect to home

@@ -1,1 +1,1 @@
-# Utils package for core functionality
+# Core utilities package

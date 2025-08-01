@@ -18,7 +18,8 @@ class RouteProtection:
         "dashboard",
         "settings",
         "template_designer",
-        "smtp_conf"
+        "smtp_conf",
+        "job_management"
     }
 
     # Define public routes that don't require authentication

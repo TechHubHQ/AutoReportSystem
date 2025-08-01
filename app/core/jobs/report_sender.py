@@ -1,8 +1,14 @@
 from app.integrations.email.email_client import EmailService
 from .utils.template_loader import load_template
 from .utils.content_loader import load_content
+from .registry import job_registry
 
 
+@job_registry.register(
+    name="Weekly Report",
+    description="Sends weekly report email to stakeholders",
+    schedule_type="weekly"
+)
 async def send_w_report():
     print("Initiating weekly report transmission protocol...")
     w_report = await load_content("weekly")
@@ -24,6 +30,11 @@ async def send_w_report():
     print("Weekly report email has been dispatched successfully.")
 
 
+@job_registry.register(
+    name="Monthly Report",
+    description="Sends monthly report email to stakeholders", 
+    schedule_type="monthly"
+)
 async def send_m_report():
     print("Initiating monthly report dispatch sequence...")
     m_report = await load_content("monthly")

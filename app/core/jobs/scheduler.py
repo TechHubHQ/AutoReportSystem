@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Awaitable, Optional, Tuple
+from app.core.interface.job_interface import JobInterface
 
 
 @dataclass
@@ -121,6 +122,21 @@ class JobScheduler:
 
     async def _execute_job(self, job: ScheduledJob):
         try:
+            # Update last run time - get registered job name
+            from .registry import job_registry
+            job_name = None
+            for name, info in job_registry.get_jobs().items():
+                if info['function'] == job.coro:
+                    job_name = name
+                    break
+            
+            if job_name:
+                await JobInterface.update_job_run_times(
+                    job_name, 
+                    datetime.now(timezone.utc),
+                    datetime.now(timezone.utc) + timedelta(seconds=job.repeat) if job.repeat else None
+                )
+            
             await job.coro(*job.args, **job.kwargs)
         except Exception as e:
             print(f"Scheduled job error: {e}")
