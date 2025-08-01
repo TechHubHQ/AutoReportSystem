@@ -74,7 +74,10 @@ class Job(Base):
     function_name = Column(String, nullable=False)
     module_path = Column(String, nullable=False)
     schedule_type = Column(String, nullable=False)  # weekly, monthly, daily, custom
+    code = Column(Text, nullable=True)  # Python code for the job
+    schedule_config = Column(Text, nullable=True)  # JSON config for scheduling
     is_active = Column(Boolean, default=True, nullable=False)
+    is_custom = Column(Boolean, default=False, nullable=False)  # User-created vs auto-discovered
     last_run = Column(DateTime(timezone=True), nullable=True)
     next_run = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
