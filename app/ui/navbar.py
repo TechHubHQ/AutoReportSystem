@@ -99,5 +99,11 @@ def navbar(go_to_page, current_page="dashboard"):
 
         # Logout button
         if st.button("🚪 Logout", use_container_width=True, type="secondary"):
+            RouteProtection.logout()
             st.success("👋 Successfully logged out!")
             go_to_page("home")
+
+
+def show_navbar(go_to_page):
+    """Simple navbar for dashboard pages"""
+    navbar(go_to_page, "dashboard")

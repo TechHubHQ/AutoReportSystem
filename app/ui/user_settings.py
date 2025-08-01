@@ -1,6 +1,7 @@
 import streamlit as st
 from app.ui.navbar import navbar
 from app.ui.security_dashboard import security_dashboard
+from app.ui.components.loader import LoaderContext
 
 
 def settings(go_to_page):
@@ -62,7 +63,8 @@ def settings(go_to_page):
     st.markdown('</div>', unsafe_allow_html=True)
 
     if st.button("💾 Save Settings", type="primary", use_container_width=True):
-        st.success("🎉 Settings saved successfully!")
+        with LoaderContext("Saving settings...", "inline"):
+            st.success("🎉 Settings saved successfully!")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Add security dashboard

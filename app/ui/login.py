@@ -1,7 +1,7 @@
 import asyncio
 import streamlit as st
 from app.core.interface.user_interface import authenticate_user
-from app.ui.loader import show_inline_loader
+from app.ui.components.loader import LoaderContext
 from app.security.route_protection import RouteProtection
 
 
@@ -57,7 +57,7 @@ def login(navigate):
                     "← Back to Home", use_container_width=True)
             if 'submitted' in locals() and submitted:
                 if email and password:
-                    with st.spinner("🔐 Authenticating..."):
+                    with LoaderContext("🔐 Authenticating...", "inline"):
                         try:
                             user = asyncio.run(
                                 authenticate_user(email, password))

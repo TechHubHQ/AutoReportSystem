@@ -3,6 +3,7 @@ import asyncio
 from app.ui.navbar import navbar
 from app.core.interface.smtp_interface import setup_smtp, get_smtp_conf, update_smtp_conf
 from app.integrations.email.email_client import EmailService
+from app.ui.components.loader import LoaderContext
 
 
 def smtp_conf(go_to_page):
@@ -118,7 +119,7 @@ def smtp_conf(go_to_page):
     # Handle form submissions
     if test_connection:
         if smtp_host and smtp_username and smtp_password:
-            with st.spinner("🔍 Testing SMTP connection..."):
+            with LoaderContext("🔍 Testing SMTP connection...", "inline"):
                 try:
                     email_service = EmailService(
                         smtp_username, smtp_host, smtp_password, smtp_port)
@@ -130,7 +131,7 @@ def smtp_conf(go_to_page):
 
     if save_config:
         if smtp_host and smtp_username and smtp_password:
-            with st.spinner("💾 Saving SMTP configuration..."):
+            with LoaderContext("💾 Saving SMTP configuration...", "inline"):
                 try:
                     asyncio.run(setup_smtp(smtp_host, smtp_port,
                                 smtp_username, smtp_password))

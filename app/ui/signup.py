@@ -1,7 +1,7 @@
 import asyncio
 import streamlit as st
 from app.core.interface.user_interface import create_user
-from app.ui.loader import show_inline_loader
+from app.ui.components.loader import LoaderContext
 
 
 def signup(navigate):
@@ -65,7 +65,7 @@ def signup(navigate):
 
             if 'submitted' in locals() and submitted:
                 if username and email and password:
-                    with st.spinner("🎆 Creating account..."):
+                    with LoaderContext("🎆 Creating account...", "inline"):
                         try:
                             user = asyncio.run(handle_signup())
                             if user:

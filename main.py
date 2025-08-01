@@ -200,7 +200,7 @@ elif st.session_state.page == "signup":
 
 elif st.session_state.page == "dashboard":
     # This route is protected by RouteProtection.check_route_access()
-    dashboard(go_to_page)
+    dashboard()
 
 elif st.session_state.page == "settings":
     # This route is protected by RouteProtection.check_route_access()

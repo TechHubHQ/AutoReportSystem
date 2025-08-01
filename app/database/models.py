@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Boolean
 from app.config.config import settings
 
 
@@ -20,6 +20,9 @@ class User(Base):
     # One-to-many: User → Tasks
     tasks = relationship("Task", back_populates="creator",
                          cascade="all, delete-orphan")
+    # One-to-many: User → EmailTemplates
+    templates = relationship("EmailTemplate", back_populates="creator",
+                           cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -59,3 +62,19 @@ class SMTPConf(Base):
     # Many-to-one: SMTPConf → User
     user = relationship("User", backref="smtp_confs",
                         primaryjoin="SMTPConf.sender_email==User.email")
+
+
+class EmailTemplate(Base):
+    __tablename__ = "email_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    subject = Column(String, nullable=False)
+    html_content = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Many-to-one: EmailTemplate → User
+    creator = relationship("User", backref="email_templates")

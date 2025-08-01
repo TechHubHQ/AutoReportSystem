@@ -1,566 +1,784 @@
 import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 import asyncio
-import html
+import random
+import uuid
+from typing import List
 from app.ui.navbar import navbar
-from app.ui.kanban_board import kanban_board
-from app.core.interface.task_interface import get_tasks, get_task_statistics, get_tasks_by_category
-from app.core.utils.datetime_utils import format_datetime_for_display
+from app.core.interface.task_interface import (
+    get_tasks, create_task, update_task, delete_task, get_task_statistics
+)
+from app.core.interface.analytics_interface import (
+    get_task_completion_trends, get_productivity_insights
+)
+from app.core.interface.metrics_interface import (
+    get_current_system_status, get_historical_metrics, get_system_info
+)
 from app.security.route_protection import RouteProtection
+from app.ui.components.loader import LoaderContext
 
 
-def dashboard(go_to_page):
-    """Enhanced Dashboard page with Kanban board and metrics"""
+# Background job data structure for demo purposes
+from dataclasses import dataclass
 
-    # Custom CSS for enhanced dashboard styling
+
+@dataclass
+class BackgroundJob:
+    id: str
+    name: str
+    status: str  # running, queued, completed, failed
+    progress: int
+    start_time: datetime
+    estimated_completion: datetime
+
+
+class DashboardManager:
+    def __init__(self):
+        self.initialize_session_state()
+
+    def initialize_session_state(self):
+        """Initialize session state"""
+        if "background_jobs" not in st.session_state:
+            st.session_state.background_jobs = self.generate_sample_jobs()
+
+        if "selected_task" not in st.session_state:
+            st.session_state.selected_task = None
+
+    async def get_user_tasks(self):
+        """Get tasks for current user"""
+        user = RouteProtection.get_current_user()
+        if user:
+            return await get_tasks(user_id=user.get('id'))
+        return []
+
+    def generate_sample_jobs(self) -> List[BackgroundJob]:
+        """Generate sample background jobs"""
+        jobs = []
+        job_names = [
+            "Report Generation - Sales Q4",
+            "Data Backup Process",
+            "Email Campaign Delivery",
+            "Database Maintenance",
+            "Analytics Processing"
+        ]
+        statuses = ["running", "queued", "completed", "failed"]
+
+        for name in job_names:
+            job = BackgroundJob(
+                id=str(uuid.uuid4()),
+                name=name,
+                status=random.choice(statuses),
+                progress=random.randint(0, 100) if random.choice(
+                    [True, False]) else 0,
+                start_time=datetime.now() - timedelta(minutes=random.randint(1, 120)),
+                estimated_completion=datetime.now() + timedelta(minutes=random.randint(5, 60))
+            )
+            jobs.append(job)
+
+        return jobs
+
+
+def apply_custom_css():
+    """Apply custom CSS for modern UI styling"""
     st.markdown("""
     <style>
-    .dashboard-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
         padding: 2rem;
         border-radius: 15px;
         margin-bottom: 2rem;
-        color: white;
         text-align: center;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
-    .stMetric {
-        background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .dashboard-section {
+    
+    .metric-card {
         background: white;
         padding: 1.5rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        margin-bottom: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e1e5e9;
+        margin-bottom: 1rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .quick-action-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        transition: all 0.3s ease;
-        border: 1px solid #dee2e6;
-    }
-    .quick-action-card:hover {
+    
+    .metric-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }
-    .activity-item {
+    
+    .task-card {
+        background: white;
         padding: 1rem;
         border-radius: 10px;
-        margin: 0.5rem 0;
-        border-left: 4px solid #dee2e6;
-        background: #f8f9fa;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border-left: 4px solid #667eea;
+        margin-bottom: 0.8rem;
+        transition: all 0.2s ease;
     }
-    .activity-item.completed {
-        border-left-color: #28a745;
-        background: #d4edda;
-    }
-    .activity-item.inprogress {
-        border-left-color: #ffc107;
-        background: #fff3cd;
-    }
-    .activity-item.pending {
-        border-left-color: #dc3545;
-        background: #f8d7da;
-    }
-    .activity-item.todo {
-        border-left-color: #6c757d;
-        background: #e9ecef;
-    }
+    
     .task-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transform: translateX(2px);
     }
-    .stExpander > div > div {
-        background: transparent !important;
-        border: none !important;
+    
+    .priority-high { border-left-color: #ff6b6b !important; }
+    .priority-urgent { border-left-color: #d32f2f !important; }
+    .priority-medium { border-left-color: #ffd93d !important; }
+    .priority-low { border-left-color: #6bcf7f !important; }
+    
+    .status-todo { background: #fff3cd; }
+    .status-in_progress { background: #d1ecf1; }
+    .status-pending { background: #f8d7da; }
+    .status-completed { background: #d4edda; }
+    
+    .job-progress {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
     }
-    .task-card-accomplishments {
-        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-        border-left: 4px solid #28a745;
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
     }
-    .task-card-inprogress {
-        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-        border-left: 4px solid #ffc107;
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 0 1.5rem;
+        font-weight: 600;
     }
-    /* Custom expander styling */
-    .stExpander > div > div > div > div {
-        background-color: transparent !important;
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    /* Custom loader styles */
+    .stSpinner > div {
+        border-top-color: #667eea !important;
+    }
+    
+    .stSpinner {
+        text-align: center;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    navbar(go_to_page, "dashboard")
 
-    user = st.session_state.get("user", {})
-    username = user.get("username", "User")
-    user_id = user.get("id")
+async def render_kanban_board(dashboard_manager):
+    """Render the Kanban board interface"""
+    st.markdown("### 📋 Kanban Board")
 
-    # Enhanced header
-    st.markdown(f"""
-    <div class="dashboard-header">
-        <h1 style="margin: 0; font-size: 2.5rem;">📊 Dashboard</h1>
-        <p style="margin: 0.5rem 0 0 0; font-size: 1.2rem; opacity: 0.9;">Welcome back, <strong>{username}</strong>! Here's your productivity overview.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Get current user tasks with loader
+    with LoaderContext("Loading tasks...", "inline"):
+        tasks = await dashboard_manager.get_user_tasks()
 
-    # Load task statistics
-    try:
-        stats = asyncio.run(get_task_statistics(user_id))
+    # Add new task button
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col3:
+        if st.button("➕ New Task", type="primary"):
+            st.session_state.show_task_modal = True
 
-        # Enhanced metrics with real data
-        st.markdown("### 📈 Task Overview")
-        col1, col2, col3, col4, col5 = st.columns(5)
+    # Task creation modal
+    if st.session_state.get("show_task_modal", False):
+        with st.expander("Create New Task", expanded=True):
+            with st.form("new_task_form"):
+                title = st.text_input("Task Title")
+                description = st.text_area("Description")
+                col1, col2 = st.columns(2)
+                with col1:
+                    priority = st.selectbox(
+                        "Priority", ["low", "medium", "high", "urgent"])
+                with col2:
+                    category = st.selectbox(
+                        "Category", ["in progress", "accomplishments"])
+                due_date = st.date_input("Due Date")
 
-        with col1:
-            st.metric("📊 Total Tasks", stats['total'])
-        with col2:
-            st.metric("📝 To Do", stats['todo'], delta=f"+{stats['todo']}")
-        with col3:
-            st.metric("🔄 In Progress",
-                      stats['inprogress'], delta=f"+{stats['inprogress']}")
-        with col4:
-            st.metric("✅ Completed", stats['completed'],
-                      delta=f"+{stats['completed']}")
-        with col5:
-            st.metric("⏳ Pending", stats['pending'],
-                      delta=f"+{stats['pending']}")
+                if st.form_submit_button("Create Task"):
+                    with LoaderContext("Creating task...", "inline"):
+                        try:
+                            user = RouteProtection.get_current_user()
+                            await create_task(
+                                title=title,
+                                description=description,
+                                status="todo",
+                                priority=priority,
+                                category=category,
+                                due_date=datetime.combine(
+                                    due_date, datetime.min.time()) if due_date else None,
+                                created_by=user.get('id')
+                            )
+                            st.session_state.show_task_modal = False
+                            st.success("Task created successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error creating task: {str(e)}")
 
-        # Additional metrics if there are urgent/overdue tasks
-        if stats.get('urgent', 0) > 0 or stats.get('overdue', 0) > 0:
-            st.markdown("### 🚨 Attention Required")
-            col1, col2, col3 = st.columns(3)
+    # Kanban columns
+    col1, col2, col3, col4 = st.columns(4)
 
-            with col1:
-                if stats.get('overdue', 0) > 0:
-                    st.metric("🚨 Overdue Tasks",
-                              stats['overdue'], delta=f"-{stats['overdue']}")
-            with col2:
-                if stats.get('urgent', 0) > 0:
-                    st.metric("🔥 Urgent Tasks",
-                              stats['urgent'], delta=f"+{stats['urgent']}")
-            with col3:
-                if stats.get('high_priority', 0) > 0:
-                    st.metric("⚡ High Priority", stats['high_priority'])
-
-    except Exception as e:
-        st.error(f"Error loading task statistics: {e}")
-        # Fallback metrics
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("📊 Total Reports", "24", "↗️ 12%")
-        with col2:
-            st.metric("📋 Active Templates", "8", "↗️ 2")
-        with col3:
-            st.metric("⏰ Scheduled Tasks", "15", "→ 0%")
-        with col4:
-            st.metric("✅ Success Rate", "98.5%", "↗️ 1.2%")
-
-    st.markdown("---")
-
-    # Main content area with tabs
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["📋 Kanban Board", "📊 By Category", "📈 Analytics", "🚀 Quick Actions"])
-
-    with tab1:
-        # Kanban Board - Main feature
-        kanban_board()
-
-    with tab2:
-        # Category view
-        render_category_tab(user_id)
-
-    with tab3:
-        # Analytics and insights
-        render_analytics_tab(user_id)
-
-    with tab4:
-        # Quick actions and shortcuts
-        render_quick_actions_tab(go_to_page, user_id)
-
-
-def render_category_tab(user_id: int):
-    """Render tasks organized by category"""
-
-    st.markdown("### 📊 Tasks by Category")
-    st.markdown(
-        "View your tasks organized by **In Progress** and **Accomplishments**")
-
-    try:
-        # Get tasks by category
-        in_progress_tasks = asyncio.run(
-            get_tasks_by_category("in progress", user_id))
-        accomplishments_tasks = asyncio.run(
-            get_tasks_by_category("accomplishments", user_id))
-
-        # Category statistics
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric("📝 In Progress", len(in_progress_tasks))
-        with col2:
-            st.metric("🏆 Accomplishments", len(accomplishments_tasks))
-        with col3:
-            total_tasks = len(in_progress_tasks) + len(accomplishments_tasks)
-            if total_tasks > 0:
-                completion_rate = (
-                    len(accomplishments_tasks) / total_tasks) * 100
-                st.metric("✅ Completion Rate", f"{completion_rate:.1f}%")
-            else:
-                st.metric("✅ Completion Rate", "0%")
-
-        st.markdown("---")
-
-        # Two column layout for categories
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown("#### 📝 In Progress")
-            st.markdown("*Active work and planned tasks*")
-
-            if in_progress_tasks:
-                for task in in_progress_tasks:
-                    render_category_task_card(task, "in_progress")
-            else:
-                st.info("🎯 No tasks in progress. Create a new task to get started!")
-
-        with col2:
-            st.markdown("#### 🏆 Accomplishments")
-            st.markdown("*Completed work and achievements*")
-
-            if accomplishments_tasks:
-                for task in accomplishments_tasks:
-                    render_category_task_card(task, "accomplishments")
-            else:
-                st.info("🎉 Complete some tasks to see your accomplishments here!")
-
-    except Exception as e:
-        st.error(f"Error loading tasks by category: {e}")
-
-
-def render_category_task_card(task, category_type: str):
-    """Render an expandable task card in the category view"""
-
-    # Determine styling based on category
-    if category_type == "accomplishments":
-        card_class = "task-card-accomplishments"
-        status_emoji = "✅" if task.status == "completed" else "🎯"
-    else:
-        card_class = "task-card-inprogress"
-        status_emoji = {
-            "todo": "📝",
-            "inprogress": "🔄",
-            "pending": "⏳",
-            "completed": "✅"
-        }.get(task.status, "📋")
-
-    # Priority colors
-    priority_colors = {
-        "low": "#28a745",
-        "medium": "#ffc107",
-        "high": "#fd7e14",
-        "urgent": "#dc3545"
+    columns = {
+        "todo": ("📝 To Do", col1),
+        "inprogress": ("🔄 In Progress", col2),
+        "pending": ("⏳ Pending", col3),
+        "completed": ("✅ Completed", col4)
     }
-    priority_color = priority_colors.get(task.priority, "#6c757d")
 
-    # Format dates
-    created_date = format_datetime_for_display(task.created_at, "%m/%d/%Y")
-    due_date_str = format_datetime_for_display(task.due_date, "%m/%d/%Y")
+    for status, (title, column) in columns.items():
+        with column:
+            st.markdown(f"**{title}**")
+            status_tasks = [task for task in tasks if task.status == status]
 
-    # Create single expandable card
-    with st.container():
-        st.markdown(f"""
-        <div class="task-card {card_class}" style="
-            background: {'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' if category_type == 'accomplishments' else 'linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%)'};
-            border-left: 4px solid {'#28a745' if category_type == 'accomplishments' else '#ffc107'};
-            border-radius: 12px;
-            padding: 1.2rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: all 0.3s ease;
-            border: 1px solid {'#c3e6cb' if category_type == 'accomplishments' else '#ffeaa7'};
-        ">
-            <div style="
-                display: flex; 
-                justify-content: space-between; 
-                align-items: center; 
-                margin-bottom: 0.8rem;
-            ">
-                <span style="
-                    font-weight: 600;
-                    color: #2c3e50;
-                    font-size: 1rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                ">
-                    {status_emoji} {html.escape(task.title)}
-                </span>
-                <span style="
-                    background: {priority_color};
-                    color: white;
-                    padding: 0.4rem 0.8rem;
-                    border-radius: 20px;
-                    font-size: 0.75rem;
-                    font-weight: bold;
-                    text-transform: uppercase;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                ">
-                    {task.priority}
-                </span>
-            </div>
-        """, unsafe_allow_html=True)
+            for task in status_tasks:
+                priority_class = f"priority-{task.priority}"
+                due_date_str = task.due_date.strftime(
+                    '%Y-%m-%d') if task.due_date else "No due date"
+                description_preview = (task.description[:50] + "...") if task.description and len(
+                    task.description) > 50 else (task.description or "No description")
 
-        # Create expander for details within the same card
-        with st.expander("📋 View Details", expanded=False):
-            st.markdown(f"""
-            <div style="
-                background: rgba(255,255,255,0.3);
-                padding: 1rem;
-                border-radius: 8px;
-                margin-top: 0.5rem;
-            ">
-            """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="task-card {priority_class}">
+                    <strong>{task.title}</strong><br>
+                    <small>{description_preview}</small><br>
+                    <small>📅 {due_date_str}</small><br>
+                    <small>🏷️ {task.category}</small>
+                </div>
+                """, unsafe_allow_html=True)
 
-            # Description section
-            if task.description:
-                st.markdown("**📝 Description:**")
-                description_lines = task.description.strip().split('\n')
+                # Task actions
+                col_edit, col_move = st.columns(2)
+                with col_edit:
+                    if st.button("✏️", key=f"edit_{task.id}", help="Edit task"):
+                        st.session_state.selected_task = task
+                with col_move:
+                    new_status = st.selectbox(
+                        "Move to:",
+                        ["todo", "inprogress", "pending", "completed"],
+                        index=["todo", "inprogress", "pending",
+                               "completed"].index(task.status),
+                        key=f"status_{task.id}",
+                        label_visibility="collapsed"
+                    )
+                    if new_status != task.status:
+                        with LoaderContext("Updating task...", "inline"):
+                            try:
+                                await update_task(task.id, status=new_status)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating task: {str(e)}")
 
-                for line in description_lines:
-                    line = line.strip()
-                    if line:
-                        if line.startswith('>>'):
-                            line = line[2:].strip()
-                        elif line.startswith('>'):
-                            line = line[1:].strip()
+    # Edit task modal
+    if st.session_state.get("selected_task"):
+        task = st.session_state.selected_task
+        with st.expander(f"Edit Task: {task.title}", expanded=True):
+            with st.form("edit_task_form"):
+                new_title = st.text_input("Title", value=task.title)
+                new_description = st.text_area(
+                    "Description", value=task.description or "")
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_priority = st.selectbox("Priority", ["low", "medium", "high", "urgent"],
+                                                index=["low", "medium", "high", "urgent"].index(task.priority))
+                with col2:
+                    new_category = st.selectbox("Category", ["in progress", "accomplishments"],
+                                                index=["in progress", "accomplishments"].index(task.category))
 
-                        if line:
-                            st.markdown(f"• {line}")
+                due_date_value = task.due_date.date() if task.due_date else None
+                new_due_date = st.date_input("Due Date", value=due_date_value)
 
-                st.markdown("---")
-
-            # Task details in organized sections
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.markdown("**📅 Timeline:**")
-                st.markdown(f"• **Created:** {created_date}")
-                st.markdown(f"• **Due Date:** {due_date_str}")
-
-            with col2:
-                st.markdown("**📊 Status Information:**")
-                st.markdown(f"• **Status:** {task.status.title()}")
-                if hasattr(task, 'category'):
-                    st.markdown(f"• **Category:** {task.category.title()}")
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_analytics_tab(user_id: int):
-    """Render analytics and insights tab"""
-
-    st.markdown("### 📊 Task Analytics & Insights")
-
-    try:
-        stats = asyncio.run(get_task_statistics(user_id))
-
-        # Progress visualization
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown("#### 📈 Task Distribution")
-
-            # Create a simple progress visualization
-            total_tasks = stats['total']
-            if total_tasks > 0:
-                completed_percentage = (stats['completed'] / total_tasks) * 100
-                inprogress_percentage = (
-                    stats['inprogress'] / total_tasks) * 100
-                todo_percentage = (stats['todo'] / total_tasks) * 100
-                pending_percentage = (stats['pending'] / total_tasks) * 100
-
-                st.progress(completed_percentage / 100,
-                            text=f"✅ Completed: {completed_percentage:.1f}%")
-                st.progress(inprogress_percentage / 100,
-                            text=f"🔄 In Progress: {inprogress_percentage:.1f}%")
-                st.progress(todo_percentage / 100,
-                            text=f"📝 To Do: {todo_percentage:.1f}%")
-                st.progress(pending_percentage / 100,
-                            text=f"⏳ Pending: {pending_percentage:.1f}%")
-            else:
-                st.info("📝 No tasks yet. Create your first task to see analytics!")
-
-        with col2:
-            st.markdown("#### 🎯 Productivity Insights")
-
-            if total_tasks > 0:
-                completion_rate = (stats['completed'] / total_tasks) * 100
-
-                if completion_rate >= 80:
-                    st.success(
-                        f"🎉 Excellent! {completion_rate:.1f}% completion rate")
-                elif completion_rate >= 60:
-                    st.info(
-                        f"👍 Good progress! {completion_rate:.1f}% completion rate")
-                elif completion_rate >= 40:
-                    st.warning(
-                        f"⚠️ Room for improvement: {completion_rate:.1f}% completion rate")
-                else:
-                    st.error(
-                        f"🚨 Focus needed: {completion_rate:.1f}% completion rate")
-
-                # Priority distribution
-                st.markdown("**Priority Distribution:**")
-                st.write(f"🔥 Urgent: {stats.get('urgent', 0)} tasks")
-                st.write(f"⚡ High: {stats.get('high_priority', 0)} tasks")
-                st.write(
-                    f"📊 Total Active: {stats['todo'] + stats['inprogress']} tasks")
-
-                if stats.get('overdue', 0) > 0:
-                    st.error(
-                        f"🚨 {stats['overdue']} overdue tasks need attention!")
-            else:
-                st.info("📊 Analytics will appear once you create tasks")
-
-        # Recent activity simulation (this would come from actual task updates)
-        st.markdown("#### 📈 Recent Activity")
-
-        # Get only the 4 most recently created tasks for recent activity
-        all_tasks = asyncio.run(get_tasks(user_id))
-        recent_tasks = all_tasks[:4] if all_tasks else []
-
-        # Format for activity_items as expected by the rendering loop
-        activity_items = []
-        for task in recent_tasks:
-            activity_items.append({
-                "type": "created",
-                "text": f"Task created: {task.title}",
-                "time": task.created_at.strftime("%Y-%m-%d %H:%M")
-            })
-
-        for item in activity_items:
-            st.markdown(f"""
-            <div class="activity-item {item['type']}">
-                <strong>{item['text']}</strong><br>
-                <small style="color: #6c757d;">{item['time']}</small>
-            </div>
-            """, unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error(f"Error loading analytics: {e}")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.form_submit_button("Update Task"):
+                        with LoaderContext("Updating task...", "inline"):
+                            try:
+                                await update_task(
+                                    task.id,
+                                    title=new_title,
+                                    description=new_description,
+                                    priority=new_priority,
+                                    category=new_category,
+                                    due_date=datetime.combine(
+                                        new_due_date, datetime.min.time()) if new_due_date else None
+                                )
+                                st.session_state.selected_task = None
+                                st.success("Task updated successfully!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating task: {str(e)}")
+                with col2:
+                    if st.form_submit_button("Delete Task", type="secondary"):
+                        with LoaderContext("Deleting task...", "inline"):
+                            try:
+                                await delete_task(task.id)
+                                st.session_state.selected_task = None
+                                st.success("Task deleted successfully!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting task: {str(e)}")
+                with col3:
+                    if st.form_submit_button("Cancel"):
+                        st.session_state.selected_task = None
+                        st.rerun()
 
 
-def render_quick_actions_tab(go_to_page, user_id: int):
-    """Render quick actions and shortcuts tab"""
+async def render_productivity_analytics(dashboard_manager):
+    """Render productivity analytics dashboard"""
+    st.markdown("### 📊 Productivity Analytics")
 
-    st.markdown("### 🚀 Quick Actions & Shortcuts")
+    with LoaderContext("Loading analytics data...", "inline"):
+        tasks = await dashboard_manager.get_user_tasks()
+        user = RouteProtection.get_current_user()
+        stats = await get_task_statistics(user_id=user.get('id') if user else None)
 
-    # Quick task creation
-    st.markdown("#### ⚡ Quick Task Creation")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        quick_title = st.text_input(
-            "📝 Quick Task Title", placeholder="Enter task title...")
-        quick_priority = st.selectbox(
-            "⚡ Priority", ["low", "medium", "high", "urgent"], index=1)
-
-    with col2:
-        quick_status = st.selectbox(
-            "📊 Status", ["todo", "inprogress", "pending"], index=0)
-        quick_category = st.selectbox("🏷️ Category",
-                                      options=["in progress",
-                                               "accomplishments"],
-                                      index=0)
-
-    if st.button("🚀 Create Quick Task", type="primary", use_container_width=True):
-        if quick_title.strip():
-            try:
-                from app.core.interface.task_interface import create_task
-                asyncio.run(create_task(
-                    title=quick_title.strip(),
-                    status=quick_status,
-                    priority=quick_priority,
-                    category=quick_category.strip(),
-                    created_by=user_id
-                ))
-                st.success(f"✅ Quick task '{quick_title}' created!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error creating task: {e}")
-        else:
-            st.error("⚠️ Please enter a task title")
-
-    st.markdown("---")
-
-    # System shortcuts
-    st.markdown("#### 🔧 System Shortcuts")
-
+    # Key metrics
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.markdown("""
-        <div class="quick-action-card">
-            <h4>📊 Reports</h4>
-            <p>Generate and manage reports</p>
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #667eea; margin: 0;">📋 {stats['total']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Total Tasks</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("📊 Generate Report", use_container_width=True):
-            with st.spinner("📊 Generating report..."):
-                import time
-                time.sleep(2)
-                st.success("🎉 Report generated successfully!")
 
     with col2:
-        st.markdown("""
-        <div class="quick-action-card">
-            <h4>🎨 Templates</h4>
-            <p>Design custom templates</p>
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #6bcf7f; margin: 0;">✅ {stats['completed']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Completed</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("🎨 Template Designer", use_container_width=True):
-            go_to_page("template_designer")
 
     with col3:
-        st.markdown("""
-        <div class="quick-action-card">
-            <h4>📧 Email</h4>
-            <p>Configure SMTP settings</p>
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #4fc3f7; margin: 0;">🔄 {stats['inprogress']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">In Progress</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("📧 SMTP Config", use_container_width=True):
-            go_to_page("smtp_conf")
 
     with col4:
-        st.markdown("""
-        <div class="quick-action-card">
-            <h4>⚙️ Settings</h4>
-            <p>System preferences</p>
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #ff9800; margin: 0;">⏳ {stats['pending']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Pending</p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("⚙️ Settings", use_container_width=True):
-            go_to_page("settings")
 
-    st.markdown("---")
+    # Charts
+    col1, col2 = st.columns(2)
 
-    # Productivity tips
-    st.markdown("#### 💡 Productivity Tips")
+    with col1:
+        # Task status distribution
+        status_counts = {
+            'todo': stats['todo'],
+            'inprogress': stats['inprogress'],
+            'pending': stats['pending'],
+            'completed': stats['completed']
+        }
+        status_counts = {k: v for k, v in status_counts.items() if v > 0}
 
-    tips = [
-        "🎯 **Focus on High Priority Tasks**: Tackle urgent and high-priority items first",
-        "📅 **Set Due Dates**: Add deadlines to keep yourself accountable",
-        "🔄 **Update Status Regularly**: Keep your Kanban board current for better visibility",
-        "📊 **Review Analytics**: Check your completion rate weekly to track progress",
-        "🏷️ **Use Categories**: Organize tasks by project or type for better management",
-        "✅ **Celebrate Completions**: Acknowledge finished tasks to stay motivated"
-    ]
+        if status_counts:
+            fig = px.pie(
+                values=list(status_counts.values()),
+                names=list(status_counts.keys()),
+                title="Task Status Distribution",
+                color_discrete_map={
+                    'todo': '#ffd93d',
+                    'inprogress': '#4fc3f7',
+                    'pending': '#ff9800',
+                    'completed': '#6bcf7f'
+                }
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
 
-    for tip in tips:
-        st.markdown(f"- {tip}")
+    with col2:
+        # Priority distribution
+        priority_counts = {
+            'low': len([t for t in tasks if t.priority == 'low']),
+            'medium': len([t for t in tasks if t.priority == 'medium']),
+            'high': len([t for t in tasks if t.priority == 'high']),
+            'urgent': len([t for t in tasks if t.priority == 'urgent'])
+        }
+        priority_counts = {k: v for k, v in priority_counts.items() if v > 0}
+
+        if priority_counts:
+            fig = px.bar(
+                x=list(priority_counts.keys()),
+                y=list(priority_counts.values()),
+                title="Task Priority Distribution",
+                color=list(priority_counts.keys()),
+                color_discrete_map={
+                    'low': '#6bcf7f',
+                    'medium': '#ffd93d',
+                    'high': '#ff6b6b',
+                    'urgent': '#d32f2f'
+                }
+            )
+            fig.update_layout(height=400, showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+
+    # Completion trend
+    st.markdown("#### 📈 Task Completion Trend")
+
+    # Generate completion data for the last 7 days
+    dates = [datetime.now() - timedelta(days=i) for i in range(6, -1, -1)]
+    completed_per_day = []
+
+    for date in dates:
+        completed_count = len([
+            task for task in tasks
+            if task.status == 'completed' and task.updated_at and task.updated_at.date() == date.date()
+        ])
+        completed_per_day.append(completed_count)
+
+    fig = px.line(
+        x=[d.strftime('%Y-%m-%d') for d in dates],
+        y=completed_per_day,
+        title="Tasks Completed (Last 7 Days)",
+        markers=True
+    )
+    fig.update_traces(line_color='#667eea', marker_color='#667eea')
+    fig.update_layout(height=300)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # User productivity summary
+    st.markdown("#### 👤 Your Productivity Summary")
+
+    if tasks:
+        user_data = {
+            'Category': ['Total Tasks', 'Completed', 'In Progress', 'Pending', 'Todo'],
+            'Count': [stats['total'], stats['completed'], stats['inprogress'], stats['pending'], stats['todo']]
+        }
+
+        fig = px.bar(
+            x=user_data['Category'],
+            y=user_data['Count'],
+            title="Your Task Overview",
+            color=user_data['Category'],
+            color_discrete_map={
+                'Total Tasks': '#667eea',
+                'Completed': '#6bcf7f',
+                'In Progress': '#4fc3f7',
+                'Pending': '#ff9800',
+                'Todo': '#ffd93d'
+            }
+        )
+        fig.update_layout(height=400, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No tasks found. Create your first task to see productivity analytics!")
+
+    # Add productivity insights section
+    st.markdown("#### 💡 Productivity Insights")
+    with LoaderContext("Analyzing productivity patterns...", "inline"):
+        insights = await get_productivity_insights(user_id=user.get('id') if user else None)
+
+    if insights['insights']:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**📈 Key Insights**")
+            for insight in insights['insights']:
+                st.info(f"• {insight}")
+
+        with col2:
+            st.markdown("**💡 Recommendations**")
+            for recommendation in insights['recommendations']:
+                st.success(f"• {recommendation}")
+
+    # Task completion trends
+    st.markdown("#### 📈 Completion Trends (Last 30 Days)")
+    with LoaderContext("Generating trend analysis...", "inline"):
+        trends = await get_task_completion_trends(user_id=user.get('id') if user else None, days=30)
+
+    if trends['daily_trends']:
+        df_trends = pd.DataFrame(trends['daily_trends'])
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=df_trends['date'],
+            y=df_trends['created'],
+            mode='lines+markers',
+            name='Tasks Created',
+            line=dict(color='#667eea')
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_trends['date'],
+            y=df_trends['completed'],
+            mode='lines+markers',
+            name='Tasks Completed',
+            line=dict(color='#6bcf7f')
+        ))
+
+        fig.update_layout(
+            title="Task Creation vs Completion Trends",
+            xaxis_title="Date",
+            yaxis_title="Number of Tasks",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
+async def render_system_monitoring(dashboard_manager):
+    """Render system monitoring dashboard"""
+    st.markdown("### 🖥️ System Monitoring")
+
+    # Get current system status with loader
+    with LoaderContext("Collecting system metrics...", "inline"):
+        system_status = await get_current_system_status()
+        system_info = await get_system_info()
+
+    # System health overview
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">💻 {system_status['cpu_usage']:.1f}%</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">CPU Usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">🧠 {system_status['memory_usage']:.1f}%</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Memory Usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">💾 {system_status['disk_usage']:.1f}%</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Disk Usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">❤️ {system_status['health_score']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Health Score</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # System alerts
+    st.markdown("#### 🚨 System Alerts")
+    for alert in system_status['alerts']:
+        if "Critical" in alert:
+            st.error(alert)
+        elif "Warning" in alert:
+            st.warning(alert)
+        else:
+            st.success(alert)
+
+    # Historical metrics chart
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### 📊 Resource Usage Trends")
+        with LoaderContext("Loading historical data...", "inline"):
+            historical_data = await get_historical_metrics(hours=12)
+
+        if historical_data['data']:
+            df_metrics = pd.DataFrame(historical_data['data'])
+            df_metrics['timestamp'] = pd.to_datetime(df_metrics['timestamp'])
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df_metrics['timestamp'],
+                y=df_metrics['cpu_usage'],
+                mode='lines+markers',
+                name='CPU Usage (%)',
+                line=dict(color='#667eea')
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_metrics['timestamp'],
+                y=df_metrics['memory_usage'],
+                mode='lines+markers',
+                name='Memory Usage (%)',
+                line=dict(color='#764ba2')
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_metrics['timestamp'],
+                y=df_metrics['disk_usage'],
+                mode='lines+markers',
+                name='Disk Usage (%)',
+                line=dict(color='#ff9800')
+            ))
+
+            fig.update_layout(
+                title="System Resource Usage (Last 12 Hours)",
+                xaxis_title="Time",
+                yaxis_title="Usage (%)",
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("#### ℹ️ System Information")
+        st.markdown(f"""
+        <div class="task-card">
+            <strong>System Details</strong><br>
+            <small>🔧 CPU Cores: {system_info['cpu_cores']}</small><br>
+            <small>⚡ CPU Frequency: {system_info['cpu_frequency']}</small><br>
+            <small>🧠 Total Memory: {system_info['total_memory']}</small><br>
+            <small>💾 Total Disk: {system_info['total_disk']}</small><br>
+            <small>⏱️ Uptime: {system_info['system_uptime']}</small><br>
+            <small>🐍 Platform: {system_info['platform']}</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Background jobs section
+        st.markdown("#### 🔄 Background Jobs")
+        jobs = st.session_state.background_jobs
+
+        # Job status overview
+        status_counts = {}
+        for job in jobs:
+            status_counts[job.status] = status_counts.get(job.status, 0) + 1
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            running_jobs = status_counts.get('running', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="color: #4fc3f7; margin: 0;">🔄 {running_jobs}</h3>
+                <p style="margin: 0.5rem 0 0 0; color: #666;">Running</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            queued_jobs = status_counts.get('queued', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="color: #ffd93d; margin: 0;">⏳ {queued_jobs}</h3>
+                <p style="margin: 0.5rem 0 0 0; color: #666;">Queued</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+            completed_jobs = status_counts.get('completed', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="color: #6bcf7f; margin: 0;">✅ {completed_jobs}</h3>
+                <p style="margin: 0.5rem 0 0 0; color: #666;">Completed</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col4:
+            failed_jobs = status_counts.get('failed', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="color: #ff6b6b; margin: 0;">❌ {failed_jobs}</h3>
+                <p style="margin: 0.5rem 0 0 0; color: #666;">Failed</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("#### 🔄 Active Background Jobs")
+        for job in jobs:
+            if job.status in ['running', 'queued']:
+                status_color = {
+                    'running': '#4fc3f7',
+                    'queued': '#ffd93d',
+                    'completed': '#6bcf7f',
+                    'failed': '#ff6b6b'
+                }.get(job.status, '#666')
+
+                st.markdown(f"""
+                <div class="task-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>{job.name}</strong><br>
+                            <small style="color: {status_color};">Status: {job.status.replace('_', ' ').title()}</small><br>
+                            <small>Started: {job.start_time.strftime('%Y-%m-%d %H:%M')}</small>
+                        </div>
+                        <div style="text-align: right;">
+                            <strong>{job.progress}%</strong>
+                        </div>
+                    </div>
+                    <div class="job-progress">
+                        <div style="background: {status_color}; height: 8px; border-radius: 4px; width: {job.progress}%; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Job status distribution
+        if len(jobs) > 0:
+            status_counts = {}
+            for job in jobs:
+                status_counts[job.status] = status_counts.get(
+                    job.status, 0) + 1
+
+            if status_counts:
+                fig = px.pie(
+                    values=list(status_counts.values()),
+                    names=list(status_counts.keys()),
+                    title="Background Job Status",
+                    color_discrete_map={
+                        'running': '#4fc3f7',
+                        'queued': '#ffd93d',
+                        'completed': '#6bcf7f',
+                        'failed': '#ff6b6b'
+                    }
+                )
+                fig.update_traces(textposition='inside',
+                                  textinfo='percent+label')
+                fig.update_layout(height=300)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No background jobs currently running")
+
+
+def dashboard():
+    """Main dashboard function"""
+    apply_custom_css()
+
+    # Add navigation
+    def go_to_page(page_name):
+        st.session_state.page = page_name
+        st.query_params["page"] = page_name
+        st.rerun()
+
+    navbar(go_to_page, "dashboard")
+
+    # Header
+    st.markdown("""
+    <div class="main-header">
+        <h1 style="margin: 0; font-size: 2.5rem;">📊 AutoReportSystem Dashboard</h1>
+        <p style="margin: 0.5rem 0 0 0; font-size: 1.1rem; opacity: 0.9;">
+            Comprehensive project management and system monitoring
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Initialize dashboard manager
+    dashboard_manager = DashboardManager()
+
+    # Tabs
+    tab1, tab2, tab3 = st.tabs(
+        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor"])
+
+    with tab1:
+        asyncio.run(render_kanban_board(dashboard_manager))
+
+    with tab2:
+        asyncio.run(render_productivity_analytics(dashboard_manager))
+
+    with tab3:
+        asyncio.run(render_system_monitoring(dashboard_manager))
+
+
+if __name__ == "__main__":
+    # For standalone testing
+    dashboard()

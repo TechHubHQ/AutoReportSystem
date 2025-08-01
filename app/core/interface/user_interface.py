@@ -4,8 +4,27 @@ from app.database.db_connector import get_db
 from app.security.auth.auth_handler import hash_password, verify_password
 
 
+async def user_exists(email: str) -> bool:
+    """
+    Check if a user with the given email already exists in the database.
+    Returns True if exists, False otherwise.
+    """
+    try:
+        db = await get_db()
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        return user is not None
+    except Exception as e:
+        print(f"Error checking if user exists: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
 async def create_user(username: str, email: str, password: str):
     try:
+        if await user_exists(email):
+            raise Exception("User with this email already exists.")
         db = await get_db()
         password = hash_password(password)
         new_user = User(username=username, email=email, password=password)
