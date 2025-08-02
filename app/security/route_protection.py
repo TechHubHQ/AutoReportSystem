@@ -8,6 +8,7 @@ to protect routes from unauthorized access.
 import streamlit as st
 from typing import List, Optional, Callable
 from functools import wraps
+from app.security.session_manager import SessionManager
 
 
 class RouteProtection:
@@ -32,12 +33,12 @@ class RouteProtection:
     @staticmethod
     def is_authenticated() -> bool:
         """Check if user is currently authenticated"""
-        return "user" in st.session_state and st.session_state.user is not None
+        return SessionManager.is_authenticated()
 
     @staticmethod
     def get_current_user() -> Optional[dict]:
         """Get current authenticated user"""
-        return st.session_state.get("user", None)
+        return SessionManager.get_current_user()
 
     @staticmethod
     def is_route_protected(route: str) -> bool:
@@ -52,11 +53,7 @@ class RouteProtection:
     @staticmethod
     def clear_session():
         """Clear user session data"""
-        keys_to_keep = {"db_initialized"}
-        keys_to_remove = [
-            key for key in st.session_state.keys() if key not in keys_to_keep]
-        for key in keys_to_remove:
-            del st.session_state[key]
+        SessionManager.destroy_session()
 
     @staticmethod
     def set_intended_destination(route: str):
@@ -80,6 +77,11 @@ class RouteProtection:
         st.info("👆 You will be redirected to your intended page after login.")
         go_to_page("login")
 
+    @staticmethod
+    def logout():
+        """Logout user and clear session"""
+        SessionManager.destroy_session()
+    
     @staticmethod
     def check_route_access(route: str, go_to_page: Callable) -> bool:
         """

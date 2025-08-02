@@ -24,6 +24,10 @@ class User(Base):
     # One-to-many: User → EmailTemplates
     templates = relationship(
         "EmailTemplate", back_populates="creator", cascade="all, delete-orphan")
+    
+    # One-to-many: User → UserSessions
+    sessions = relationship(
+        "UserSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -103,3 +107,17 @@ class EmailTemplate(Base):
 
     # Many-to-one: EmailTemplate → User
     creator = relationship("User", back_populates="templates")
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    session_token = Column(String, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_data = Column(Text, nullable=False)  # JSON string of user data
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_accessed = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Many-to-one: UserSession → User
+    user = relationship("User", back_populates="sessions")

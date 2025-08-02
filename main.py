@@ -10,15 +10,22 @@ from app.ui.smtp_conf import smtp_conf
 from app.ui.job_management import job_management
 from app.security.route_protection import RouteProtection, session_timeout_check
 from app.security.middleware import apply_security_middleware
+from app.security.session_manager import SessionManager
 
 
 st.set_page_config(page_title="Automate Report System", layout="wide")
 
 
-# Initialize DB only once
+# Initialize DB and session system only once
 if "db_initialized" not in st.session_state:
     asyncio.run(init_db())
+    SessionManager.init_session_table()
+    SessionManager.cleanup_expired_sessions()
     st.session_state.db_initialized = True
+
+# Attempt to restore session from browser storage
+if not SessionManager.is_authenticated():
+    SessionManager.restore_session_from_browser()
 
 
 # Apply security middleware

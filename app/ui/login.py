@@ -3,6 +3,7 @@ import streamlit as st
 from app.core.interface.user_interface import authenticate_user
 from app.ui.components.loader import LoaderContext
 from app.security.route_protection import RouteProtection
+from app.security.session_manager import SessionManager
 
 
 def login(navigate):
@@ -68,7 +69,8 @@ def login(navigate):
                                     "email": user.email,
                                     "username": user.username
                                 }
-                                st.session_state.user = user_data
+                                # Create persistent session
+                                SessionManager.create_session(user_data)
                                 # Redirect to intended destination or dashboard
                                 intended_destination = RouteProtection.get_intended_destination()
                                 navigate(intended_destination)

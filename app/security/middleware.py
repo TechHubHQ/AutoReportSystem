@@ -10,13 +10,14 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 from app.security.route_protection import RouteProtection
+from app.security.session_manager import SessionManager
 
 
 class SecurityMiddleware:
     """Security middleware for additional protection features"""
 
-    # Session timeout in seconds (30 minutes)
-    SESSION_TIMEOUT = 30 * 60
+    # Session timeout in seconds (6 hours - managed by SessionManager)
+    SESSION_TIMEOUT = 6 * 60 * 60
 
     @staticmethod
     def init_session_security():
@@ -35,52 +36,27 @@ class SecurityMiddleware:
     @staticmethod
     def check_session_timeout() -> bool:
         """
-        Check if session has timed out
+        Check if session has timed out using SessionManager
 
         Returns:
             bool: True if session is valid, False if timed out
         """
-        if not RouteProtection.is_authenticated():
+        if not SessionManager.is_authenticated():
             return True
 
-        SecurityMiddleware.init_session_security()
-
-        current_time = time.time()
-        last_activity = st.session_state.get("last_activity", current_time)
-
-        if current_time - last_activity > SecurityMiddleware.SESSION_TIMEOUT:
-            # Session timed out
-            RouteProtection.clear_session()
+        session_info = SessionManager.get_session_info()
+        if not session_info.get('is_valid', False):
+            # Session expired
+            SessionManager.destroy_session()
             st.error("🕐 Your session has expired. Please log in again.")
             return False
 
-        # Update last activity
-        SecurityMiddleware.update_last_activity()
         return True
 
     @staticmethod
     def get_session_info() -> dict:
-        """Get current session information"""
-        if not RouteProtection.is_authenticated():
-            return {}
-
-        SecurityMiddleware.init_session_security()
-
-        current_time = time.time()
-        session_start = st.session_state.get(
-            "session_start_time", current_time)
-        last_activity = st.session_state.get("last_activity", current_time)
-
-        session_duration = current_time - session_start
-        time_since_activity = current_time - last_activity
-        time_until_timeout = SecurityMiddleware.SESSION_TIMEOUT - time_since_activity
-
-        return {
-            "session_duration": session_duration,
-            "time_since_activity": time_since_activity,
-            "time_until_timeout": max(0, time_until_timeout),
-            "is_active": time_until_timeout > 0
-        }
+        """Get current session information from SessionManager"""
+        return SessionManager.get_session_info()
 
     @staticmethod
     def format_time_remaining(seconds: float) -> str:
@@ -99,18 +75,23 @@ class SecurityMiddleware:
     @staticmethod
     def show_session_warning():
         """Show session timeout warning if needed"""
-        if not RouteProtection.is_authenticated():
+        if not SessionManager.is_authenticated():
             return
 
-        session_info = SecurityMiddleware.get_session_info()
-        time_until_timeout = session_info.get("time_until_timeout", 0)
+        session_info = SessionManager.get_session_info()
+        time_remaining = session_info.get("time_remaining", 0)
 
-        # Show warning if less than 5 minutes remaining
-        if 0 < time_until_timeout < 300:  # 5 minutes
-            remaining_time = SecurityMiddleware.format_time_remaining(
-                time_until_timeout)
-            st.warning(
-                f"⚠️ Your session will expire in {remaining_time}. Please save your work.")
+        # Show warning if less than 30 minutes remaining
+        if 0 < time_remaining < 1800:  # 30 minutes
+            remaining_time = SecurityMiddleware.format_time_remaining(time_remaining)
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.warning(f"⚠️ Your session will expire in {remaining_time}. Please save your work.")
+            with col2:
+                if st.button("🔄 Extend Session", key="extend_session"):
+                    if SessionManager.extend_session():
+                        st.success("✅ Session extended by 6 hours!")
+                        st.rerun()
 
     @staticmethod
     def add_security_headers():

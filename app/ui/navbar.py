@@ -1,6 +1,8 @@
 import streamlit as st
 from app.security.route_protection import RouteProtection
+from app.security.session_manager import SessionManager
 from app.ui.security_dashboard import show_security_status
+from app.ui.components.session_status import show_compact_session_status
 
 
 def navbar(go_to_page, current_page="dashboard"):
@@ -63,13 +65,17 @@ def navbar(go_to_page, current_page="dashboard"):
         """, unsafe_allow_html=True)
 
         # Enhanced user info
-        user = st.session_state.get("user", {})
+        user = SessionManager.get_current_user() or {}
         username = user.get("username", "User")
+        
         st.markdown(f"""
         <div class="user-welcome">
             <strong>👋 Welcome, {username}!</strong>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Show compact session status
+        show_compact_session_status()
 
         # Navigation items
         nav_items = [
