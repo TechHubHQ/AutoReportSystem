@@ -17,7 +17,7 @@ class TaskRunnerManager:
     def __init__(self):
         self._runner_thread = None
         self._runner_loop = None
-        self._is_running = False
+        self._is_running = self._load_runner_status()
 
     def start_runner(self) -> bool:
         """Start the task runner in a separate thread"""
@@ -39,6 +39,8 @@ class TaskRunnerManager:
             self._runner_thread.start()
 
             self._is_running = True
+            # Store status in a persistent way
+            self._save_runner_status(True)
             print("✅ Task Runner Manager started successfully")
             print(
                 "ℹ️ All active jobs will be scheduled according to their configured times")
@@ -67,6 +69,8 @@ class TaskRunnerManager:
                 future.result(timeout=10)  # Wait up to 10 seconds
 
             self._is_running = False
+            # Store status in a persistent way
+            self._save_runner_status(False)
             print("✅ Task Runner Manager stopped successfully")
             return True
 
@@ -173,9 +177,17 @@ class TaskRunnerManager:
 
     def is_running(self) -> bool:
         """Check if the task runner is currently running"""
-        return self._is_running and (
-            self._runner_thread.is_alive() if self._runner_thread else False
-        )
+        # Check both memory status and thread status
+        memory_status = self._load_runner_status()
+        thread_alive = self._runner_thread.is_alive() if self._runner_thread else False
+        
+        # If memory says running but thread is dead, update status
+        if memory_status and not thread_alive:
+            self._save_runner_status(False)
+            self._is_running = False
+            return False
+            
+        return memory_status and thread_alive
 
     def get_health_check(self) -> Dict[str, Any]:
         """Get health check information"""
@@ -229,9 +241,68 @@ def get_task_runner_health() -> Dict[str, Any]:
     return task_runner_manager.get_health_check()
 
 
+    def _save_runner_status(self, is_running: bool):
+        """Save runner status to a persistent file"""
+        try:
+            import os
+            import json
+            status_file = os.path.join(os.getcwd(), '.task_runner_status')
+            with open(status_file, 'w') as f:
+                json.dump({'is_running': is_running}, f)
+        except Exception as e:
+            print(f"Warning: Could not save runner status: {e}")
+
+    def _load_runner_status(self) -> bool:
+        """Load runner status from persistent file"""
+        try:
+            import os
+            import json
+            status_file = os.path.join(os.getcwd(), '.task_runner_status')
+            if os.path.exists(status_file):
+                with open(status_file, 'r') as f:
+                    data = json.load(f)
+                    return data.get('is_running', False)
+        except Exception as e:
+            print(f"Warning: Could not load runner status: {e}")
+        return False
+
+
 # Auto-start functionality (disabled by default)
 def auto_start_task_runner():
     """Auto-start the task runner if not already running (disabled by default)"""
     # Auto-start is disabled - task runner should only start when user clicks the button
     print("⚠️ Auto-start is disabled. Use the 'Start Runner' button in Job Management to start the task runner.")
     return False
+
+
+# Add methods to TaskRunnerManager class
+TaskRunnerManager._save_runner_status = lambda self, is_running: self._save_runner_status_impl(is_running)
+TaskRunnerManager._load_runner_status = lambda self: self._load_runner_status_impl()
+
+def _save_runner_status_impl(self, is_running: bool):
+    """Save runner status to a persistent file"""
+    try:
+        import os
+        import json
+        status_file = os.path.join(os.getcwd(), '.task_runner_status')
+        with open(status_file, 'w') as f:
+            json.dump({'is_running': is_running}, f)
+    except Exception as e:
+        print(f"Warning: Could not save runner status: {e}")
+
+def _load_runner_status_impl(self) -> bool:
+    """Load runner status from persistent file"""
+    try:
+        import os
+        import json
+        status_file = os.path.join(os.getcwd(), '.task_runner_status')
+        if os.path.exists(status_file):
+            with open(status_file, 'r') as f:
+                data = json.load(f)
+                return data.get('is_running', False)
+    except Exception as e:
+        print(f"Warning: Could not load runner status: {e}")
+    return False
+
+TaskRunnerManager._save_runner_status_impl = _save_runner_status_impl
+TaskRunnerManager._load_runner_status_impl = _load_runner_status_impl

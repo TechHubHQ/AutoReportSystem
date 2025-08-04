@@ -33,7 +33,7 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
     """Get active SMTP configuration for a user or the first active one"""
     try:
         db = await get_db()
-        
+
         if user_id:
             # Try to get user-specific SMTP config
             result = await db.execute(
@@ -49,9 +49,10 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
             smtp_conf = result.scalar_one_or_none()
             if smtp_conf:
                 # Decrypt password
-                smtp_conf.smtp_password = EncryptionService.decrypt(smtp_conf.smtp_password)
+                smtp_conf.smtp_password = EncryptionService.decrypt(
+                    smtp_conf.smtp_password)
                 return smtp_conf
-        
+
         # Fallback to any active SMTP config
         result = await db.execute(
             select(SMTPConf).where(SMTPConf.is_active == "True").limit(1)
@@ -59,11 +60,12 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
         smtp_conf = result.scalar_one_or_none()
         if smtp_conf:
             # Decrypt password
-            smtp_conf.smtp_password = EncryptionService.decrypt(smtp_conf.smtp_password)
+            smtp_conf.smtp_password = EncryptionService.decrypt(
+                smtp_conf.smtp_password)
             return smtp_conf
-        
+
         return None
-        
+
     except Exception as e:
         print(f"Error getting active SMTP configuration: {e}")
         return None

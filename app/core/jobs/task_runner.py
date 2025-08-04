@@ -116,23 +116,25 @@ class task_runner:
             if job_config.get('template_id'):
                 # Create template-based job function
                 async def template_job():
-                    print(f"📧 Sending report with template {job_config['template_id']}")
-                    print(f"📄 Content type: {job_config.get('content_type', 'all')}")
+                    print(
+                        f"📧 Sending report with template {job_config['template_id']}")
+                    print(
+                        f"📄 Content type: {job_config.get('content_type', 'all')}")
                     print(f"👤 User ID: {job_config.get('user_id')}")
                     print(f"📧 Recipients: {job_config.get('recipients', [])}")
-                    
+
                     result = await send_report(
                         template_id=job_config['template_id'],
                         content_type=job_config.get('content_type', 'all'),
                         user_id=job_config.get('user_id'),
                         recipients=job_config.get('recipients', [])
                     )
-                    
+
                     if result:
                         print(f"✅ Report sent successfully")
                     else:
                         print(f"❌ Report sending failed")
-                    
+
                     return result
                 return template_job
 
@@ -367,14 +369,15 @@ class task_runner:
         """Run a job immediately for testing"""
         try:
             jobs = await JobInterface.get_active_jobs()
-            target_job = next((job for job in jobs if job.name == job_name), None)
-            
+            target_job = next(
+                (job for job in jobs if job.name == job_name), None)
+
             if not target_job:
                 print(f"❌ Job '{job_name}' not found")
                 return False
-            
+
             print(f"⚡ Running job '{job_name}' immediately...")
-            
+
             # Parse job configuration
             schedule_config = {}
             if target_job.schedule_config:
@@ -383,14 +386,14 @@ class task_runner:
                     print(f"📋 Job config: {schedule_config}")
                 except json.JSONDecodeError:
                     print(f"⚠️ Invalid JSON in schedule config")
-            
+
             job_config = schedule_config.get('job', {})
             if not job_config and schedule_config:
                 job_config = schedule_config
-            
+
             print(f"📄 Template ID: {job_config.get('template_id')}")
             print(f"📧 Recipients: {job_config.get('recipients')}")
-            
+
             # Create and execute job function
             job_function = await self.create_job_function(target_job, job_config)
             if job_function:
@@ -400,7 +403,7 @@ class task_runner:
             else:
                 print(f"❌ Failed to create function for job '{job_name}'")
                 return False
-                
+
         except Exception as e:
             print(f"❌ Error running job immediately: {e}")
             import traceback
