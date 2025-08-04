@@ -52,7 +52,7 @@ if __name__ == "__main__":
     key = generate_key()
     print(f"Encryption Key (store securely): {key.decode()}")
 
-    original_text = "some string"
+    original_text = "ars smtp secret key"
     encrypted_text = encrypt_string(key, original_text)
     print(f"Encrypted: {encrypted_text.decode()}")
 

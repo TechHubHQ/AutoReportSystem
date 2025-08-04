@@ -3,6 +3,7 @@ from app.core.services.encryption_service import EncryptionService
 from app.database.models import SMTPConf
 from sqlalchemy import select
 from typing import Optional
+import asyncio
 
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
@@ -64,7 +65,7 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
                 smtp_conf.smtp_password)
             return smtp_conf
 
-        return None
+        return smtp_conf
 
     except Exception as e:
         print(f"Error getting active SMTP configuration: {e}")
@@ -72,6 +73,8 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
     finally:
         await db.close()
 
+
+asyncio.run(get_active_smtp_config(1))
 
 async def get_smtp_conf(user_id) -> SMTPConf:
     try:

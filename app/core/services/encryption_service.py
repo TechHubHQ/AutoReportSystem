@@ -1,54 +1,47 @@
 import os
-from cryptography.fernet import Fernet
-from app.config.config import settings
+from dotenv import load_dotenv
+from app.core.services import encryption_client
 
+
+load_dotenv()
 
 class EncryptionService:
     """
-    Service for encrypting and decrypting SMTP passwords.
+    Service for encrypting and decrypting strings using a consistent key.
     """
 
-    _key_env_var = settings.SMTP_ENV_KEY or "SMTP_ENCRYPTION_KEY"
-
-    @classmethod
-    def _get_key(cls):
-        key = os.environ.get(cls._key_env_var)
-        if not key:
-            key = Fernet.generate_key()
-            os.environ[cls._key_env_var] = key.decode()
-        else:
-            try:
-                key = key.encode() if isinstance(key, str) else key
-                Fernet(key)
-            except Exception:
-                key = Fernet.generate_key()
-                os.environ[cls._key_env_var] = key.decode()
-        return key
+    # In a real application, store this key securely (e.g., environment variable, secrets manager)
+    # Here, we attempt to load the key from an environment variable for safety.
+    # Fernet key must be 32 url-safe base64-encoded bytes (44 chars when base64-encoded)
+    _KEY = os.getenv("FERNET_KEY")
 
     @classmethod
     def encrypt(cls, plaintext: str) -> str:
         """
-        Encrypts the given plaintext string and returns a base64-encoded ciphertext.
+        Encrypts a string using the class key.
+        Args:
+            plaintext (str): The string to encrypt.
+        Returns:
+            str: The encrypted text, base64-encoded.
         """
-        try:
-            key = cls._get_key()
-            f = Fernet(key)
-            token = f.encrypt(plaintext.encode())
-            return token.decode()
-        except Exception as e:
-            print(f"Encryption failed: {e}")
-            raise e
+        encrypted_bytes = encryption_client.encrypt_string(cls._KEY, plaintext)
+        # Fernet returns base64-encoded bytes, decode to str for storage
+        return encrypted_bytes.decode("utf-8")
 
     @classmethod
     def decrypt(cls, ciphertext: str) -> str:
         """
-        Decrypts the given base64-encoded ciphertext and returns the plaintext string.
+        Decrypts a ciphertext using the class key.
+        Args:
+            ciphertext (str): The encrypted text, base64-encoded.
+        Returns:
+            str: The decrypted string.
         """
-        try:
-            key = cls._get_key()
-            f = Fernet(key)
-            plaintext = f.decrypt(ciphertext.encode())
-            return plaintext.decode()
-        except Exception as e:
-            print(f"Decryption failed: {e}")
-            raise e
+        # Accept both str and bytes for ciphertext, but ensure bytes for decryption
+        if isinstance(ciphertext, str):
+            ciphertext_bytes = ciphertext.encode("utf-8")
+        else:
+            ciphertext_bytes = ciphertext
+        decrypted_text = encryption_client.decrypt_string(cls._KEY, ciphertext_bytes)
+        print(decrypted_text)
+        return decrypted_text
