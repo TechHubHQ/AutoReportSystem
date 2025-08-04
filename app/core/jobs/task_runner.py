@@ -19,7 +19,7 @@ from app.core.utils.timezone_utils import (
 )
 
 
-class task_runner:
+class TaskRunner:
     """Handles task scheduling based on database configuration"""
 
     def __init__(self):
@@ -451,7 +451,7 @@ class task_runner:
 
 
 # Global instance
-task_runner = task_runner()
+task_runner = TaskRunner()
 
 
 async def run_tasks():
