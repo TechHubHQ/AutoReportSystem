@@ -19,8 +19,8 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
             sender_email=sender_email
         )
         db.add(new_smtp_conf)
-        db.commit()
-        db.refresh(new_smtp_conf)
+        await db.commit()
+        await db.refresh(new_smtp_conf)
         return new_smtp_conf
     except Exception as e:
         print(f"Error creating new smtp configuration {e}")
