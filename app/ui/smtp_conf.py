@@ -134,7 +134,7 @@ def smtp_conf(go_to_page):
             with LoaderContext("💾 Saving SMTP configuration...", "inline"):
                 try:
                     asyncio.run(setup_smtp(smtp_host, smtp_port,
-                                smtp_username, smtp_password))
+                                smtp_username, smtp_password, user_email))
                     st.success("✅ SMTP configuration saved successfully!")
                     st.info("📧 You can now send automated email reports")
                 except Exception as e:

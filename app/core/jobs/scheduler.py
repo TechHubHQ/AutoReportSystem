@@ -2,7 +2,7 @@
 Enhanced Job Scheduler for AutomateReportSystem with IST Support
 
 Provides better job management capabilities including job cancellation,
-status tracking, and dynamic rescheduling using IST timezone.
+status tracking, and rescheduling using IST timezone.
 """
 
 import asyncio
@@ -329,6 +329,7 @@ class JobScheduler:
 
             # Execute the job
             start_time = time.time()
+            print(f"💼 Starting job execution...")
             await job.coro(*job.args, **job.kwargs)
             execution_time = time.time() - start_time
 
@@ -340,6 +341,10 @@ class JobScheduler:
             job.last_error = str(e)
             print(
                 f"❌ Job '{job.job_name}' failed at {format_ist_time_display(now_ist())}: {e}")
+            
+            # Print full traceback for debugging
+            import traceback
+            traceback.print_exc()
 
             # Log error to database if needed
             if job.db_job_id:

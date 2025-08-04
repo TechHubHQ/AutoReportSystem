@@ -469,7 +469,7 @@ def render_create_template():
             "HTML Code",
             value=template_presets[preset_choice],
             height=400,
-            help="Enter your HTML template code. Use {{variable_name}} for dynamic content placeholders."
+            help="Enter your HTML template code. Use {{variable_name}} for content placeholders."
         )
 
         # Form buttons
@@ -588,7 +588,7 @@ def render_template_help():
         **Basic Structure:**
         - Use standard HTML5 structure
         - Include CSS styles in the `<head>` section
-        - Use `{{variable_name}}` for dynamic content
+        - Use `{{variable_name}}` for content
         - Test your template with the preview function
 
         **Best Practices:**
@@ -600,9 +600,9 @@ def render_template_help():
 
         with tab2:
             st.markdown("""
-            #### Dynamic Variables
+            #### Variables
 
-            You can use double curly braces `{{ }}` to insert dynamic variables into your HTML templates. These variables will be replaced with actual data during report generation.
+            You can use double curly braces `{{ }}` to insert variables into your HTML templates. These variables will be replaced with actual data during report generation.
 
             **Examples:**
             - `{{report_title}}`
@@ -665,7 +665,7 @@ def render_template_help():
         ```
 
         **Tip:**
-        Combine dynamic variables with loops to create advanced, data-driven layouts!
+        Combine variables with loops to create advanced, data-driven layouts!
         """)
 
 

@@ -27,14 +27,14 @@ class EmailService:
         )
 
     async def send_template_email(self, to_address, template_id, user_id=None):
-        """Send email using a template with dynamic content"""
+        """Send email using a template with content"""
         try:
             # Get template
             template = await get_template(template_id)
             if not template:
                 raise ValueError(f"Template with ID {template_id} not found")
 
-            # Process template with dynamic content
+            # Process template with content
             rendered = await load_template_from_string(
                 template.html_content,
                 template.subject,

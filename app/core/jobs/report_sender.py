@@ -1,14 +1,12 @@
 """
-Dynamic Report Sender for AutomateReportSystem
+Report Sender for AutomateReportSystem
 
 Handles sending reports using dynamically selected templates and content.
 """
 
-import asyncio
 from typing import List, Optional, Dict, Any
 from app.integrations.email.email_client import EmailService
 from app.core.jobs.utils.template_loader import load_template_by_id
-from app.core.jobs.utils.content_loader import load_content
 from app.core.interface.smtp_interface import get_active_smtp_config
 
 
@@ -20,7 +18,7 @@ async def send_report(
     subject_override: Optional[str] = None
 ) -> bool:
     """
-    Send a report using a dynamic template and content type
+    Send a report using a template and content type
 
     Args:
         template_id: ID of the template to use
@@ -33,7 +31,7 @@ async def send_report(
         bool: True if successful, False otherwise
     """
     try:
-        print(f"🚀 Starting dynamic report generation...")
+        print(f"🚀 Starting report generation...")
         print(f"   Template ID: {template_id}")
         print(f"   Content Type: {content_type}")
         print(f"   Recipients: {len(recipients) if recipients else 0}")
@@ -45,7 +43,7 @@ async def send_report(
         if not recipients:
             raise ValueError("At least one recipient is required")
 
-        # Load template and render with dynamic content
+        # Load template and render with content
         print("📄 Loading template...")
         template_result = await load_template_by_id(template_id, user_id=user_id)
 
@@ -106,7 +104,7 @@ async def send_report(
             return False
 
     except Exception as e:
-        print(f"❌ Dynamic report sending failed: {str(e)}")
+        print(f"❌ report sending failed: {str(e)}")
         return False
 
 
@@ -166,11 +164,11 @@ def validate_job_config(config: Dict[str, Any]) -> bool:
 
 
 # Legacy compatibility functions
-async def send_w_report_dynamic(template_id: int, recipients: List[str], user_id: Optional[int] = None):
-    """Legacy weekly report function with dynamic template"""
+async def send_w_report(template_id: int, recipients: List[str], user_id: Optional[int] = None):
+    """Legacy weekly report function with template"""
     return await send_weekly_report(template_id, user_id, recipients)
 
 
-async def send_m_report_dynamic(template_id: int, recipients: List[str], user_id: Optional[int] = None):
-    """Legacy monthly report function with dynamic template"""
+async def send_m_report(template_id: int, recipients: List[str], user_id: Optional[int] = None):
+    """Legacy monthly report function with template"""
     return await send_monthly_report(template_id, user_id, recipients)

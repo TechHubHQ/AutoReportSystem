@@ -5,15 +5,18 @@ from sqlalchemy import select
 from typing import Optional
 
 
-async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd):
+async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
     try:
         db = await get_db()
+        print(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email)
         smtp_pwd = EncryptionService.encrypt(smtp_pwd)
+        print(smtp_pwd)
         new_smtp_conf = SMTPConf(
             smtp_host=smtp_host,
             smtp_port=smtp_port,
             smtp_username=smtp_username,
-            smtp_password=smtp_pwd
+            smtp_password=smtp_pwd,
+            sender_email=sender_email
         )
         db.add(new_smtp_conf)
         db.commit()

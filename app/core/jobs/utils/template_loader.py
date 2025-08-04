@@ -16,8 +16,8 @@ class StringTemplateLoader(BaseLoader):
 
 
 async def load_template_from_string(template_content: str, subject: str, user_id: int = None):
-    """Load template from string content with dynamic data processing"""
-    # Process dynamic placeholders in both subject and content
+    """Load template from string content with data processing"""
+    # Process placeholders in both subject and content
     subject_context = await process_dynamic_content(subject, user_id)
     content_context = await process_dynamic_content(template_content, user_id)
 
@@ -54,10 +54,10 @@ async def load_template_by_id(template_id: int, context: dict = None, user_id: i
         template = await get_template(template_id)
         if not template:
             raise ValueError(f"Template with ID {template_id} not found")
-        
+
         return await load_template_from_string(
-            template.html_content, 
-            template.subject, 
+            template.html_content,
+            template.subject,
             user_id
         )
     except Exception as e:
@@ -69,14 +69,15 @@ async def load_template_by_name(template_name: str, context: dict = None, user_i
     """Load template by name and render with context"""
     try:
         templates = await get_templates(user_id)
-        template = next((t for t in templates if t.name.lower() == template_name.lower()), None)
-        
+        template = next((t for t in templates if t.name.lower()
+                        == template_name.lower()), None)
+
         if not template:
             raise ValueError(f"Template with name '{template_name}' not found")
-        
+
         return await load_template_from_string(
-            template.html_content, 
-            template.subject, 
+            template.html_content,
+            template.subject,
             user_id
         )
     except Exception as e:
@@ -112,13 +113,14 @@ async def load_template(content, template):
         context = content
         return template_obj.render(**context)
     else:
-        # New dynamic template loading by name
+        # New template loading by name
         try:
             result = await load_template_by_name(template, content)
             return result['content']
         except Exception as e:
-            print(f"Failed to load template '{template}' dynamically, falling back to legacy: {e}")
-            # Fallback to legacy if dynamic loading fails
+            print(
+                f"Failed to load template '{template}' dynamically, falling back to legacy: {e}")
+            # Fallback to legacy if loading fails
             env = Environment(
                 loader=FileSystemLoader('app/integrations/email/templates'),
                 autoescape=select_autoescape(['html', 'xml'])

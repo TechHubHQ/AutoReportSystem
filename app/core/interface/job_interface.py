@@ -68,15 +68,18 @@ class JobInterface:
         """Create a new custom job with optional job configuration"""
         db = await get_db()
         try:
-            # Combine schedule_config and job_config
+            # Combine schedule_config and job_config properly
             final_config = {}
             
+            # First add schedule configuration (time settings)
             if schedule_config:
                 try:
-                    final_config.update(json.loads(schedule_config))
+                    schedule_data = json.loads(schedule_config)
+                    final_config.update(schedule_data)
                 except json.JSONDecodeError:
                     pass
             
+            # Then add job configuration (template, recipients, etc.)
             if job_config:
                 try:
                     job_data = json.loads(job_config)
@@ -101,12 +104,12 @@ class JobInterface:
             await db.close()
 
     @staticmethod
-    async def update_job(job_id: int, job_config: str = None, **kwargs) -> bool:
+    async def update_job(job_id: int, schedule_config: str = None, job_config: str = None, **kwargs) -> bool:
         """Update job details with optional job configuration"""
         db = await get_db()
         try:
-            # Handle job configuration updates
-            if job_config is not None:
+            # Handle configuration updates properly
+            if schedule_config is not None or job_config is not None:
                 # Get current job to merge configs
                 current_job = await JobInterface.get_job_by_id(job_id)
                 current_config = {}
@@ -117,7 +120,15 @@ class JobInterface:
                     except json.JSONDecodeError:
                         current_config = {}
                 
-                # Update job configuration
+                # Update schedule configuration (time settings)
+                if schedule_config:
+                    try:
+                        schedule_data = json.loads(schedule_config)
+                        current_config.update(schedule_data)
+                    except json.JSONDecodeError:
+                        pass
+                
+                # Update job configuration (template, recipients, etc.)
                 if job_config:
                     try:
                         job_data = json.loads(job_config)

@@ -1,7 +1,7 @@
 """
-Dynamic Task Runner for AutomateReportSystem
+Task Runner for AutomateReportSystem
 
-Runs tasks based on dynamic configuration from the database instead of static times.
+Runs tasks based on configuration from the database instead of static times.
 Integrates with the job management UI to use user-configured schedules.
 """
 
@@ -13,22 +13,22 @@ from typing import Dict, Any, Optional, Callable
 from app.core.jobs.scheduler import scheduler
 from app.core.interface.job_interface import JobInterface
 from app.core.jobs.discovery import initialize_jobs
-from app.core.jobs.dynamic_report_sender import send_report
+from app.core.jobs.report_sender import send_report
 from app.core.utils.timezone_utils import (
     IST, UTC, now_ist, get_next_daily_run_ist, next_monthly_run_ist
 )
 
 
 class task_runner:
-    """Handles dynamic task scheduling based on database configuration"""
+    """Handles task scheduling based on database configuration"""
 
     def __init__(self):
         self.scheduled_jobs = {}
         self.running = False
 
     async def start(self):
-        """Start the dynamic task runner"""
-        print("🚀 Starting Dynamic Task Runner...")
+        """Start the task runner"""
+        print("🚀 Starting Task Runner...")
 
         # Initialize job discovery and registration
         print("📋 Discovering and registering jobs...")
@@ -42,17 +42,17 @@ class task_runner:
         await scheduler.start()
 
         self.running = True
-        print("🎯 Dynamic Task Runner is now active and monitoring jobs.")
+        print("🎯 Task Runner is now active and monitoring jobs.")
 
         # Start monitoring loop
         await self.monitor_jobs()
 
     async def stop(self):
-        """Stop the dynamic task runner"""
-        print("🛑 Stopping Dynamic Task Runner...")
+        """Stop the task runner"""
+        print("🛑 Stopping Task Runner...")
         self.running = False
         await scheduler.stop()
-        print("✅ Dynamic Task Runner stopped.")
+        print("✅ Task Runner stopped.")
 
     async def load_and_schedule_jobs(self):
         """Load all active jobs from database and schedule them"""
@@ -83,6 +83,11 @@ class task_runner:
             # Get job configuration
             job_config = schedule_config.get('job', {})
 
+            # Use schedule config for time settings if available
+            if not job_config and schedule_config:
+                # If no job config but schedule config exists, use schedule config directly
+                job_config = schedule_config
+
             # Create the job function
             job_function = await self.create_job_function(job, job_config)
             if not job_function:
@@ -111,12 +116,24 @@ class task_runner:
             if job_config.get('template_id'):
                 # Create template-based job function
                 async def template_job():
-                    return await send_report(
+                    print(f"📧 Sending report with template {job_config['template_id']}")
+                    print(f"📄 Content type: {job_config.get('content_type', 'all')}")
+                    print(f"👤 User ID: {job_config.get('user_id')}")
+                    print(f"📧 Recipients: {job_config.get('recipients', [])}")
+                    
+                    result = await send_report(
                         template_id=job_config['template_id'],
                         content_type=job_config.get('content_type', 'all'),
                         user_id=job_config.get('user_id'),
                         recipients=job_config.get('recipients', [])
                     )
+                    
+                    if result:
+                        print(f"✅ Report sent successfully")
+                    else:
+                        print(f"❌ Report sending failed")
+                    
+                    return result
                 return template_job
 
             # Check if it's a custom job with code
@@ -171,8 +188,13 @@ class task_runner:
 
     async def schedule_daily_job(self, job, job_function, config: Dict[str, Any]):
         """Schedule a daily job"""
-        hour = config.get('hour', 9)
-        minute = config.get('minute', 0)
+        # Check both job config and schedule config for time settings
+        job_config = config.get('job', {})
+        hour = config.get('hour', job_config.get('hour', 9))
+        minute = config.get('minute', job_config.get('minute', 0))
+
+        print(
+            f"📅 Scheduling daily job '{job.name}' for {hour:02d}:{minute:02d} IST")
 
         # Calculate seconds until next run in IST
         target = get_next_daily_run_ist(hour, minute)
@@ -191,13 +213,19 @@ class task_runner:
 
     async def schedule_weekly_job(self, job, job_function, config: Dict[str, Any]):
         """Schedule a weekly job"""
-        day_of_week = config.get('day_of_week', 0)  # Monday = 0
-        hour = config.get('hour', 9)
-        minute = config.get('minute', 0)
+        # Check both job config and schedule config for time settings
+        job_config = config.get('job', {})
+        day_of_week = config.get('day_of_week', job_config.get(
+            'day_of_week', 0))  # Monday = 0
+        hour = config.get('hour', job_config.get('hour', 9))
+        minute = config.get('minute', job_config.get('minute', 0))
 
         days = ["Monday", "Tuesday", "Wednesday",
                 "Thursday", "Friday", "Saturday", "Sunday"]
         day_name = days[day_of_week]
+
+        print(
+            f"📅 Scheduling weekly job '{job.name}' for {day_name} at {hour:02d}:{minute:02d} IST")
 
         job_id = await scheduler.schedule_task(
             job_function,
@@ -212,9 +240,15 @@ class task_runner:
 
     async def schedule_monthly_job(self, job, job_function, config: Dict[str, Any]):
         """Schedule a monthly job"""
-        day_of_month = config.get('day_of_month', 1)
-        hour = config.get('hour', 9)
-        minute = config.get('minute', 0)
+        # Check both job config and schedule config for time settings
+        job_config = config.get('job', {})
+        day_of_month = config.get(
+            'day_of_month', job_config.get('day_of_month', 1))
+        hour = config.get('hour', job_config.get('hour', 9))
+        minute = config.get('minute', job_config.get('minute', 0))
+
+        print(
+            f"📅 Scheduling monthly job '{job.name}' for day {day_of_month} at {hour:02d}:{minute:02d} IST")
 
         def next_monthly_run():
             return next_monthly_run_ist(day_of_month, hour, minute)
@@ -329,6 +363,50 @@ class task_runner:
         except Exception as e:
             print(f"❌ Error reloading jobs: {e}")
 
+    async def run_job_now(self, job_name: str) -> bool:
+        """Run a job immediately for testing"""
+        try:
+            jobs = await JobInterface.get_active_jobs()
+            target_job = next((job for job in jobs if job.name == job_name), None)
+            
+            if not target_job:
+                print(f"❌ Job '{job_name}' not found")
+                return False
+            
+            print(f"⚡ Running job '{job_name}' immediately...")
+            
+            # Parse job configuration
+            schedule_config = {}
+            if target_job.schedule_config:
+                try:
+                    schedule_config = json.loads(target_job.schedule_config)
+                    print(f"📋 Job config: {schedule_config}")
+                except json.JSONDecodeError:
+                    print(f"⚠️ Invalid JSON in schedule config")
+            
+            job_config = schedule_config.get('job', {})
+            if not job_config and schedule_config:
+                job_config = schedule_config
+            
+            print(f"📄 Template ID: {job_config.get('template_id')}")
+            print(f"📧 Recipients: {job_config.get('recipients')}")
+            
+            # Create and execute job function
+            job_function = await self.create_job_function(target_job, job_config)
+            if job_function:
+                await job_function()
+                print(f"✅ Job '{job_name}' executed successfully")
+                return True
+            else:
+                print(f"❌ Failed to create function for job '{job_name}'")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error running job immediately: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     async def get_job_status(self) -> Dict[str, Any]:
         """Get status of all scheduled jobs"""
         try:
@@ -370,21 +448,21 @@ class task_runner:
 
 
 # Global instance
-dynamic_task_runner = task_runner()
+task_runner = task_runner()
 
 
 async def run_tasks():
-    """Main entry point for dynamic task runner"""
+    """Main entry point for task runner"""
     try:
-        await dynamic_task_runner.start()
+        await task_runner.start()
     except KeyboardInterrupt:
         print("🛑 Received interrupt signal")
     except Exception as e:
-        print(f"❌ Dynamic task runner error: {e}")
+        print(f"❌ task runner error: {e}")
     finally:
-        await dynamic_task_runner.stop()
+        await task_runner.stop()
 
 
 if __name__ == "__main__":
-    print("🚀 Starting Dynamic Task Runner...")
+    print("🚀 Starting Task Runner...")
     asyncio.run(run_tasks())

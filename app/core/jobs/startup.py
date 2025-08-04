@@ -1,7 +1,7 @@
 """
-Startup Script for Dynamic Task Runner
+Startup Script for Task Runner
 
-Initializes and starts the dynamic task runner when the application starts.
+Initializes and starts the task runner when the application starts.
 Can be called from main.py or other initialization scripts.
 """
 
@@ -11,35 +11,35 @@ from app.core.jobs.task_runner_manager import task_runner_manager
 
 
 def initialize_task_runner():
-    """Initialize the dynamic task runner on application startup"""
+    """Initialize the task runner on application startup"""
     try:
-        print("🚀 Initializing Dynamic Task Runner...")
+        print("🚀 Initializing Task Runner...")
 
         # Start the task runner
         success = task_runner_manager.start_runner()
 
         if success:
-            print("✅ Dynamic Task Runner initialized successfully")
+            print("✅ Task Runner initialized successfully")
 
             # Register cleanup function for application shutdown
             atexit.register(cleanup_task_runner)
 
             return True
         else:
-            print("❌ Failed to initialize Dynamic Task Runner")
+            print("❌ Failed to initialize Task Runner")
             return False
 
     except Exception as e:
-        print(f"❌ Error initializing Dynamic Task Runner: {e}")
+        print(f"❌ Error initializing Task Runner: {e}")
         return False
 
 
 def cleanup_task_runner():
     """Cleanup function called on application shutdown"""
     try:
-        print("🛑 Shutting down Dynamic Task Runner...")
+        print("🛑 Shutting down Task Runner...")
         task_runner_manager.stop_runner()
-        print("✅ Dynamic Task Runner shutdown complete")
+        print("✅ Task Runner shutdown complete")
     except Exception as e:
         print(f"❌ Error during task runner shutdown: {e}")
 

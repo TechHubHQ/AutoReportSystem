@@ -155,6 +155,7 @@ def get_next_daily_run_ist(hour: int, minute: int) -> datetime:
     now = now_ist()
     target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     
+    # If the target time has passed today, schedule for tomorrow
     if now >= target:
         target += timedelta(days=1)
     
@@ -207,6 +208,12 @@ def format_schedule_display(schedule_type: str, config: dict) -> str:
         return f"Custom: {cron} (IST)" if cron else "Custom (IST)"
     
     return f"{schedule_type.title()} (IST)"
+
+
+def get_next_run_in_minutes(minutes: int) -> datetime:
+    """Get a time that's X minutes from now in IST (for testing)"""
+    now = now_ist()
+    return now + timedelta(minutes=minutes)
 
 
 def get_timezone_info() -> dict:

@@ -237,7 +237,7 @@ def job_management(go_to_page):
                                     if template_id:
                                         code = f'''async def {function_name}():
     """Auto-generated job: {job_name}"""
-    from app.core.jobs.dynamic_report_sender import send_report
+    from app.core.jobs.report_sendert_sender import send_report
     
     # Job configuration
     template_id = {template_id}
@@ -307,7 +307,7 @@ def job_management(go_to_page):
                             if template_id:
                                 preview_code = f'''async def {function_name}():
     """Auto-generated job: {job_name}"""
-    from app.core.jobs.dynamic_report_sender import send_report
+    from app.core.jobs.report_sendert_sender import send_report
     
     # Job configuration
     template_id = {template_id}
@@ -431,6 +431,19 @@ def job_management(go_to_page):
                     if st.button("✏️ Edit", key=f"edit_{job.id}", use_container_width=True):
                         st.session_state.selected_job = job
                         st.rerun()
+
+                    # Run Now button for testing
+                    if st.button("⚡ Run Now", key=f"run_now_{job.id}", use_container_width=True, help="Run this job immediately for testing"):
+                        with st.spinner(f"Running {job.name}..."):
+                            try:
+                                from app.core.jobs.task_runner import task_runner
+                                success = asyncio.run(task_runner.run_job_now(job.name))
+                                if success:
+                                    st.success(f"✅ Job '{job.name}' executed successfully!")
+                                else:
+                                    st.error(f"❌ Job '{job.name}' execution failed!")
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
 
                     # Delete button (only for custom jobs)
                     if getattr(job, 'is_custom', False):
@@ -605,7 +618,7 @@ def job_management(go_to_page):
                             if edit_template_id:
                                 new_code = f'''async def {new_function_name}():
     """Auto-generated job: {new_name}"""
-    from app.core.jobs.dynamic_report_sender import send_report
+    from app.core.jobs.report_sendert_sender import send_report
     
     # Job configuration
     template_id = {edit_template_id}
@@ -666,7 +679,7 @@ def job_management(go_to_page):
                         if edit_template_id:
                             preview_code = f'''async def {new_function_name}():
     """Auto-generated job: {new_name}"""
-    from app.core.jobs.dynamic_report_sender import send_report
+    from app.core.jobs.report_sendert_sender import send_report
     
     template_id = {edit_template_id}
     content_type = "{edit_content_type}"
