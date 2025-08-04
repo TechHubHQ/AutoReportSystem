@@ -63,10 +63,27 @@ class JobInterface:
 
     @staticmethod
     async def create_job(name: str, description: str, function_name: str, code: str,
-                         schedule_type: str, schedule_config: str = None) -> bool:
-        """Create a new custom job"""
+                         schedule_type: str, schedule_config: str = None, 
+                         job_config: str = None) -> bool:
+        """Create a new custom job with optional job configuration"""
         db = await get_db()
         try:
+            # Combine schedule_config and job_config
+            final_config = {}
+            
+            if schedule_config:
+                try:
+                    final_config.update(json.loads(schedule_config))
+                except json.JSONDecodeError:
+                    pass
+            
+            if job_config:
+                try:
+                    job_data = json.loads(job_config)
+                    final_config['job'] = job_data
+                except json.JSONDecodeError:
+                    pass
+            
             new_job = Job(
                 name=name,
                 description=description,
@@ -74,7 +91,7 @@ class JobInterface:
                 module_path="custom_jobs",
                 code=code,
                 schedule_type=schedule_type,
-                schedule_config=schedule_config,
+                schedule_config=json.dumps(final_config) if final_config else None,
                 is_custom=True
             )
             db.add(new_job)
@@ -84,10 +101,32 @@ class JobInterface:
             await db.close()
 
     @staticmethod
-    async def update_job(job_id: int, **kwargs) -> bool:
-        """Update job details"""
+    async def update_job(job_id: int, job_config: str = None, **kwargs) -> bool:
+        """Update job details with optional job configuration"""
         db = await get_db()
         try:
+            # Handle job configuration updates
+            if job_config is not None:
+                # Get current job to merge configs
+                current_job = await JobInterface.get_job_by_id(job_id)
+                current_config = {}
+                
+                if current_job and current_job.schedule_config:
+                    try:
+                        current_config = json.loads(current_job.schedule_config)
+                    except json.JSONDecodeError:
+                        current_config = {}
+                
+                # Update job configuration
+                if job_config:
+                    try:
+                        job_data = json.loads(job_config)
+                        current_config['job'] = job_data
+                    except json.JSONDecodeError:
+                        pass
+                
+                kwargs['schedule_config'] = json.dumps(current_config)
+            
             await db.execute(
                 update(Job)
                 .where(Job.id == job_id)
@@ -139,3 +178,15 @@ class JobInterface:
             return {"success": True, "message": "Code executed successfully"}
         except Exception as e:
             return {"success": False, "message": str(e)}
+    
+    @staticmethod
+    async def get_job_config(job_id: int) -> dict:
+        """Get job configuration for a job"""
+        job = await JobInterface.get_job_by_id(job_id)
+        if job and job.schedule_config:
+            try:
+                config = json.loads(job.schedule_config)
+                return config.get('job', {})
+            except json.JSONDecodeError:
+                return {}
+        return {}

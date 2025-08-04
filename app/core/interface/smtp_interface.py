@@ -1,6 +1,8 @@
 from app.database.db_connector import get_db
 from app.core.services.encryption_service import EncryptionService
 from app.database.models import SMTPConf
+from sqlalchemy import select
+from typing import Optional
 
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd):
@@ -20,6 +22,48 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd):
     except Exception as e:
         print(f"Error creating new smtp configuration {e}")
         raise e
+    finally:
+        await db.close()
+
+
+async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTPConf]:
+    """Get active SMTP configuration for a user or the first active one"""
+    try:
+        db = await get_db()
+        
+        if user_id:
+            # Try to get user-specific SMTP config
+            result = await db.execute(
+                select(SMTPConf).where(
+                    SMTPConf.sender_email.in_(
+                        select(SMTPConf.sender_email).join(
+                            SMTPConf.user
+                        ).where(SMTPConf.user.has(id=user_id))
+                    ),
+                    SMTPConf.is_active == "True"
+                )
+            )
+            smtp_conf = result.scalar_one_or_none()
+            if smtp_conf:
+                # Decrypt password
+                smtp_conf.smtp_password = EncryptionService.decrypt(smtp_conf.smtp_password)
+                return smtp_conf
+        
+        # Fallback to any active SMTP config
+        result = await db.execute(
+            select(SMTPConf).where(SMTPConf.is_active == "True").limit(1)
+        )
+        smtp_conf = result.scalar_one_or_none()
+        if smtp_conf:
+            # Decrypt password
+            smtp_conf.smtp_password = EncryptionService.decrypt(smtp_conf.smtp_password)
+            return smtp_conf
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error getting active SMTP configuration: {e}")
+        return None
     finally:
         await db.close()
 
