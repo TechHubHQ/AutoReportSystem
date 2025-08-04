@@ -5,15 +5,15 @@ Displays current session information and provides session management controls.
 """
 
 import streamlit as st
-from app.security.session_manager import SessionManager
+from app.security.backend_session_manager import BackendSessionManager
 
 
 def show_session_status():
     """Display session status information"""
-    if not SessionManager.is_authenticated():
+    if not BackendSessionManager.is_authenticated():
         return
 
-    session_info = SessionManager.get_session_info()
+    session_info = BackendSessionManager.get_session_info()
     time_remaining = session_info.get('time_remaining', 0)
 
     if time_remaining <= 0:
@@ -34,7 +34,7 @@ def show_session_status():
     if time_remaining < 1800:  # Less than 30 minutes
         st.warning(f"⚠️ Session expires in {time_str}")
         if st.button("🔄 Extend Session", key="extend_session_status"):
-            if SessionManager.extend_session():
+            if BackendSessionManager.extend_session():
                 st.success("✅ Session extended by 6 hours!")
                 st.rerun()
     elif time_remaining < 3600:  # Less than 1 hour
@@ -45,14 +45,14 @@ def show_session_status():
 
 def show_compact_session_status():
     """Display compact session status for sidebar or header"""
-    if not SessionManager.is_authenticated():
+    if not BackendSessionManager.is_authenticated():
         return
 
-    session_info = SessionManager.get_session_info()
+    session_info = BackendSessionManager.get_session_info()
     time_remaining = session_info.get('time_remaining', 0)
 
+    # Don't show anything if session is expired - let the backend handle it
     if time_remaining <= 0:
-        st.error("🔒 Session expired")
         return
 
     # Format time remaining
@@ -61,8 +61,10 @@ def show_compact_session_status():
 
     if hours > 0:
         time_str = f"{hours}h {minutes}m"
-    else:
+    elif minutes > 0:
         time_str = f"{minutes}m"
+    else:
+        time_str = "<1m"
 
     # Color based on time remaining
     if time_remaining < 1800:  # Less than 30 minutes
@@ -92,6 +94,6 @@ def show_compact_session_status():
     # Show extend button if session is expiring soon
     if time_remaining < 3600:  # Less than 1 hour
         if st.button("🔄 Extend", key="extend_compact_session", use_container_width=True):
-            if SessionManager.extend_session():
+            if BackendSessionManager.extend_session():
                 st.success("✅ Extended!")
                 st.rerun()

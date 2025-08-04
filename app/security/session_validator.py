@@ -6,7 +6,7 @@ Provides utilities to validate and refresh sessions during critical operations.
 
 import streamlit as st
 from datetime import datetime, timedelta
-from app.security.session_manager import SessionManager
+from app.security.backend_session_manager import BackendSessionManager
 
 
 class SessionValidator:
@@ -20,7 +20,7 @@ class SessionValidator:
         Returns:
             bool: True if session is valid, False if invalid/expired
         """
-        if not SessionManager.is_authenticated():
+        if not BackendSessionManager.is_authenticated():
             return False
 
         session_token = st.session_state.get('session_token')
@@ -28,11 +28,10 @@ class SessionValidator:
             return False
 
         # Validate session with database
-        user_data = SessionManager.validate_session(session_token)
+        user_data = BackendSessionManager.validate_session(session_token)
         if not user_data:
             # Session is invalid, clear it
-            SessionManager._clear_streamlit_session()
-            SessionManager._clear_browser_session()
+            BackendSessionManager.clear_session()
             return False
 
         return True
@@ -45,15 +44,15 @@ class SessionValidator:
         Returns:
             bool: True if session is valid/refreshed, False if expired
         """
-        if not SessionManager.is_authenticated():
+        if not BackendSessionManager.is_authenticated():
             return False
 
-        session_info = SessionManager.get_session_info()
+        session_info = BackendSessionManager.get_session_info()
         time_remaining = session_info.get('time_remaining', 0)
 
         # If less than 1 hour remaining, extend the session
         if 0 < time_remaining < 3600:  # 1 hour
-            return SessionManager.extend_session()
+            return BackendSessionManager.extend_session()
 
         return time_remaining > 0
 

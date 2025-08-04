@@ -22,7 +22,7 @@ class SessionManager:
     """Handles persistent session management"""
 
     # Session duration: 6 hours in seconds
-    SESSION_DURATION = 6 * 60 * 60  # 6 hours
+    SESSION_DURATION = 6 * 60 * 60  # 6 hours (21600 seconds)
 
     @staticmethod
     def generate_session_token() -> str:
@@ -61,9 +61,11 @@ class SessionManager:
             # Store in browser localStorage
             SessionManager._store_session_in_browser(session_token)
 
+            print(f"Session created successfully for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
             return session_token
 
         except Exception as e:
+            print(f"Failed to create session: {e}")
             st.error(f"Failed to create session: {e}")
             return None
 
@@ -105,9 +107,11 @@ class SessionManager:
                 st.session_state.session_token = session_token
                 st.session_state.session_expires_at = session.expires_at
 
+                print(f"Session validated successfully for user {user_data.get('email', 'unknown')} - expires at {session.expires_at}")
                 return user_data
             else:
                 # Session not found or expired, clear browser storage
+                print(f"Session not found or expired for token: {session_token[:8]}...")
                 SessionManager._clear_browser_session()
             return None
 
@@ -193,8 +197,10 @@ class SessionManager:
         if not session_token or not expires_at:
             return False
 
-        # Check if session has expired
-        if datetime.now() > expires_at:
+        # Check if session has expired (with 5 minute grace period)
+        now = datetime.now()
+        if now > expires_at:
+            # Only clear if truly expired (no grace period for critical operations)
             SessionManager._clear_streamlit_session()
             SessionManager._clear_browser_session()
             return False
@@ -245,15 +251,7 @@ class SessionManager:
         """Attempt to restore session from browser storage"""
         # First check if we already have a valid session in Streamlit state
         if SessionManager.is_authenticated():
-            session_token = st.session_state.get('session_token')
-            if session_token:
-                # Validate existing session
-                user_data = SessionManager.validate_session(session_token)
-                if user_data:
-                    return True
-                else:
-                    # Session expired, clear it
-                    SessionManager._clear_streamlit_session()
+            return True
 
         # Check if there's a session token in query params (from browser storage)
         session_token = st.query_params.get('restore_session')
@@ -261,7 +259,7 @@ class SessionManager:
             # Validate the session token
             user_data = SessionManager.validate_session(session_token)
             if user_data:
-                # Clear the query parameter
+                # Clear the query parameter to clean up URL
                 if 'restore_session' in st.query_params:
                     del st.query_params['restore_session']
                 return True

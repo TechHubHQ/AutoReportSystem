@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 from app.security.route_protection import RouteProtection
-from app.security.session_manager import SessionManager
+from app.security.backend_session_manager import BackendSessionManager
 
 
 class SecurityMiddleware:
@@ -41,27 +41,14 @@ class SecurityMiddleware:
         Returns:
             bool: True if session is valid, False if timed out
         """
-        if not SessionManager.is_authenticated():
-            return True
-
-        session_info = SessionManager.get_session_info()
-        if session_info and not session_info.get('is_valid', False):
-            # Session expired - only show error if we're on a protected route
-            current_page = st.session_state.get('page', 'home')
-            if RouteProtection.is_route_protected(current_page):
-                SessionManager.destroy_session()
-                st.error("🕐 Your session has expired. Please log in again.")
-                return False
-            else:
-                # Just clear the session silently for public pages
-                SessionManager.destroy_session()
-
+        # Don't check session timeout on every page load - let SessionManager handle it
+        # This prevents premature "session expired" messages
         return True
 
     @staticmethod
     def get_session_info() -> dict:
-        """Get current session information from SessionManager"""
-        return SessionManager.get_session_info()
+        """Get current session information from BackendSessionManager"""
+        return BackendSessionManager.get_session_info()
 
     @staticmethod
     def format_time_remaining(seconds: float) -> str:
@@ -80,10 +67,15 @@ class SecurityMiddleware:
     @staticmethod
     def show_session_warning():
         """Show session timeout warning if needed"""
-        if not SessionManager.is_authenticated():
+        if not BackendSessionManager.is_authenticated():
             return
 
-        session_info = SessionManager.get_session_info()
+        # Only show warnings on protected routes
+        current_page = st.session_state.get('page', 'home')
+        if not RouteProtection.is_route_protected(current_page):
+            return
+
+        session_info = BackendSessionManager.get_session_info()
         time_remaining = session_info.get("time_remaining", 0)
 
         # Show warning if less than 30 minutes remaining
@@ -96,7 +88,7 @@ class SecurityMiddleware:
                     f"⚠️ Your session will expire in {remaining_time}. Please save your work.")
             with col2:
                 if st.button("🔄 Extend Session", key="extend_session"):
-                    if SessionManager.extend_session():
+                    if BackendSessionManager.extend_session():
                         st.success("✅ Session extended by 6 hours!")
                         st.rerun()
 

@@ -10,7 +10,7 @@ from app.ui.smtp_conf import smtp_conf
 from app.ui.job_management import job_management
 from app.security.route_protection import RouteProtection, session_timeout_check
 from app.security.middleware import apply_security_middleware
-from app.security.session_manager import SessionManager
+from app.security.backend_session_manager import BackendSessionManager
 from app.security.session_validator import SessionValidator
 
 
@@ -20,17 +20,20 @@ st.set_page_config(page_title="Automate Report System", layout="wide")
 # Initialize DB and session system only once
 if "db_initialized" not in st.session_state:
     asyncio.run(init_db())
-    SessionManager.init_session_table()
-    SessionManager.cleanup_expired_sessions()
+    BackendSessionManager.init_session_table()
+    BackendSessionManager.cleanup_expired_sessions()
     st.session_state.db_initialized = True
 
-# Always attempt to restore/validate session from browser storage on page load
+# Always attempt to restore session from URL parameters or existing state
 # This ensures sessions persist through page refreshes
-SessionManager.restore_session_from_browser()
+BackendSessionManager.restore_session()
 
-# Validate and refresh session if needed
-if SessionManager.is_authenticated():
-    SessionValidator.validate_and_refresh()
+# Validate and refresh session if needed (but don't be too aggressive)
+if BackendSessionManager.is_authenticated():
+    # Only validate if we're on a protected route
+    current_page = st.session_state.get('page', 'home')
+    if RouteProtection.is_route_protected(current_page):
+        SessionValidator.validate_and_refresh()
 
 
 # Apply security middleware

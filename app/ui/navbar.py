@@ -1,6 +1,6 @@
 import streamlit as st
 from app.security.route_protection import RouteProtection
-from app.security.session_manager import SessionManager
+from app.security.backend_session_manager import BackendSessionManager
 from app.ui.security_dashboard import show_security_status
 from app.ui.components.session_status import show_compact_session_status
 
@@ -65,7 +65,7 @@ def navbar(go_to_page, current_page="dashboard"):
         """, unsafe_allow_html=True)
 
         # Enhanced user info
-        user = SessionManager.get_current_user() or {}
+        user = BackendSessionManager.get_current_user() or {}
         username = user.get("username", "User")
 
         st.markdown(f"""
@@ -96,11 +96,6 @@ def navbar(go_to_page, current_page="dashboard"):
                 type="primary" if current_page == item["page"] else "secondary"
             ):
                 go_to_page(item["page"])
-
-        st.divider()
-
-        # Show security status
-        show_security_status()
 
         st.divider()
 
