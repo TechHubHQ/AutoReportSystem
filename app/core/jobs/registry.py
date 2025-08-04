@@ -9,7 +9,7 @@ from app.database.models import Job
 
 class JobRegistry:
     _jobs: Dict[str, Dict[str, Any]] = {}
-    
+
     @classmethod
     def register(cls, name: str, description: str = "", schedule_type: str = "custom"):
         """Decorator to register a job function"""
@@ -22,18 +22,18 @@ class JobRegistry:
                 "module_path": func.__module__,
                 "schedule_type": schedule_type
             }
-            
+
             @wraps(func)
             async def wrapper(*args, **kwargs):
                 return await func(*args, **kwargs)
             return wrapper
         return decorator
-    
+
     @classmethod
     def get_jobs(cls) -> Dict[str, Dict[str, Any]]:
         """Get all registered jobs"""
         return cls._jobs
-    
+
     @classmethod
     async def sync_to_database(cls):
         """Sync registered jobs to database"""
@@ -43,7 +43,7 @@ class JobRegistry:
                 # Check if job exists
                 result = await db.execute(select(Job).where(Job.name == job_name))
                 existing_job = result.scalar_one_or_none()
-                
+
                 if not existing_job:
                     # Create new job record
                     new_job = Job(
@@ -54,7 +54,7 @@ class JobRegistry:
                         schedule_type=job_info["schedule_type"]
                     )
                     db.add(new_job)
-            
+
             await db.commit()
         finally:
             await db.close()

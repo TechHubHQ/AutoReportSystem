@@ -32,7 +32,7 @@ async def send_w_report():
 
 @job_registry.register(
     name="Monthly Report",
-    description="Sends monthly report email to stakeholders", 
+    description="Sends monthly report email to stakeholders",
     schedule_type="monthly"
 )
 async def send_m_report():

@@ -129,14 +129,15 @@ class JobScheduler:
                 if info['function'] == job.coro:
                     job_name = name
                     break
-            
+
             if job_name:
                 await JobInterface.update_job_run_times(
-                    job_name, 
+                    job_name,
                     datetime.now(timezone.utc),
-                    datetime.now(timezone.utc) + timedelta(seconds=job.repeat) if job.repeat else None
+                    datetime.now(
+                        timezone.utc) + timedelta(seconds=job.repeat) if job.repeat else None
                 )
-            
+
             await job.coro(*job.args, **job.kwargs)
         except Exception as e:
             print(f"Scheduled job error: {e}")

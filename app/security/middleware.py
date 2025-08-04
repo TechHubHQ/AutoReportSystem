@@ -45,11 +45,16 @@ class SecurityMiddleware:
             return True
 
         session_info = SessionManager.get_session_info()
-        if not session_info.get('is_valid', False):
-            # Session expired
-            SessionManager.destroy_session()
-            st.error("🕐 Your session has expired. Please log in again.")
-            return False
+        if session_info and not session_info.get('is_valid', False):
+            # Session expired - only show error if we're on a protected route
+            current_page = st.session_state.get('page', 'home')
+            if RouteProtection.is_route_protected(current_page):
+                SessionManager.destroy_session()
+                st.error("🕐 Your session has expired. Please log in again.")
+                return False
+            else:
+                # Just clear the session silently for public pages
+                SessionManager.destroy_session()
 
         return True
 
@@ -83,10 +88,12 @@ class SecurityMiddleware:
 
         # Show warning if less than 30 minutes remaining
         if 0 < time_remaining < 1800:  # 30 minutes
-            remaining_time = SecurityMiddleware.format_time_remaining(time_remaining)
+            remaining_time = SecurityMiddleware.format_time_remaining(
+                time_remaining)
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.warning(f"⚠️ Your session will expire in {remaining_time}. Please save your work.")
+                st.warning(
+                    f"⚠️ Your session will expire in {remaining_time}. Please save your work.")
             with col2:
                 if st.button("🔄 Extend Session", key="extend_session"):
                     if SessionManager.extend_session():

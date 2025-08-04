@@ -7,7 +7,7 @@ from app.core.jobs.discovery import initialize_jobs
 
 async def run_tasks():
     print("Initializing task scheduling sequence...")
-    
+
     # Initialize job discovery and registration
     print("Discovering and registering jobs...")
     await initialize_jobs()

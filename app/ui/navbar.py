@@ -67,13 +67,13 @@ def navbar(go_to_page, current_page="dashboard"):
         # Enhanced user info
         user = SessionManager.get_current_user() or {}
         username = user.get("username", "User")
-        
+
         st.markdown(f"""
         <div class="user-welcome">
             <strong>👋 Welcome, {username}!</strong>
         </div>
         """, unsafe_allow_html=True)
-        
+
         # Show compact session status
         show_compact_session_status()
 

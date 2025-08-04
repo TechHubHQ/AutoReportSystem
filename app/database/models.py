@@ -24,7 +24,7 @@ class User(Base):
     # One-to-many: User → EmailTemplates
     templates = relationship(
         "EmailTemplate", back_populates="creator", cascade="all, delete-orphan")
-    
+
     # One-to-many: User → UserSessions
     sessions = relationship(
         "UserSession", back_populates="user", cascade="all, delete-orphan")
@@ -77,15 +77,19 @@ class Job(Base):
     description = Column(Text, nullable=True)
     function_name = Column(String, nullable=False)
     module_path = Column(String, nullable=False)
-    schedule_type = Column(String, nullable=False)  # weekly, monthly, daily, custom
+    # weekly, monthly, daily, custom
+    schedule_type = Column(String, nullable=False)
     code = Column(Text, nullable=True)  # Python code for the job
     schedule_config = Column(Text, nullable=True)  # JSON config for scheduling
     is_active = Column(Boolean, default=True, nullable=False)
-    is_custom = Column(Boolean, default=False, nullable=False)  # User-created vs auto-discovered
+    # User-created vs auto-discovered
+    is_custom = Column(Boolean, default=False, nullable=False)
     last_run = Column(DateTime(timezone=True), nullable=True)
     next_run = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(
+    ), onupdate=func.now(), nullable=False)
 
 
 class EmailTemplate(Base):
@@ -116,8 +120,10 @@ class UserSession(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user_data = Column(Text, nullable=False)  # JSON string of user data
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    last_accessed = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+    last_accessed = Column(DateTime(timezone=True),
+                           server_default=func.now(), nullable=False)
 
     # Many-to-one: UserSession → User
     user = relationship("User", back_populates="sessions")

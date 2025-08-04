@@ -81,7 +81,7 @@ class RouteProtection:
     def logout():
         """Logout user and clear session"""
         SessionManager.destroy_session()
-    
+
     @staticmethod
     def check_route_access(route: str, go_to_page: Callable) -> bool:
         """

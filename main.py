@@ -11,6 +11,7 @@ from app.ui.job_management import job_management
 from app.security.route_protection import RouteProtection, session_timeout_check
 from app.security.middleware import apply_security_middleware
 from app.security.session_manager import SessionManager
+from app.security.session_validator import SessionValidator
 
 
 st.set_page_config(page_title="Automate Report System", layout="wide")
@@ -23,9 +24,13 @@ if "db_initialized" not in st.session_state:
     SessionManager.cleanup_expired_sessions()
     st.session_state.db_initialized = True
 
-# Attempt to restore session from browser storage
-if not SessionManager.is_authenticated():
-    SessionManager.restore_session_from_browser()
+# Always attempt to restore/validate session from browser storage on page load
+# This ensures sessions persist through page refreshes
+SessionManager.restore_session_from_browser()
+
+# Validate and refresh session if needed
+if SessionManager.is_authenticated():
+    SessionValidator.validate_and_refresh()
 
 
 # Apply security middleware

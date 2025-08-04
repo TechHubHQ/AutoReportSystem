@@ -6,6 +6,7 @@ that survives page refreshes and browser restarts.
 """
 
 import streamlit as st
+import streamlit.components.v1
 import uuid
 import json
 import asyncio
@@ -35,7 +36,8 @@ class SessionManager:
         expires_at = datetime.now() + timedelta(seconds=SessionManager.SESSION_DURATION)
 
         async def _create_session():
-            async with get_db() as db:
+            db = await get_db()
+            async with db:
                 # Create new session
                 new_session = UserSession(
                     session_token=session_token,
@@ -72,37 +74,48 @@ class SessionManager:
             return None
 
         async def _validate_session():
-            async with get_db() as db:
-                # Find valid session
-                stmt = select(UserSession).where(
-                    UserSession.session_token == session_token,
-                    UserSession.expires_at > datetime.now()
-                )
-                result = await db.execute(stmt)
-                session = result.scalar_one_or_none()
+            try:
+                db = await get_db()
+                async with db:
+                    # Find valid session
+                    stmt = select(UserSession).where(
+                        UserSession.session_token == session_token,
+                        UserSession.expires_at > datetime.now()
+                    )
+                    result = await db.execute(stmt)
+                    session = result.scalar_one_or_none()
 
-                if session:
-                    # Update last accessed time
-                    session.last_accessed = datetime.now()
-                    await db.commit()
-                    return session
+                    if session:
+                        # Update last accessed time
+                        session.last_accessed = datetime.now()
+                        await db.commit()
+                        return session
+                    return None
+            except Exception as e:
+                print(f"Database error in session validation: {e}")
                 return None
 
         try:
             session = asyncio.run(_validate_session())
             if session:
                 user_data = json.loads(session.user_data)
-                
+
                 # Store in Streamlit session
                 st.session_state.user = user_data
                 st.session_state.session_token = session_token
                 st.session_state.session_expires_at = session.expires_at
-                
+
                 return user_data
+            else:
+                # Session not found or expired, clear browser storage
+                SessionManager._clear_browser_session()
             return None
 
         except Exception as e:
-            st.error(f"Session validation failed: {e}")
+            print(f"Session validation failed: {e}")
+            # Clear potentially corrupted session data
+            SessionManager._clear_streamlit_session()
+            SessionManager._clear_browser_session()
             return None
 
     @staticmethod
@@ -113,8 +126,10 @@ class SessionManager:
 
         if session_token:
             async def _destroy_session():
-                async with get_db() as db:
-                    stmt = delete(UserSession).where(UserSession.session_token == session_token)
+                db = await get_db()
+                async with db:
+                    stmt = delete(UserSession).where(
+                        UserSession.session_token == session_token)
                     await db.execute(stmt)
                     await db.commit()
 
@@ -133,8 +148,10 @@ class SessionManager:
     def cleanup_expired_sessions():
         """Remove expired sessions from database"""
         async def _cleanup_sessions():
-            async with get_db() as db:
-                stmt = delete(UserSession).where(UserSession.expires_at < datetime.now())
+            db = await get_db()
+            async with db:
+                stmt = delete(UserSession).where(
+                    UserSession.expires_at < datetime.now())
                 await db.execute(stmt)
                 await db.commit()
 
@@ -165,8 +182,24 @@ class SessionManager:
 
     @staticmethod
     def is_authenticated() -> bool:
-        """Check if user is authenticated"""
-        return 'user' in st.session_state and st.session_state.user is not None
+        """Check if user is authenticated with session validation"""
+        if 'user' not in st.session_state or st.session_state.user is None:
+            return False
+
+        # Check if session token exists and is still valid
+        session_token = st.session_state.get('session_token')
+        expires_at = st.session_state.get('session_expires_at')
+
+        if not session_token or not expires_at:
+            return False
+
+        # Check if session has expired
+        if datetime.now() > expires_at:
+            SessionManager._clear_streamlit_session()
+            SessionManager._clear_browser_session()
+            return False
+
+        return True
 
     @staticmethod
     def get_current_user() -> Optional[Dict[str, Any]]:
@@ -183,11 +216,13 @@ class SessionManager:
         new_expires_at = datetime.now() + timedelta(seconds=SessionManager.SESSION_DURATION)
 
         async def _extend_session():
-            async with get_db() as db:
-                stmt = select(UserSession).where(UserSession.session_token == session_token)
+            db = await get_db()
+            async with db:
+                stmt = select(UserSession).where(
+                    UserSession.session_token == session_token)
                 result = await db.execute(stmt)
                 session = result.scalar_one_or_none()
-                
+
                 if session:
                     session.expires_at = new_expires_at
                     session.last_accessed = datetime.now()
@@ -208,22 +243,36 @@ class SessionManager:
     @staticmethod
     def restore_session_from_browser():
         """Attempt to restore session from browser storage"""
+        # First check if we already have a valid session in Streamlit state
+        if SessionManager.is_authenticated():
+            session_token = st.session_state.get('session_token')
+            if session_token:
+                # Validate existing session
+                user_data = SessionManager.validate_session(session_token)
+                if user_data:
+                    return True
+                else:
+                    # Session expired, clear it
+                    SessionManager._clear_streamlit_session()
+
         # Check if there's a session token in query params (from browser storage)
         session_token = st.query_params.get('restore_session')
-
         if session_token:
             # Validate the session token
             user_data = SessionManager.validate_session(session_token)
             if user_data:
                 # Clear the query parameter
-                del st.query_params['restore_session']
+                if 'restore_session' in st.query_params:
+                    del st.query_params['restore_session']
                 return True
             else:
                 # Invalid session, clear query parameter
-                del st.query_params['restore_session']
+                if 'restore_session' in st.query_params:
+                    del st.query_params['restore_session']
+                SessionManager._clear_browser_session()
                 return False
 
-        # If no session in Streamlit but we haven't checked browser storage yet
+        # If no session in Streamlit and we haven't checked browser storage yet
         if 'browser_session_checked' not in st.session_state:
             st.session_state.browser_session_checked = True
             # Show JavaScript to check localStorage and reload with token if found
@@ -233,7 +282,7 @@ class SessionManager:
                 if (token && !window.location.search.includes('restore_session')) {
                     const url = new URL(window.location);
                     url.searchParams.set('restore_session', token);
-                    window.location.href = url.toString();
+                    window.location.replace(url.toString());
                 }
             </script>
             """

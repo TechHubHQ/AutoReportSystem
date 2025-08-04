@@ -609,8 +609,10 @@ async def render_system_monitoring(dashboard_manager):
         # Job status overview
         active_jobs = len([j for j in jobs if j.is_active])
         inactive_jobs = len([j for j in jobs if not j.is_active])
-        recent_runs = len([j for j in jobs if j.last_run and j.last_run > datetime.now() - timedelta(hours=24)])
-        scheduled_jobs = len([j for j in jobs if j.next_run and j.next_run > datetime.now()])
+        recent_runs = len(
+            [j for j in jobs if j.last_run and j.last_run > datetime.now() - timedelta(hours=24)])
+        scheduled_jobs = len(
+            [j for j in jobs if j.next_run and j.next_run > datetime.now()])
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -649,9 +651,11 @@ async def render_system_monitoring(dashboard_manager):
         for job in jobs:
             status_color = '#4fc3f7' if job.is_active else '#ff6b6b'
             status_text = 'Active' if job.is_active else 'Inactive'
-            
-            last_run_text = job.last_run.strftime('%Y-%m-%d %H:%M') if job.last_run else 'Never'
-            next_run_text = job.next_run.strftime('%Y-%m-%d %H:%M') if job.next_run else 'Not scheduled'
+
+            last_run_text = job.last_run.strftime(
+                '%Y-%m-%d %H:%M') if job.last_run else 'Never'
+            next_run_text = job.next_run.strftime(
+                '%Y-%m-%d %H:%M') if job.next_run else 'Not scheduled'
 
             st.markdown(f"""
             <div class="task-card">
@@ -673,10 +677,11 @@ async def render_system_monitoring(dashboard_manager):
         # Job status and schedule type distribution
         if len(jobs) > 0:
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 # Job status distribution
-                status_counts = {'Active': active_jobs, 'Inactive': inactive_jobs}
+                status_counts = {'Active': active_jobs,
+                                 'Inactive': inactive_jobs}
                 if any(status_counts.values()):
                     fig = px.pie(
                         values=list(status_counts.values()),
@@ -687,16 +692,18 @@ async def render_system_monitoring(dashboard_manager):
                             'Inactive': '#ff6b6b'
                         }
                     )
-                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    fig.update_traces(textposition='inside',
+                                      textinfo='percent+label')
                     fig.update_layout(height=300)
                     st.plotly_chart(fig, use_container_width=True)
-            
+
             with col2:
                 # Schedule type distribution
                 schedule_counts = {}
                 for job in jobs:
-                    schedule_counts[job.schedule_type] = schedule_counts.get(job.schedule_type, 0) + 1
-                
+                    schedule_counts[job.schedule_type] = schedule_counts.get(
+                        job.schedule_type, 0) + 1
+
                 if schedule_counts:
                     fig = px.bar(
                         x=list(schedule_counts.keys()),
@@ -713,7 +720,8 @@ async def render_system_monitoring(dashboard_manager):
                     fig.update_layout(height=300, showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No background jobs found. Jobs will appear here once discovered.")
+            st.info(
+                "No background jobs found. Jobs will appear here once discovered.")
 
 
 def dashboard():

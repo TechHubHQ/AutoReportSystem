@@ -60,10 +60,10 @@ class JobInterface:
             await db.commit()
         finally:
             await db.close()
-    
+
     @staticmethod
-    async def create_job(name: str, description: str, function_name: str, code: str, 
-                        schedule_type: str, schedule_config: str = None) -> bool:
+    async def create_job(name: str, description: str, function_name: str, code: str,
+                         schedule_type: str, schedule_config: str = None) -> bool:
         """Create a new custom job"""
         db = await get_db()
         try:
@@ -82,7 +82,7 @@ class JobInterface:
             return True
         finally:
             await db.close()
-    
+
     @staticmethod
     async def update_job(job_id: int, **kwargs) -> bool:
         """Update job details"""
@@ -97,7 +97,7 @@ class JobInterface:
             return True
         finally:
             await db.close()
-    
+
     @staticmethod
     async def delete_job(job_id: int) -> bool:
         """Delete a job"""
@@ -108,7 +108,7 @@ class JobInterface:
             return True
         finally:
             await db.close()
-    
+
     @staticmethod
     async def get_job_by_id(job_id: int) -> Optional[Job]:
         """Get job by ID"""
@@ -118,7 +118,7 @@ class JobInterface:
             return result.scalar_one_or_none()
         finally:
             await db.close()
-    
+
     @staticmethod
     async def test_job_code(code: str) -> dict:
         """Test job code execution"""
