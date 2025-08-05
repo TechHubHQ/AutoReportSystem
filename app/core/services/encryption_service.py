@@ -9,10 +9,6 @@ class EncryptionService:
     """
     Service for encrypting and decrypting strings using a consistent key.
     """
-
-    # In a real application, store this key securely (e.g., environment variable, secrets manager)
-    # Here, we attempt to load the key from an environment variable for safety.
-    # Fernet key must be 32 url-safe base64-encoded bytes (44 chars when base64-encoded)
     _KEY = os.getenv("FERNET_KEY")
 
     @classmethod
@@ -43,5 +39,4 @@ class EncryptionService:
         else:
             ciphertext_bytes = ciphertext
         decrypted_text = encryption_client.decrypt_string(cls._KEY, ciphertext_bytes)
-        print(decrypted_text)
         return decrypted_text

@@ -1,7 +1,7 @@
 import aiosmtplib
 from email.mime.text import MIMEText
 from app.core.interface.template_interface import get_template
-from app.core.jobs.utils.template_loader import load_template_from_string
+from app.integrations.email.template_loader import load_template_from_string
 
 
 class EmailService:

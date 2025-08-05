@@ -1,9 +1,7 @@
 import re
 from jinja2 import Environment, BaseLoader, select_autoescape, FileSystemLoader
-from app.core.jobs.utils.content_loader import process_dynamic_content
 from app.core.interface.template_interface import get_template, get_templates
-import asyncio
-
+from app.integrations.email.content_loader import process_dynamic_content
 
 class StringTemplateLoader(BaseLoader):
     """Custom Jinja2 loader for string templates"""

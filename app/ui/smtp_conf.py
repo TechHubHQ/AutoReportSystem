@@ -1,9 +1,10 @@
 import streamlit as st
 import asyncio
 from app.ui.navbar import navbar
-from app.core.interface.smtp_interface import setup_smtp, get_smtp_conf, update_smtp_conf
+from app.core.interface.smtp_interface import setup_smtp, get_smtp_conf, update_smtp_conf, get_active_smtp_config, get_all_smtp_configs
 from app.integrations.email.email_client import EmailService
 from app.ui.components.loader import LoaderContext
+from app.core.services.encryption_service import EncryptionService
 
 
 def smtp_conf(go_to_page):
@@ -46,6 +47,66 @@ def smtp_conf(go_to_page):
     # Get current user
     user = st.session_state.get("user", {})
     user_email = user.get("email", "")
+    user_id = user.get("id")
+
+    # Display current SMTP configuration
+    st.markdown("### 📋 Current SMTP Configuration")
+    try:
+        current_config = asyncio.run(get_active_smtp_config(user_id))
+        if current_config:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.info(f"**Host:** {current_config.smtp_host}")
+                st.info(f"**Port:** {current_config.smtp_port}")
+            with col2:
+                st.info(f"**Username:** {current_config.smtp_username}")
+                st.info(
+                    f"**Status:** {'🟢 Active' if current_config.is_active == 'True' else '🔴 Inactive'}")
+            with col3:
+                st.info(f"**Sender:** {current_config.sender_email}")
+                masked_pwd = '*' * \
+                    len(current_config.smtp_password) if current_config.smtp_password else 'Not set'
+                st.info(f"**Password:** {masked_pwd}")
+        else:
+            st.warning(
+                "⚠️ No SMTP configuration found. Please set up your email server below.")
+    except Exception as e:
+        st.error(f"❌ Error loading current configuration: {str(e)}")
+
+    # Show all configurations if user has multiple
+    if st.button("📋 View All Configurations"):
+        st.session_state.show_all_configs = not st.session_state.get(
+            "show_all_configs", False)
+
+    if st.session_state.get("show_all_configs", False):
+        try:
+            all_configs = asyncio.run(get_all_smtp_configs(user_email))
+            if all_configs:
+                st.markdown("#### All SMTP Configurations")
+                for i, config in enumerate(all_configs):
+                    with st.expander(f"Config {i+1}: {config.smtp_host} ({'Active' if config.is_active == 'True' else 'Inactive'})"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Host:** {config.smtp_host}")
+                            st.write(f"**Port:** {config.smtp_port}")
+                            st.write(f"**Username:** {config.smtp_username}")
+                        with col2:
+                            st.write(f"**Sender:** {config.sender_email}")
+                            st.write(
+                                f"**Status:** {'Active' if config.is_active == 'True' else 'Inactive'}")
+                            masked_pwd = '*' * 8 if config.smtp_password else 'Not set'
+                            st.write(f"**Password:** {masked_pwd}")
+            else:
+                st.info("No additional configurations found.")
+        except Exception as e:
+            st.error(f"Error loading configurations: {str(e)}")
+
+    st.markdown("---")
+
+    # Pre-fill form with current config if available
+    default_host = current_config.smtp_host if current_config else ""
+    default_port = current_config.smtp_port if current_config else 587
+    default_username = current_config.smtp_username if current_config else ""
 
     with st.form("smtp_form"):
         st.markdown("### 🔧 Server Configuration")
@@ -55,11 +116,13 @@ def smtp_conf(go_to_page):
         with col1:
             smtp_host = st.text_input(
                 "🌐 SMTP Host *",
+                value=default_host,
                 placeholder="smtp.gmail.com",
                 help="Your email provider's SMTP server address"
             )
             smtp_username = st.text_input(
                 "👤 Username *",
+                value=default_username,
                 placeholder="your-email@domain.com",
                 help="Your email address or username"
             )
@@ -69,7 +132,7 @@ def smtp_conf(go_to_page):
                 "🔌 Port *",
                 min_value=1,
                 max_value=65535,
-                value=587,
+                value=default_port,
                 help="Common ports: 587 (TLS), 465 (SSL), 25 (unsecured)"
             )
             smtp_password = st.text_input(
@@ -104,11 +167,18 @@ def smtp_conf(go_to_page):
             )
 
         with col8:
-            save_config = st.form_submit_button(
-                "💾 Save Configuration",
-                type="primary",
-                use_container_width=True
-            )
+            if current_config:
+                save_config = st.form_submit_button(
+                    "🔄 Update Configuration",
+                    type="primary",
+                    use_container_width=True
+                )
+            else:
+                save_config = st.form_submit_button(
+                    "💾 Save Configuration",
+                    type="primary",
+                    use_container_width=True
+                )
 
         with col9:
             clear_form = st.form_submit_button(
@@ -131,14 +201,26 @@ def smtp_conf(go_to_page):
 
     if save_config:
         if smtp_host and smtp_username and smtp_password:
-            with LoaderContext("💾 Saving SMTP configuration...", "inline"):
+            action_text = "Updating" if current_config else "Saving"
+            with LoaderContext(f"💾 {action_text} SMTP configuration...", "inline"):
                 try:
-                    asyncio.run(setup_smtp(smtp_host, smtp_port,
-                                smtp_username, smtp_password, user_email))
-                    st.success("✅ SMTP configuration saved successfully!")
+                    if current_config:
+                        # Update existing configuration
+                        asyncio.run(update_smtp_conf(
+                            current_config.id, smtp_host, smtp_port, smtp_username, smtp_password
+                        ))
+                        st.success(
+                            "✅ SMTP configuration updated successfully!")
+                    else:
+                        # Create new configuration
+                        asyncio.run(setup_smtp(smtp_host, smtp_port,
+                                    smtp_username, smtp_password, user_email))
+                        st.success("✅ SMTP configuration saved successfully!")
                     st.info("📧 You can now send automated email reports")
+                    st.rerun()  # Refresh to show updated config
                 except Exception as e:
-                    st.error(f"❌ Error saving configuration: {str(e)}")
+                    st.error(
+                        f"❌ Error {action_text.lower()} configuration: {str(e)}")
         else:
             st.error("⚠️ Please fill in all required fields")
 

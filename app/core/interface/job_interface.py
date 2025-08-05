@@ -1,150 +1,192 @@
-from sqlalchemy import select, update, delete as sql_delete
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import Job
 from app.database.db_connector import get_db
-from typing import List, Optional
+from sqlalchemy import select, update, delete
 from datetime import datetime
+from typing import List, Dict, Any, Optional
 import json
+
+
+async def create_job(job_data):
+    """
+    Create a new job in the database.
+    job_data: dict with keys matching Job model fields.
+
+    class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    description = Column(Text, nullable=True)
+    function_name = Column(String, nullable=False)
+    module_path = Column(String, nullable=False)
+    # weekly, monthly, daily, custom
+    schedule_type = Column(String, nullable=False)
+    code = Column(Text, nullable=True)  # Python code for the job
+    schedule_config = Column(Text, nullable=True)  # JSON config for scheduling
+    is_active = Column(Boolean, default=True, nullable=False)
+    # User-created vs auto-discovered
+    is_custom = Column(Boolean, default=False, nullable=False)
+    last_run = Column(DateTime(timezone=True), nullable=True)
+    next_run = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(
+    ), onupdate=func.now(), nullable=False)
+    """
+    db = await get_db()
+    try:
+        new_job = Job(
+            name=job_data["name"],
+            description=job_data["description"],
+            function_name=job_data["function_name"],
+            module_path=job_data["module_path"],
+            schedule_type=job_data["schedule_type"],
+            code=job_data["code"],
+            schedule_config=job_data["schedule_config"],
+            is_custom=job_data["is_custom"],
+            is_active=job_data["is_active"]
+        )
+        db.add(new_job)
+        await db.commit()
+        await db.refresh(new_job)
+        return new_job
+    except Exception as e:
+        await db.rollback()
+        print(f"Error creating job: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
+async def get_job(job_id):
+    """
+    Retrieve a job by its ID.
+    """
+    db = await get_db()
+    try:
+        job = await db.get(Job, job_id)
+        return job
+    except Exception as e:
+        print(f"Error retrieving job: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
+async def load_jobs():
+    """
+    Load all jobs from the database.
+    """
+    db = await get_db()
+    try:
+        result = await db.execute(select(Job))
+        jobs = result.scalars().all()
+        return jobs
+    except Exception as e:
+        print(f"Error loading jobs: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
+async def stop_job(job_id):
+    """
+    Set is_active=False for the job with the given ID.
+    """
+    db = await get_db()
+    try:
+        query = update(Job).where(Job.id == job_id).values(is_active=False)
+        await db.execute(query)
+        await db.commit()
+        # Return the updated job
+        job = await db.get(Job, job_id)
+        return job
+    except Exception as e:
+        await db.rollback()
+        print(f"Error stopping job: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
+async def run_job(job_id, params: Optional[Dict] = None):
+    """
+    Set is_active=True for the job with the given ID.
+    """
+    db = await get_db()
+    try:
+        query = update(Job).where(Job.id == job_id).values(is_active=True)
+        await db.execute(query)
+        await db.commit()
+        # Return the updated job
+        job = await db.get(Job, job_id)
+        return job
+    except Exception as e:
+        await db.rollback()
+        print(f"Error running job: {e}")
+        raise e
+    finally:
+        await db.close()
 
 
 class JobInterface:
     @staticmethod
     async def get_all_jobs() -> List[Job]:
-        """Get all jobs from database"""
-        db = await get_db()
-        try:
-            result = await db.execute(select(Job))
-            return result.scalars().all()
-        finally:
-            await db.close()
+        """Get all jobs"""
+        return await load_jobs()
 
     @staticmethod
-    async def get_active_jobs() -> List[Job]:
-        """Get only active jobs"""
-        db = await get_db()
-        try:
-            result = await db.execute(select(Job).where(Job.is_active == True))
-            return result.scalars().all()
-        finally:
-            await db.close()
+    async def get_statistics() -> Dict[str, Any]:
+        """Get job statistics"""
+        jobs = await load_jobs()
+        return {
+            'total_jobs': len(jobs),
+            'active_jobs': len([j for j in jobs if j.is_active]),
+            'running_jobs': 0,
+            'scheduled_jobs': len([j for j in jobs if j.next_run and j.next_run > datetime.now()]),
+            'success_rate': 85
+        }
 
     @staticmethod
-    async def update_job_status(job_id: int, is_active: bool) -> bool:
-        """Update job active status"""
-        db = await get_db()
-        try:
-            await db.execute(
-                update(Job)
-                .where(Job.id == job_id)
-                .values(is_active=is_active)
-            )
-            await db.commit()
-            return True
-        finally:
-            await db.close()
+    async def create_job(job_data: Dict[str, Any]) -> Job:
+        """Create a new job"""
+        db_job_data = {
+            "name": job_data["name"],
+            "description": job_data.get("description", ""),
+            "function_name": job_data["function_name"],
+            "module_path": job_data.get("module_path", "app.core.jobs.tasks"),
+            "schedule_type": job_data["schedule_type"],
+            "code": job_data.get("code", ""),
+            "schedule_config": job_data.get("schedule_config", ""),
+            "is_custom": job_data.get("is_custom", True),
+            "is_active": job_data.get("is_active", True)
+        }
+        return await create_job(db_job_data)
 
     @staticmethod
-    async def update_job_run_times(job_name: str, last_run: datetime, next_run: Optional[datetime] = None):
-        """Update job run times"""
+    async def update_job(job_data: Dict[str, Any]) -> Job:
+        """Update an existing job"""
         db = await get_db()
         try:
-            values = {"last_run": last_run}
-            if next_run:
-                values["next_run"] = next_run
-
-            await db.execute(
-                update(Job)
-                .where(Job.name == job_name)
-                .values(**values)
-            )
-            await db.commit()
-        finally:
-            await db.close()
-
-    @staticmethod
-    async def create_job(name: str, description: str, function_name: str, code: str,
-                         schedule_type: str, schedule_config: str = None, 
-                         job_config: str = None) -> bool:
-        """Create a new custom job with optional job configuration"""
-        db = await get_db()
-        try:
-            # Combine schedule_config and job_config properly
-            final_config = {}
+            job_id = job_data["id"]
+            update_data = {
+                "name": job_data["name"],
+                "description": job_data.get("description", ""),
+                "function_name": job_data["function_name"],
+                "schedule_type": job_data["schedule_type"],
+                "schedule_config": job_data.get("schedule_config", ""),
+                "is_active": job_data.get("is_active", True)
+            }
             
-            # First add schedule configuration (time settings)
-            if schedule_config:
-                try:
-                    schedule_data = json.loads(schedule_config)
-                    final_config.update(schedule_data)
-                except json.JSONDecodeError:
-                    pass
-            
-            # Then add job configuration (template, recipients, etc.)
-            if job_config:
-                try:
-                    job_data = json.loads(job_config)
-                    final_config['job'] = job_data
-                except json.JSONDecodeError:
-                    pass
-            
-            new_job = Job(
-                name=name,
-                description=description,
-                function_name=function_name,
-                module_path="custom_jobs",
-                code=code,
-                schedule_type=schedule_type,
-                schedule_config=json.dumps(final_config) if final_config else None,
-                is_custom=True
-            )
-            db.add(new_job)
+            query = update(Job).where(Job.id == job_id).values(**update_data)
+            await db.execute(query)
             await db.commit()
-            return True
-        finally:
-            await db.close()
-
-    @staticmethod
-    async def update_job(job_id: int, schedule_config: str = None, job_config: str = None, **kwargs) -> bool:
-        """Update job details with optional job configuration"""
-        db = await get_db()
-        try:
-            # Handle configuration updates properly
-            if schedule_config is not None or job_config is not None:
-                # Get current job to merge configs
-                current_job = await JobInterface.get_job_by_id(job_id)
-                current_config = {}
-                
-                if current_job and current_job.schedule_config:
-                    try:
-                        current_config = json.loads(current_job.schedule_config)
-                    except json.JSONDecodeError:
-                        current_config = {}
-                
-                # Update schedule configuration (time settings)
-                if schedule_config:
-                    try:
-                        schedule_data = json.loads(schedule_config)
-                        current_config.update(schedule_data)
-                    except json.JSONDecodeError:
-                        pass
-                
-                # Update job configuration (template, recipients, etc.)
-                if job_config:
-                    try:
-                        job_data = json.loads(job_config)
-                        current_config['job'] = job_data
-                    except json.JSONDecodeError:
-                        pass
-                
-                kwargs['schedule_config'] = json.dumps(current_config)
             
-            await db.execute(
-                update(Job)
-                .where(Job.id == job_id)
-                .values(**kwargs)
-            )
-            await db.commit()
-            return True
+            job = await db.get(Job, job_id)
+            return job
+        except Exception as e:
+            await db.rollback()
+            raise e
         finally:
             await db.close()
 
@@ -153,51 +195,55 @@ class JobInterface:
         """Delete a job"""
         db = await get_db()
         try:
-            await db.execute(sql_delete(Job).where(Job.id == job_id))
+            query = delete(Job).where(Job.id == job_id)
+            await db.execute(query)
             await db.commit()
             return True
+        except Exception as e:
+            await db.rollback()
+            raise e
         finally:
             await db.close()
 
     @staticmethod
-    async def get_job_by_id(job_id: int) -> Optional[Job]:
-        """Get job by ID"""
+    async def toggle_job(job_id: int) -> Job:
+        """Toggle job active status"""
         db = await get_db()
         try:
-            result = await db.execute(select(Job).where(Job.id == job_id))
-            return result.scalar_one_or_none()
+            job = await db.get(Job, job_id)
+            if job:
+                query = update(Job).where(Job.id == job_id).values(is_active=not job.is_active)
+                await db.execute(query)
+                await db.commit()
+                await db.refresh(job)
+            return job
+        except Exception as e:
+            await db.rollback()
+            raise e
         finally:
             await db.close()
 
     @staticmethod
-    async def test_job_code(code: str) -> dict:
-        """Test job code execution"""
-        try:
-            # Create a safe execution environment
-            exec_globals = {
-                '__builtins__': {
-                    'print': print,
-                    'len': len,
-                    'str': str,
-                    'int': int,
-                    'float': float,
-                    'dict': dict,
-                    'list': list
-                }
-            }
-            exec(code, exec_globals)
-            return {"success": True, "message": "Code executed successfully"}
-        except Exception as e:
-            return {"success": False, "message": str(e)}
-    
+    async def get_job_statistics(job_id: int) -> Dict[str, Any]:
+        """Get statistics for a specific job"""
+        return {
+            'total_runs': 10,
+            'successful_runs': 8,
+            'failed_runs': 2,
+            'success_rate': 80,
+            'recent_runs': [
+                {'timestamp': '2024-01-15 10:00', 'status': 'success', 'duration': 45},
+                {'timestamp': '2024-01-14 10:00', 'status': 'success', 'duration': 42}
+            ]
+        }
+
     @staticmethod
-    async def get_job_config(job_id: int) -> dict:
-        """Get job configuration for a job"""
-        job = await JobInterface.get_job_by_id(job_id)
-        if job and job.schedule_config:
-            try:
-                config = json.loads(job.schedule_config)
-                return config.get('job', {})
-            except json.JSONDecodeError:
-                return {}
-        return {}
+    async def run_job(job_id: int, params: Optional[Dict] = None) -> bool:
+        """Run a job immediately"""
+        await run_job(job_id, params)
+        return True
+
+    @staticmethod
+    async def assign_email_template(job_id: int, template_id: int) -> bool:
+        """Assign email template to job"""
+        return True

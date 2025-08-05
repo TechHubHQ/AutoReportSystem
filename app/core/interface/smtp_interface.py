@@ -3,15 +3,11 @@ from app.core.services.encryption_service import EncryptionService
 from app.database.models import SMTPConf
 from sqlalchemy import select
 from typing import Optional
-import asyncio
-
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
     try:
         db = await get_db()
-        print(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email)
         smtp_pwd = EncryptionService.encrypt(smtp_pwd)
-        print(smtp_pwd)
         new_smtp_conf = SMTPConf(
             smtp_host=smtp_host,
             smtp_port=smtp_port,
@@ -74,8 +70,6 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
         await db.close()
 
 
-asyncio.run(get_active_smtp_config(1))
-
 async def get_smtp_conf(user_id) -> SMTPConf:
     try:
         db = await get_db()
@@ -88,10 +82,30 @@ async def get_smtp_conf(user_id) -> SMTPConf:
         await db.close()
 
 
-async def update_smtp_conf(user_id, smtp_host=None, smtp_port=None, smtp_username=None, smtp_pwd=None):
+async def get_all_smtp_configs(user_email: str) -> list[SMTPConf]:
+    """Get all SMTP configurations for a user"""
     try:
         db = await get_db()
-        smtp_conf = await get_smtp_conf(user_id)
+        result = await db.execute(
+            select(SMTPConf).where(SMTPConf.sender_email == user_email)
+        )
+        configs = result.scalars().all()
+        # Decrypt passwords for display
+        for config in configs:
+            config.smtp_password = EncryptionService.decrypt(
+                config.smtp_password)
+        return configs
+    except Exception as e:
+        print(f"Error retrieving all SMTP configurations: {e}")
+        return []
+    finally:
+        await db.close()
+
+
+async def update_smtp_conf(config_id, smtp_host=None, smtp_port=None, smtp_username=None, smtp_pwd=None):
+    try:
+        db = await get_db()
+        smtp_conf = await db.get(SMTPConf, config_id)
         if not smtp_conf:
             return None
         if smtp_host:
@@ -102,7 +116,11 @@ async def update_smtp_conf(user_id, smtp_host=None, smtp_port=None, smtp_usernam
             smtp_conf.smtp_username = smtp_username
         if smtp_pwd:
             smtp_conf.smtp_password = EncryptionService.encrypt(smtp_pwd)
+        await db.commit()
+        await db.refresh(smtp_conf)
+        return smtp_conf
     except Exception as e:
         print(f"Error updating smtp conf {e}")
+        raise e
     finally:
         await db.close()
