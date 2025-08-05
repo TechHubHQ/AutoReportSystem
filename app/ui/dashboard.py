@@ -19,7 +19,6 @@ from app.core.interface.metrics_interface import (
 )
 from app.security.route_protection import RouteProtection
 from app.ui.components.loader import LoaderContext
-from app.core.interface.job_interface import JobInterface
 
 
 class DashboardManager:
@@ -38,9 +37,6 @@ class DashboardManager:
             return await get_tasks(user_id=user.get('id'))
         return []
 
-    async def get_background_jobs(self):
-        """Get real background jobs from database"""
-        return await JobInterface.get_all_jobs()
 
 
 def apply_custom_css():
@@ -159,7 +155,7 @@ async def render_kanban_board(dashboard_manager):
                         "Priority", ["low", "medium", "high", "urgent"])
                 with col2:
                     category = st.selectbox(
-                        "Category", ["in progress", "accomplishments"])
+                        "Category", ["in progress", "accomplishments", "highlights"])
                 due_date = st.date_input("Due Date")
 
                 if st.form_submit_button("Create Task"):
@@ -600,128 +596,6 @@ async def render_system_monitoring(dashboard_manager):
             <small>🐍 Platform: {system_info['platform']}</small>
         </div>
         """, unsafe_allow_html=True)
-
-        # Background jobs section
-        st.markdown("#### 🔄 Background Jobs")
-        with LoaderContext("Loading job data...", "inline"):
-            jobs = await dashboard_manager.get_background_jobs()
-
-        # Job status overview
-        active_jobs = len([j for j in jobs if j.is_active])
-        inactive_jobs = len([j for j in jobs if not j.is_active])
-        recent_runs = len(
-            [j for j in jobs if j.last_run and j.last_run > datetime.now() - timedelta(hours=24)])
-        scheduled_jobs = len(
-            [j for j in jobs if j.next_run and j.next_run > datetime.now()])
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="color: #4fc3f7; margin: 0;">🔄 {active_jobs}</h3>
-                <p style="margin: 0.5rem 0 0 0; color: #666;">Active Jobs</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="color: #ffd93d; margin: 0;">⏳ {scheduled_jobs}</h3>
-                <p style="margin: 0.5rem 0 0 0; color: #666;">Scheduled</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="color: #6bcf7f; margin: 0;">✅ {recent_runs}</h3>
-                <p style="margin: 0.5rem 0 0 0; color: #666;">Recent Runs</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col4:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="color: #ff6b6b; margin: 0;">❌ {inactive_jobs}</h3>
-                <p style="margin: 0.5rem 0 0 0; color: #666;">Inactive</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("#### 🔄 Job Details")
-        for job in jobs:
-            status_color = '#4fc3f7' if job.is_active else '#ff6b6b'
-            status_text = 'Active' if job.is_active else 'Inactive'
-
-            last_run_text = job.last_run.strftime(
-                '%Y-%m-%d %H:%M') if job.last_run else 'Never'
-            next_run_text = job.next_run.strftime(
-                '%Y-%m-%d %H:%M') if job.next_run else 'Not scheduled'
-
-            st.markdown(f"""
-            <div class="task-card">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong>{job.name}</strong><br>
-                        <small style="color: {status_color};">Status: {status_text}</small><br>
-                        <small>Type: {job.schedule_type.title()}</small><br>
-                        <small>Last Run: {last_run_text}</small><br>
-                        <small>Next Run: {next_run_text}</small>
-                    </div>
-                    <div style="text-align: right;">
-                        <small>{job.function_name}</small>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # Job status and schedule type distribution
-        if len(jobs) > 0:
-            col1, col2 = st.columns(2)
-
-            with col1:
-                # Job status distribution
-                status_counts = {'Active': active_jobs,
-                                 'Inactive': inactive_jobs}
-                if any(status_counts.values()):
-                    fig = px.pie(
-                        values=list(status_counts.values()),
-                        names=list(status_counts.keys()),
-                        title="Job Status Distribution",
-                        color_discrete_map={
-                            'Active': '#4fc3f7',
-                            'Inactive': '#ff6b6b'
-                        }
-                    )
-                    fig.update_traces(textposition='inside',
-                                      textinfo='percent+label')
-                    fig.update_layout(height=300)
-                    st.plotly_chart(fig, use_container_width=True)
-
-            with col2:
-                # Schedule type distribution
-                schedule_counts = {}
-                for job in jobs:
-                    schedule_counts[job.schedule_type] = schedule_counts.get(
-                        job.schedule_type, 0) + 1
-
-                if schedule_counts:
-                    fig = px.bar(
-                        x=list(schedule_counts.keys()),
-                        y=list(schedule_counts.values()),
-                        title="Job Schedule Types",
-                        color=list(schedule_counts.keys()),
-                        color_discrete_map={
-                            'weekly': '#4fc3f7',
-                            'monthly': '#6bcf7f',
-                            'daily': '#ffd93d',
-                            'custom': '#ff9800'
-                        }
-                    )
-                    fig.update_layout(height=300, showlegend=False)
-                    st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info(
-                "No background jobs found. Jobs will appear here once discovered.")
 
 
 def dashboard():

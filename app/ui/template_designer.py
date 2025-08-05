@@ -8,7 +8,7 @@ import html
 import re
 from app.security.route_protection import RouteProtection
 from app.ui.navbar import navbar
-from app.core.interface.template_interface import TemplateInterface, get_templates, get_template, update_template, delete_template, load_template_from_file, get_template_files
+from app.core.interface.template_interface import TemplateInterface, get_templates, update_template, delete_template
 from app.core.utils.template_validator import TemplateValidator
 
 

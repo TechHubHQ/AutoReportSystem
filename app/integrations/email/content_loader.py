@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
-from app.core.interface.task_interface import get_weekly_tasks, get_monthly_tasks, get_tasks_by_category, get_task_statistics
+from app.core.interface.task_interface import (
+    get_weekly_tasks, get_monthly_tasks, get_tasks_by_category, get_task_statistics)
 
 
 async def load_content(timeframe, user_id: int = None):

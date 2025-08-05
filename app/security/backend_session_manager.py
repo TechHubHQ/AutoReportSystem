@@ -43,7 +43,7 @@ class BackendSessionManager:
                         UserSession.user_id == user_data.get('id')
                     )
                     await db.execute(cleanup_stmt)
-                    
+
                     # Create new session
                     new_session = UserSession(
                         session_token=session_token,
@@ -68,11 +68,12 @@ class BackendSessionManager:
                 st.session_state.session_token = session_token
                 st.session_state.session_expires_at = expires_at
                 st.session_state.session_created_at = datetime.now()
-                
+
                 # Store session token in URL params for persistence across refreshes
                 st.query_params["session"] = session_token
-                
-                print(f"✅ Session created for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
+
+                print(
+                    f"✅ Session created for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
                 return session_token
             else:
                 print("❌ Failed to create session in database")
@@ -115,17 +116,17 @@ class BackendSessionManager:
             session = asyncio.run(_validate_session())
             if session:
                 user_data = json.loads(session.user_data)
-                
+
                 # Store in Streamlit session state
                 st.session_state.user = user_data
                 st.session_state.session_token = session_token
                 st.session_state.session_expires_at = session.expires_at
                 st.session_state.session_created_at = session.created_at
-                
-                print(f"✅ Session validated for user {user_data.get('email', 'unknown')}")
+
                 return user_data
             else:
-                print(f"❌ Session not found or expired: {session_token[:8]}...")
+                print(
+                    f"❌ Session not found or expired: {session_token[:8]}...")
                 return None
 
         except Exception as e:
@@ -186,7 +187,7 @@ class BackendSessionManager:
 
         expires_at = st.session_state.get('session_expires_at')
         created_at = st.session_state.get('session_created_at')
-        
+
         if not expires_at:
             return {}
 
@@ -275,7 +276,7 @@ class BackendSessionManager:
         # Clear URL parameter
         if "session" in st.query_params:
             del st.query_params["session"]
-        
+
         # Clear Streamlit session state (keep db_initialized)
         keys_to_keep = {'db_initialized'}
         keys_to_remove = [

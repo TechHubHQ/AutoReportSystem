@@ -21,13 +21,13 @@ async def user_exists(email: str) -> bool:
         await db.close()
 
 
-async def create_user(username: str, email: str, password: str):
+async def create_user(username: str, email: str, password: str, userrole: str = "Software Engineer"):
     try:
         if await user_exists(email):
             raise Exception("User with this email already exists.")
         db = await get_db()
         password = hash_password(password)
-        new_user = User(username=username, email=email, password=password)
+        new_user = User(username=username, email=email, password=password, userrole=userrole)
         db.add(new_user)
         await db.commit()
         await db.refresh(new_user)

@@ -16,6 +16,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
+    userrole = Column(String, default="Software Engineer", nullable=False)
 
     # One-to-many: User → Tasks
     tasks = relationship("Task", back_populates="creator",

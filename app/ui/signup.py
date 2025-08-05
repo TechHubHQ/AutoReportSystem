@@ -50,6 +50,8 @@ def signup(navigate):
                 "📧 Email Address", placeholder="Enter your email")
             password = st.text_input(
                 "🔒 Password", type="password", placeholder="Create a secure password")
+            userrole = st.text_input(
+                "🧑‍💼 Role", placeholder="e.g. Software Engineer")
 
             st.markdown("<br>", unsafe_allow_html=True)
             form_col1, form_col2 = st.columns(2)
@@ -61,7 +63,7 @@ def signup(navigate):
                     "← Back to Home", use_container_width=True)
 
             async def handle_signup():
-                return await create_user(username, email, password)
+                return await create_user(username, email, password, userrole)
 
             if 'submitted' in locals() and submitted:
                 if username and email and password:

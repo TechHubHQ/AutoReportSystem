@@ -128,6 +128,22 @@ async def get_template(template_id: int) -> Optional[EmailTemplate]:
         await db.close()
 
 
+async def get_template_by_name(name: str) -> Optional[EmailTemplate]:
+    """Get a single template by name"""
+    try:
+        db = await get_db()
+        result = await db.execute(
+            select(EmailTemplate).where(EmailTemplate.name == name)
+        )
+        template = result.scalar_one_or_none()
+        return template
+    except Exception as e:
+        print(f"Error fetching template by name: {e}")
+        raise e
+    finally:
+        await db.close()
+
+
 async def update_template(template_id: int, name: str = None, subject: str = None, html_content: str = None):
     """Update an existing template"""
     try:
