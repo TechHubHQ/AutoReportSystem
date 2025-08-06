@@ -161,7 +161,7 @@ async def delete_task(task_id: int):
 
 
 async def get_weekly_tasks(user_id: Optional[int] = None):
-    """Get tasks for the current week"""
+    """Get tasks for the current week (Monday to Sunday, inclusive)"""
     try:
         db = await get_db()
         # Use UTC for database comparison
@@ -170,15 +170,16 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
         start_of_week = today - timedelta(days=today.weekday())
         start_of_week = start_of_week.replace(
             hour=0, minute=0, second=0, microsecond=0)
-        # Find Friday of the current week
+        # Find Sunday of the current week
         end_of_week = start_of_week + \
-            timedelta(days=4, hours=23, minutes=59,
+            timedelta(days=6, hours=23, minutes=59,
                       seconds=59, microseconds=999999)
 
         # Convert to naive datetime for database comparison
         start_naive = start_of_week.replace(tzinfo=None)
         end_naive = end_of_week.replace(tzinfo=None)
 
+        # Some databases store created_at as UTC, some as local/naive. Try both comparisons.
         query = select(Task).where(
             Task.created_at >= start_naive,
             Task.created_at <= end_naive
@@ -188,6 +189,22 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
 
         result = await db.execute(query)
         tasks = result.scalars().all()
+
+        # If no tasks found, try with aware datetimes (for debugging)
+        if not tasks:
+            query2 = select(Task).where(
+                Task.created_at >= start_of_week,
+                Task.created_at <= end_of_week
+            )
+            if user_id:
+                query2 = query2.where(Task.created_by == user_id)
+            result2 = await db.execute(query2)
+            tasks2 = result2.scalars().all()
+            if tasks2:
+                print("Found tasks with aware datetime comparison")
+                tasks = tasks2
+        for task in tasks:
+            print(f"Task ID: {task.id}, Title: {task.title}, Created At: {task.created_at}, Created By: {task.created_by}, Task Description: {task.description}, Task Status: {task.status}, Task Priority: {task.priority}, Task Category: {task.category}, Task Due Date: {task.due_date}, Task Updated At: {task.updated_at}")
         return tasks
     except Exception as e:
         print(f"Error while fetching weekly tasks: {e}")

@@ -21,9 +21,9 @@ async def generate_report(user_id):
 
     # Categorize tasks
     accomplishments = [
-        task.title for task in tasks if task.category == "accomplishments"]
+        task.description for task in tasks if task.category == "accomplishments"]
     in_progress = [
-        task.title for task in tasks if task.category == "in progress"]
+        task.description for task in tasks if task.category == "in progress"]
 
     # Template context with dynamic sender info
     context = {
@@ -68,7 +68,7 @@ async def send_weekly_report(to_email, user_id):
     )
 
 
-async def send_all_weeklies(to_email):
+async def send_all_weeklies(to_email="santhosh.bommana@medicasapp.com"):
     """Send weekly reports for all users with SMTP config"""
     try:
         db = await get_db()
@@ -79,7 +79,7 @@ async def send_all_weeklies(to_email):
         users = result.scalars().all()
         for user in users:
             try:
-                await send_weekly_report(to_email, user.id)
+                await send_weekly_report("kalyankanuri497@gmail.com", user.id)
                 print(f"Weekly report sent for user: {user.username}")
             except Exception as e:
                 print(f"Failed to send report for user {user.username}: {e}")

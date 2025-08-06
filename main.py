@@ -11,7 +11,8 @@ from app.security.route_protection import RouteProtection
 from app.security.middleware import apply_security_middleware
 from app.security.backend_session_manager import BackendSessionManager
 from app.security.session_validator import SessionValidator
-from app.core.jobs.tasks.weekly_reporter import generate_report
+from app.core.jobs.scheduler import run_scheduler
+from app.core.interface.task_interface import get_weekly_tasks
 
 st.set_page_config(page_title="Automate Report System", layout="wide")
 
@@ -21,6 +22,7 @@ if "db_initialized" not in st.session_state:
     asyncio.run(init_db())
     BackendSessionManager.init_session_table()
     BackendSessionManager.cleanup_expired_sessions()
+    run_scheduler()
     st.session_state.db_initialized = True
 
 # Always attempt to restore session from URL parameters or existing state
@@ -234,4 +236,5 @@ else:
     st.error("❌ Page not found. Redirecting to home...")
     go_to_page("home")
 
-asyncio.run(generate_report(1))
+
+asyncio.run(get_weekly_tasks(2))
