@@ -3,6 +3,9 @@ import os
 from sqlalchemy import select, update, delete
 from app.database.db_connector import get_db
 from app.database.models import EmailTemplate
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 TEMPLATE_DIR = "app/integrations/email/templates"
 
@@ -35,7 +38,7 @@ class TemplateInterface:
             await TemplateInterface._save_template_file(name, html_content)
             return new_template
         except Exception as e:
-            print(f"Error creating template: {e}")
+            logger.error(f"Error creating template: {e}")
             await db.rollback()
             raise e
         finally:
@@ -84,7 +87,7 @@ class TemplateInterface:
 
             await db.commit()
         except Exception as e:
-            print(f"Error syncing templates: {e}")
+            logger.error(f"Error syncing templates: {e}")
             await db.rollback()
         finally:
             await db.close()
@@ -108,7 +111,7 @@ async def get_templates(user_id: Optional[int] = None) -> List[EmailTemplate]:
         templates = result.scalars().all()
         return templates
     except Exception as e:
-        print(f"Error fetching templates: {e}")
+        logger.error(f"Error fetching templates: {e}")
         raise e
     finally:
         await db.close()
@@ -122,7 +125,7 @@ async def get_template(template_id: int) -> Optional[EmailTemplate]:
         template = result.scalar_one_or_none()
         return template
     except Exception as e:
-        print(f"Error fetching template: {e}")
+        logger.error(f"Error fetching template: {e}")
         raise e
     finally:
         await db.close()
@@ -138,7 +141,7 @@ async def get_template_by_name(name: str) -> Optional[EmailTemplate]:
         template = result.scalar_one_or_none()
         return template
     except Exception as e:
-        print(f"Error fetching template by name: {e}")
+        logger.error(f"Error fetching template by name: {e}")
         raise e
     finally:
         await db.close()
@@ -182,7 +185,7 @@ async def update_template(template_id: int, name: str = None, subject: str = Non
 
         return updated_template
     except Exception as e:
-        print(f"Error updating template: {e}")
+        logger.error(f"Error updating template: {e}")
         await db.rollback()
         raise e
     finally:
@@ -210,15 +213,14 @@ async def delete_template(template_id: int):
 
         return True
     except Exception as e:
-        print(f"Error deleting template: {e}")
+        logger.error(f"Error deleting template: {e}")
         await db.rollback()
         raise e
     finally:
         await db.close()
 
+
 # Add new functions for file operations
-
-
 async def load_template_from_file(filename: str) -> str:
     """Load template content from file"""
     filepath = os.path.join(TEMPLATE_DIR, filename)

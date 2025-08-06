@@ -9,6 +9,9 @@ from app.core.interface.user_interface import get_user
 from app.integrations.email.email_client import EmailService
 from app.database.db_connector import get_db
 from app.database.models import User, SMTPConf
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def generate_report(user_id):
@@ -33,7 +36,7 @@ async def generate_report(user_id):
     }
 
     rendered_content = await load_template(context, 'weekly_update_template.html')
-    print(rendered_content)
+    logger.debug("Weekly report content generated")
     return rendered_content
 
 
@@ -68,7 +71,7 @@ async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com"):
         today = datetime.utcnow().date()
 
         if today.weekday() != 4:  # 4 = Friday
-            print("Today is not Friday. Skipping weekly report.")
+            logger.info("Today is not Friday. Skipping weekly report.")
             return
 
         # Count how many Fridays have occurred so far this month
@@ -80,7 +83,8 @@ async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com"):
             current_day += timedelta(days=1)
 
         if count > 3:
-            print("Today is not 1st, 2nd, or 3rd Friday. Skipping weekly report.")
+            logger.info(
+                "Today is not 1st, 2nd, or 3rd Friday. Skipping weekly report.")
             return
 
         # Continue only if 1st, 2nd, or 3rd Friday
@@ -94,11 +98,12 @@ async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com"):
         for user in users:
             try:
                 await send_report(to_email, user.id)
-                print(f"Weekly report sent for user: {user.username}")
+                logger.info(f"Weekly report sent for user: {user.username}")
             except Exception as e:
-                print(f"Failed to send report for user {user.username}: {e}")
+                logger.error(
+                    f"Failed to send report for user {user.username}: {e}")
     except Exception as e:
-        print(f"Error sending weekly reports for all users: {e}")
+        logger.error(f"Error sending weekly reports for all users: {e}")
         raise e
     finally:
         await db.close()

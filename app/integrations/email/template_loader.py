@@ -2,6 +2,10 @@ import re
 from jinja2 import Environment, BaseLoader, select_autoescape, FileSystemLoader
 from app.core.interface.template_interface import get_templates
 from app.integrations.email.content_loader import process_dynamic_content
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class StringTemplateLoader(BaseLoader):
     """Custom Jinja2 loader for string templates"""
@@ -62,7 +66,7 @@ async def load_template_by_name(template_name: str, context: dict = None, user_i
             user_id
         )
     except Exception as e:
-        print(f"Error loading template by name '{template_name}': {e}")
+        logger.error(f"Error loading template by name '{template_name}': {e}")
         raise e
 
 
@@ -77,7 +81,7 @@ async def get_available_templates(user_id: int = None):
             'category': getattr(template, 'category', 'General')
         } for template in templates if template.is_active]
     except Exception as e:
-        print(f"Error getting available templates: {e}")
+        logger.error(f"Error getting available templates: {e}")
         return []
 
 
@@ -99,7 +103,7 @@ async def load_template(content, template):
             result = await load_template_by_name(template, content)
             return result['content']
         except Exception as e:
-            print(
+            logger.warning(
                 f"Failed to load template '{template}' dynamically, falling back to legacy: {e}")
             # Fallback to legacy if loading fails
             env = Environment(

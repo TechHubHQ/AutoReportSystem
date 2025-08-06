@@ -3,6 +3,9 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from dataclasses import dataclass
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -84,7 +87,7 @@ class SystemMetricsCollector:
             metrics.update(network_metrics)
 
         except Exception as e:
-            print(f"Error collecting system metrics: {e}")
+            logger.error(f"Error collecting system metrics: {e}")
 
         return metrics
 
@@ -143,7 +146,7 @@ async def get_current_system_status() -> Dict:
         }
 
     except Exception as e:
-        print(f"Error getting system status: {e}")
+        logger.error(f"Error getting system status: {e}")
         return {
             'cpu_usage': 0,
             'memory_usage': 0,
@@ -215,7 +218,7 @@ async def get_historical_metrics(hours: int = 24) -> Dict:
         }
 
     except Exception as e:
-        print(f"Error getting historical metrics: {e}")
+        logger.error(f"Error getting historical metrics: {e}")
         return {
             'data': [],
             'period_hours': hours,
@@ -244,7 +247,7 @@ async def get_system_info() -> Dict:
         }
 
     except Exception as e:
-        print(f"Error getting system info: {e}")
+        logger.error(f"Error getting system info: {e}")
         return {
             'cpu_cores': 'Unknown',
             'cpu_frequency': 'Unknown',

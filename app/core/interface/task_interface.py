@@ -6,6 +6,9 @@ from app.database.models import Task
 from app.core.utils.datetime_utils import (
     ensure_timezone_aware, get_current_utc_datetime, safe_datetime_compare
 )
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def create_task(title: str, description: str = "", status: str = "todo",
@@ -28,7 +31,7 @@ async def create_task(title: str, description: str = "", status: str = "todo",
         await db.refresh(new_task)
         return new_task
     except Exception as e:
-        print(f"Error while creating new task: {e}")
+        logger.error(f"Error while creating new task: {e}")
         await db.rollback()
         raise e
     finally:
@@ -48,7 +51,7 @@ async def get_tasks(user_id: Optional[int] = None) -> List[Task]:
         tasks = result.scalars().all()
         return tasks
     except Exception as e:
-        print(f"Error while fetching tasks: {e}")
+        logger.error(f"Error while fetching tasks: {e}")
         raise e
     finally:
         await db.close()
@@ -67,7 +70,7 @@ async def get_tasks_by_status(status: str, user_id: Optional[int] = None) -> Lis
         tasks = result.scalars().all()
         return tasks
     except Exception as e:
-        print(f"Error while fetching tasks by status: {e}")
+        logger.error(f"Error while fetching tasks by status: {e}")
         raise e
     finally:
         await db.close()
@@ -86,7 +89,7 @@ async def get_tasks_by_category(category: str, user_id: Optional[int] = None) ->
         tasks = result.scalars().all()
         return tasks
     except Exception as e:
-        print(f"Error while fetching tasks by category: {e}")
+        logger.error(f"Error while fetching tasks by category: {e}")
         raise e
     finally:
         await db.close()
@@ -100,7 +103,7 @@ async def get_task(task_id: int) -> Optional[Task]:
         task = result.scalar_one_or_none()
         return task
     except Exception as e:
-        print(f"Error while fetching task: {e}")
+        logger.error(f"Error while fetching task: {e}")
         raise e
     finally:
         await db.close()
@@ -137,7 +140,7 @@ async def update_task(task_id: int, title: str = None, description: str = None,
         # Return updated task
         return await get_task(task_id)
     except Exception as e:
-        print(f"Error while updating task: {e}")
+        logger.error(f"Error while updating task: {e}")
         await db.rollback()
         raise e
     finally:
@@ -153,7 +156,7 @@ async def delete_task(task_id: int):
         await db.commit()
         return True
     except Exception as e:
-        print(f"Error while deleting task: {e}")
+        logger.error(f"Error while deleting task: {e}")
         await db.rollback()
         raise e
     finally:
@@ -201,13 +204,14 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
             result2 = await db.execute(query2)
             tasks2 = result2.scalars().all()
             if tasks2:
-                print("Found tasks with aware datetime comparison")
+                logger.debug("Found tasks with aware datetime comparison")
                 tasks = tasks2
         for task in tasks:
-            print(f"Task ID: {task.id}, Title: {task.title}, Created At: {task.created_at}, Created By: {task.created_by}, Task Description: {task.description}, Task Status: {task.status}, Task Priority: {task.priority}, Task Category: {task.category}, Task Due Date: {task.due_date}, Task Updated At: {task.updated_at}")
+            logger.debug(
+                f"Task ID: {task.id}, Title: {task.title}, Created At: {task.created_at}, Created By: {task.created_by}")
         return tasks
     except Exception as e:
-        print(f"Error while fetching weekly tasks: {e}")
+        logger.error(f"Error while fetching weekly tasks: {e}")
         raise e
     finally:
         await db.close()
@@ -246,7 +250,7 @@ async def get_monthly_tasks(user_id: Optional[int] = None):
         tasks = result.scalars().all()
         return tasks
     except Exception as e:
-        print(f"Error while fetching monthly tasks: {e}")
+        logger.error(f"Error while fetching monthly tasks: {e}")
         raise e
     finally:
         await db.close()
@@ -282,7 +286,7 @@ async def get_task_statistics(user_id: Optional[int] = None):
 
         return stats
     except Exception as e:
-        print(f"Error while fetching task statistics: {e}")
+        logger.error(f"Error while fetching task statistics: {e}")
         raise e
     finally:
         await db.close()

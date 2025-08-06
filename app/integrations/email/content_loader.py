@@ -2,6 +2,9 @@ import re
 from datetime import datetime
 from app.core.interface.task_interface import (
     get_weekly_tasks, get_monthly_tasks, get_tasks_by_category, get_task_statistics)
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def load_content(timeframe, user_id: int = None):
@@ -46,7 +49,7 @@ async def load_dynamic_content(content_type: str = "all", user_id: int = None):
         content['current_year'] = datetime.now().strftime('%Y')
 
     except Exception as e:
-        print(f"Error loading content: {e}")
+        logger.error(f"Error loading content: {e}")
 
     return content
 

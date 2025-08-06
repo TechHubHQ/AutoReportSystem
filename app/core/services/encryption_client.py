@@ -1,4 +1,7 @@
 from cryptography.fernet import Fernet
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def generate_key():
@@ -50,11 +53,11 @@ def decrypt_string(key: bytes, ciphertext: bytes) -> str:
 # Example usage (for demonstration; remove or modify as needed)
 if __name__ == "__main__":
     key = generate_key()
-    print(f"Encryption Key (store securely): {key.decode()}")
+    logger.info("Encryption key generated")
 
     original_text = "ars smtp secret key"
     encrypted_text = encrypt_string(key, original_text)
-    print(f"Encrypted: {encrypted_text.decode()}")
+    logger.debug("Text encrypted successfully")
 
     decrypted_text = decrypt_string(key, encrypted_text)
-    print(f"Decrypted: {decrypted_text}")
+    logger.debug("Text decrypted successfully")

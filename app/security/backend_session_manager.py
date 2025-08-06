@@ -15,6 +15,9 @@ from app.database.db_connector import get_db
 from app.database.models import UserSession, User
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class BackendSessionManager:
@@ -57,7 +60,7 @@ class BackendSessionManager:
                     await db.commit()
                     return True
             except Exception as e:
-                print(f"Database error creating session: {e}")
+                logger.error(f"Database error creating session: {e}")
                 return False
 
         try:
@@ -72,15 +75,15 @@ class BackendSessionManager:
                 # Store session token in URL params for persistence across refreshes
                 st.query_params["session"] = session_token
 
-                print(
-                    f"✅ Session created for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
+                logger.info(
+                    f"Session created for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
                 return session_token
             else:
-                print("❌ Failed to create session in database")
+                logger.error("Failed to create session in database")
                 return None
 
         except Exception as e:
-            print(f"❌ Failed to create session: {e}")
+            logger.error(f"Failed to create session: {e}")
             st.error(f"Failed to create session: {e}")
             return None
 
@@ -109,7 +112,7 @@ class BackendSessionManager:
                         return session
                     return None
             except Exception as e:
-                print(f"Database error in session validation: {e}")
+                logger.error(f"Database error in session validation: {e}")
                 return None
 
         try:
@@ -125,12 +128,12 @@ class BackendSessionManager:
 
                 return user_data
             else:
-                print(
-                    f"❌ Session not found or expired: {session_token[:8]}...")
+                logger.warning(
+                    f"Session not found or expired: {session_token[:8]}...")
                 return None
 
         except Exception as e:
-            print(f"❌ Session validation failed: {e}")
+            logger.error(f"Session validation failed: {e}")
             return None
 
     @staticmethod
@@ -228,19 +231,19 @@ class BackendSessionManager:
                         return True
                     return False
             except Exception as e:
-                print(f"Database error extending session: {e}")
+                logger.error(f"Database error extending session: {e}")
                 return False
 
         try:
             success = asyncio.run(_extend_session())
             if success:
                 st.session_state.session_expires_at = new_expires_at
-                print(f"✅ Session extended to {new_expires_at}")
+                logger.info(f"Session extended to {new_expires_at}")
                 return True
             return False
 
         except Exception as e:
-            print(f"❌ Failed to extend session: {e}")
+            logger.error(f"Failed to extend session: {e}")
             return False
 
     @staticmethod
@@ -260,13 +263,13 @@ class BackendSessionManager:
                         await db.execute(stmt)
                         await db.commit()
                 except Exception as e:
-                    print(f"Database error destroying session: {e}")
+                    logger.error(f"Database error destroying session: {e}")
 
             try:
                 asyncio.run(_destroy_session())
-                print(f"✅ Session destroyed: {session_token[:8]}...")
+                logger.info(f"Session destroyed: {session_token[:8]}...")
             except Exception as e:
-                print(f"❌ Failed to destroy session: {e}")
+                logger.error(f"Failed to destroy session: {e}")
 
         BackendSessionManager.clear_session()
 
@@ -298,14 +301,15 @@ class BackendSessionManager:
                     )
                     result = await db.execute(stmt)
                     await db.commit()
-                    print(f"✅ Cleaned up {result.rowcount} expired sessions")
+                    logger.info(
+                        f"Cleaned up {result.rowcount} expired sessions")
             except Exception as e:
-                print(f"❌ Failed to cleanup sessions: {e}")
+                logger.error(f"Failed to cleanup sessions: {e}")
 
         try:
             asyncio.run(_cleanup_sessions())
         except Exception as e:
-            print(f"❌ Session cleanup error: {e}")
+            logger.error(f"Session cleanup error: {e}")
 
     @staticmethod
     def init_session_table():

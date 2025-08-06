@@ -6,16 +6,17 @@ that survives page refreshes and browser restarts.
 """
 
 import streamlit as st
-import streamlit.components.v1
 import uuid
 import json
 import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from app.database.db_connector import get_db
-from app.database.models import UserSession, User
+from app.database.models import UserSession
 from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SessionManager:
@@ -61,11 +62,12 @@ class SessionManager:
             # Store in browser localStorage
             SessionManager._store_session_in_browser(session_token)
 
-            print(f"Session created successfully for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
+            logger.info(
+                f"Session created successfully for user {user_data.get('email', 'unknown')} - expires at {expires_at}")
             return session_token
 
         except Exception as e:
-            print(f"Failed to create session: {e}")
+            logger.error(f"Failed to create session: {e}")
             st.error(f"Failed to create session: {e}")
             return None
 
@@ -94,7 +96,7 @@ class SessionManager:
                         return session
                     return None
             except Exception as e:
-                print(f"Database error in session validation: {e}")
+                logger.error(f"Database error in session validation: {e}")
                 return None
 
         try:
@@ -107,16 +109,18 @@ class SessionManager:
                 st.session_state.session_token = session_token
                 st.session_state.session_expires_at = session.expires_at
 
-                print(f"Session validated successfully for user {user_data.get('email', 'unknown')} - expires at {session.expires_at}")
+                logger.info(
+                    f"Session validated successfully for user {user_data.get('email', 'unknown')} - expires at {session.expires_at}")
                 return user_data
             else:
                 # Session not found or expired, clear browser storage
-                print(f"Session not found or expired for token: {session_token[:8]}...")
+                logger.warning(
+                    f"Session not found or expired for token: {session_token[:8]}...")
                 SessionManager._clear_browser_session()
             return None
 
         except Exception as e:
-            print(f"Session validation failed: {e}")
+            logger.error(f"Session validation failed: {e}")
             # Clear potentially corrupted session data
             SessionManager._clear_streamlit_session()
             SessionManager._clear_browser_session()

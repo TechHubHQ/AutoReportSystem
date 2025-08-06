@@ -3,6 +3,9 @@ from typing import Dict, List, Optional
 from sqlalchemy import select, func
 from app.database.db_connector import get_db
 from app.database.models import Task, User
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def get_dashboard_summary(user_id: Optional[int] = None) -> Dict:
@@ -55,7 +58,7 @@ async def get_dashboard_summary(user_id: Optional[int] = None) -> Dict:
         }
 
     except Exception as e:
-        print(f"Error getting dashboard summary: {e}")
+        logger.error(f"Error getting dashboard summary: {e}")
         raise e
     finally:
         await db.close()
@@ -103,7 +106,7 @@ async def get_task_completion_trends(user_id: Optional[int] = None, days: int = 
         }
 
     except Exception as e:
-        print(f"Error getting task completion trends: {e}")
+        logger.error(f"Error getting task completion trends: {e}")
         raise e
     finally:
         await db.close()
@@ -175,7 +178,7 @@ async def get_productivity_insights(user_id: Optional[int] = None) -> Dict:
         }
 
     except Exception as e:
-        print(f"Error getting productivity insights: {e}")
+        logger.error(f"Error getting productivity insights: {e}")
         raise e
     finally:
         await db.close()

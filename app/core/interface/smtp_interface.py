@@ -3,6 +3,10 @@ from app.core.services.encryption_service import EncryptionService
 from app.database.models import SMTPConf
 from sqlalchemy import select
 from typing import Optional
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
     try:
@@ -20,7 +24,7 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
         await db.refresh(new_smtp_conf)
         return new_smtp_conf
     except Exception as e:
-        print(f"Error creating new smtp configuration {e}")
+        logger.error(f"Error creating new smtp configuration {e}")
         raise e
     finally:
         await db.close()
@@ -64,7 +68,7 @@ async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTP
         return smtp_conf
 
     except Exception as e:
-        print(f"Error getting active SMTP configuration: {e}")
+        logger.error(f"Error getting active SMTP configuration: {e}")
         return None
     finally:
         await db.close()
@@ -76,7 +80,7 @@ async def get_smtp_conf(user_id) -> SMTPConf:
         smtp_conf = await db.get(SMTPConf, user_id)
         return smtp_conf
     except Exception as e:
-        print(f"Error retrieving smtp configuration {e}")
+        logger.error(f"Error retrieving smtp configuration {e}")
         raise e
     finally:
         await db.close()
@@ -96,7 +100,7 @@ async def get_all_smtp_configs(user_email: str) -> list[SMTPConf]:
                 config.smtp_password)
         return configs
     except Exception as e:
-        print(f"Error retrieving all SMTP configurations: {e}")
+        logger.error(f"Error retrieving all SMTP configurations: {e}")
         return []
     finally:
         await db.close()
@@ -120,7 +124,7 @@ async def update_smtp_conf(config_id, smtp_host=None, smtp_port=None, smtp_usern
         await db.refresh(smtp_conf)
         return smtp_conf
     except Exception as e:
-        print(f"Error updating smtp conf {e}")
+        logger.error(f"Error updating smtp conf {e}")
         raise e
     finally:
         await db.close()

@@ -6,6 +6,9 @@ from app.integrations.email.email_client import EmailService
 from app.database.db_connector import get_db
 from app.database.models import User, SMTPConf
 from sqlalchemy import select
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def generate_report(user_id):
@@ -35,7 +38,7 @@ async def generate_report(user_id):
 
     # Load and render template
     rendered_content = await load_template(context, 'monthly_update_template.html')
-    print(rendered_content)
+    logger.debug("Monthly report content generated")
     return rendered_content
 
 
@@ -79,11 +82,12 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com"):
         for user in users:
             try:
                 await send_report("kalyankanuri497@gmail.com", user.id)
-                print(f"Monthly report sent for user: {user.username}")
+                logger.info(f"Monthly report sent for user: {user.username}")
             except Exception as e:
-                print(f"Failed to send report for user {user.username}: {e}")
+                logger.error(
+                    f"Failed to send report for user {user.username}: {e}")
     except Exception as e:
-        print(f"Error sending monthly reports for all users: {e}")
+        logger.error(f"Error sending monthly reports for all users: {e}")
         raise e
     finally:
         await db.close()
