@@ -123,7 +123,7 @@ async def start_scheduler():
             f"Scheduled async job {job_config['id']} with trigger {job_config['trigger']}")
 
     scheduler.start()
-    logger.info("Async scheduler started successfully.")
+    logger.info("Scheduler started successfully.")
 
     await health_check()
 
@@ -132,7 +132,7 @@ async def start_scheduler():
             await asyncio.sleep(2)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
-        logger.info("Async scheduler shutdown successfully.")
+        logger.info("Scheduler shutdown successfully.")
 
 
 def run_scheduler():

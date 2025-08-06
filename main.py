@@ -1,5 +1,6 @@
 import streamlit as st
 import asyncio
+from threading import Thread
 from app.database.db_connector import init_db
 from app.ui.login import login
 from app.ui.signup import signup
@@ -12,7 +13,6 @@ from app.security.middleware import apply_security_middleware
 from app.security.backend_session_manager import BackendSessionManager
 from app.security.session_validator import SessionValidator
 from app.core.jobs.scheduler import run_scheduler
-from app.core.interface.task_interface import get_weekly_tasks
 
 st.set_page_config(page_title="Automate Report System", layout="wide")
 
@@ -22,7 +22,7 @@ if "db_initialized" not in st.session_state:
     asyncio.run(init_db())
     BackendSessionManager.init_session_table()
     BackendSessionManager.cleanup_expired_sessions()
-    run_scheduler()
+    Thread(target=run_scheduler).start()
     st.session_state.db_initialized = True
 
 # Always attempt to restore session from URL parameters or existing state
@@ -235,6 +235,3 @@ else:
     # Unknown page - redirect to home
     st.error("❌ Page not found. Redirecting to home...")
     go_to_page("home")
-
-
-asyncio.run(get_weekly_tasks(2))
