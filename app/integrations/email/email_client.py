@@ -1,7 +1,5 @@
 import aiosmtplib
 from email.mime.text import MIMEText
-from app.core.interface.template_interface import get_template
-from app.integrations.email.template_loader import load_template_from_string
 
 
 class EmailService:
@@ -25,34 +23,6 @@ class EmailService:
             password=self.pwd,
             start_tls=True,
         )
-
-    async def send_template_email(self, to_address, template_id, user_id=None):
-        """Send email using a template with content"""
-        try:
-            # Get template
-            template = await get_template(template_id)
-            if not template:
-                raise ValueError(f"Template with ID {template_id} not found")
-
-            # Process template with content
-            rendered = await load_template_from_string(
-                template.html_content,
-                template.subject,
-                user_id
-            )
-
-            # Send email
-            await self.send_email(
-                to_address=to_address,
-                subject=rendered['subject'],
-                content=rendered['content'],
-                html=True
-            )
-
-            return True
-        except Exception as e:
-            print(f"Error sending template email: {e}")
-            raise e
 
 # Example Usage
 # import asyncio
