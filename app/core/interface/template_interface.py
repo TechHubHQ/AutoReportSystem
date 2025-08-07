@@ -4,6 +4,7 @@ from sqlalchemy import select, update, delete
 from app.database.db_connector import get_db
 from app.database.models import EmailTemplate
 from app.config.logging_config import get_logger
+from app.integrations.git.auto_commit import auto_commit_template_change
 
 logger = get_logger(__name__)
 
@@ -36,6 +37,25 @@ class TemplateInterface:
 
             # Save to file
             await TemplateInterface._save_template_file(name, html_content)
+            
+            # Auto-commit to Git
+            try:
+                filename = f"{name.lower().replace(' ', '_')}.html"
+                file_path = os.path.join(TEMPLATE_DIR, filename)
+                commit_result = await auto_commit_template_change(
+                    action="create",
+                    template_name=name,
+                    file_paths=[file_path],
+                    details=f"Created new email template: {name}\nCategory: {category}\nDescription: {description}",
+                    push_to_remote=False  # Set to True if you want to auto-push
+                )
+                if commit_result['success']:
+                    logger.info(f"Template '{name}' auto-committed: {commit_result.get('commit_hash', 'N/A')}")
+                else:
+                    logger.warning(f"Failed to auto-commit template '{name}': {commit_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Error during auto-commit for template '{name}': {e}")
+            
             return new_template
         except Exception as e:
             logger.error(f"Error creating template: {e}")
@@ -182,6 +202,36 @@ async def update_template(template_id: int, name: str = None, subject: str = Non
                 old_filepath = os.path.join(TEMPLATE_DIR, old_filename)
                 if os.path.exists(old_filepath):
                     os.remove(old_filepath)
+            
+            # Auto-commit to Git
+            try:
+                filename = f"{final_name.lower().replace(' ', '_')}.html"
+                file_path = os.path.join(TEMPLATE_DIR, filename)
+                
+                # Prepare commit details
+                changes = []
+                if name is not None and name != old_name:
+                    changes.append(f"Renamed from '{old_name}' to '{name}'")
+                if html_content is not None:
+                    changes.append("Updated HTML content")
+                if subject is not None:
+                    changes.append("Updated subject")
+                
+                details = f"Updated email template: {final_name}\nChanges: {', '.join(changes)}"
+                
+                commit_result = await auto_commit_template_change(
+                    action="update",
+                    template_name=final_name,
+                    file_paths=[file_path],
+                    details=details,
+                    push_to_remote=False  # Set to True if you want to auto-push
+                )
+                if commit_result['success']:
+                    logger.info(f"Template '{final_name}' update auto-committed: {commit_result.get('commit_hash', 'N/A')}")
+                else:
+                    logger.warning(f"Failed to auto-commit template '{final_name}' update: {commit_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Error during auto-commit for template '{final_name}' update: {e}")
 
         return updated_template
     except Exception as e:
@@ -204,12 +254,28 @@ async def delete_template(template_id: int):
         await db.execute(query)
         await db.commit()
 
-        # Remove file
+        # Remove file and auto-commit
         if template:
             filename = f"{template.name.lower().replace(' ', '_')}.html"
             filepath = os.path.join(TEMPLATE_DIR, filename)
             if os.path.exists(filepath):
                 os.remove(filepath)
+                
+                # Auto-commit to Git
+                try:
+                    commit_result = await auto_commit_template_change(
+                        action="delete",
+                        template_name=template.name,
+                        file_paths=[filepath],
+                        details=f"Deleted email template: {template.name}\nTemplate was soft-deleted from database and file removed",
+                        push_to_remote=False  # Set to True if you want to auto-push
+                    )
+                    if commit_result['success']:
+                        logger.info(f"Template '{template.name}' deletion auto-committed: {commit_result.get('commit_hash', 'N/A')}")
+                    else:
+                        logger.warning(f"Failed to auto-commit template '{template.name}' deletion: {commit_result.get('error', 'Unknown error')}")
+                except Exception as e:
+                    logger.error(f"Error during auto-commit for template '{template.name}' deletion: {e}")
 
         return True
     except Exception as e:

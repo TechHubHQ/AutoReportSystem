@@ -6,6 +6,8 @@ from app.security.route_protection import RouteProtection
 from app.ui.navbar import navbar
 from app.core.interface.template_interface import TemplateInterface, get_templates, update_template, delete_template
 from app.core.utils.template_validator import TemplateValidator
+from app.integrations.git.auto_commit import GitAutoCommit
+from app.integrations.git.config import is_auto_commit_enabled, is_auto_push_enabled
 
 
 def apply_custom_css():
@@ -145,6 +147,48 @@ def render_template_preview(html_content: str):
         st.info("No content to preview")
 
 
+def render_git_status():
+    """Render Git status information"""
+    try:
+        git_client = GitAutoCommit()
+        
+        # Check if Git is available and auto-commit is enabled
+        is_git_repo = git_client.is_git_repository()
+        auto_commit_enabled = is_auto_commit_enabled()
+        auto_push_enabled = is_auto_push_enabled()
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if is_git_repo:
+                st.success("🔗 Git Repository")
+            else:
+                st.warning("⚠️ Not a Git Repository")
+        
+        with col2:
+            if auto_commit_enabled:
+                st.success("✅ Auto-Commit Enabled")
+            else:
+                st.info("ℹ️ Auto-Commit Disabled")
+        
+        with col3:
+            if auto_push_enabled:
+                st.success("🚀 Auto-Push Enabled")
+            else:
+                st.info("📝 Auto-Push Disabled")
+        
+        # Show Git status if it's a repository
+        if is_git_repo:
+            status = git_client.get_git_status()
+            if status['success'] and status['has_changes']:
+                st.warning(f"⚠️ Uncommitted changes: {len(status['modified_files'])} modified, {len(status['new_files'])} new, {len(status['deleted_files'])} deleted")
+            elif status['success']:
+                st.success("✅ Working directory clean")
+    
+    except Exception as e:
+        st.error(f"❌ Error checking Git status: {str(e)}")
+
+
 def render_template_list():
     """Render the list of existing templates"""
     col1, col2 = st.columns([3, 1])
@@ -158,6 +202,10 @@ def render_template_list():
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Error syncing templates: {str(e)}")
+    
+    # Show Git status
+    with st.expander("🔗 Git Integration Status", expanded=False):
+        render_git_status()
 
     try:
         templates = asyncio.run(get_templates())
