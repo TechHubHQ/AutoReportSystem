@@ -13,6 +13,7 @@ from app.ui.jobs_dashboard import jobs_dashboard
 from app.ui.signup import signup
 from app.ui.login import login
 from app.database.db_connector import init_db
+from app.database.migrations import run_migrations
 from app.config.logging_config import setup_logging, get_logger
 
 # Initialize logging
@@ -24,6 +25,7 @@ st.set_page_config(page_title="Automate Report System", layout="wide")
 
 # Initialize DB and session system only once
 if "db_initialized" not in st.session_state:
+    run_migrations()
     asyncio.run(init_db())
     BackendSessionManager.init_session_table()
     BackendSessionManager.cleanup_expired_sessions()

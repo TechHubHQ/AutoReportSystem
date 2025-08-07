@@ -204,6 +204,14 @@ def smtp_conf(go_to_page):
             action_text = "Updating" if current_config else "Saving"
             with LoaderContext(f"💾 {action_text} SMTP configuration...", "inline"):
                 try:
+                    # Debug information
+                    st.write("🔍 Debug Info:")
+                    st.write(f"- Host: {smtp_host}")
+                    st.write(f"- Port: {smtp_port}")
+                    st.write(f"- Username: {smtp_username}")
+                    st.write(f"- Password length: {len(smtp_password) if smtp_password else 0}")
+                    st.write(f"- User email: {user_email}")
+                    
                     if current_config:
                         # Update existing configuration
                         asyncio.run(update_smtp_conf(
@@ -219,10 +227,20 @@ def smtp_conf(go_to_page):
                     st.info("📧 You can now send automated email reports")
                     st.rerun()  # Refresh to show updated config
                 except Exception as e:
-                    st.error(
-                        f"❌ Error {action_text.lower()} configuration: {str(e)}")
+                    st.error(f"❌ Error {action_text.lower()} configuration: {str(e)}")
+                    st.error(f"🔍 Detailed error: {type(e).__name__}: {e}")
+                    
+                    # Additional debugging for encryption errors
+                    if "encrypt" in str(e).lower() or "none" in str(e).lower():
+                        st.error("🔐 This appears to be an encryption-related error.")
+                        st.info("💡 Possible solutions:")
+                        st.info("1. Check if FERNET_KEY is set in your .env file")
+                        st.info("2. Restart the application to reload environment variables")
+                        st.info("3. Ensure the password field is not empty")
         else:
             st.error("⚠️ Please fill in all required fields")
+            if not smtp_password:
+                st.error("🔒 Password field appears to be empty")
 
     if clear_form:
         st.rerun()

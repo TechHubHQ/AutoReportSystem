@@ -12,7 +12,8 @@ class AppSettings:
 
     @property
     def db_url(self):
-        return "sqlite+aiosqlite:///ars.db"
+        db_path = "/home/ars.db"
+        return f"sqlite+aiosqlite:///{db_path}"
 
     @property
     def SMTP_ENV_KEY(self):

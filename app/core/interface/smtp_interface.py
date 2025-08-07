@@ -10,13 +10,27 @@ logger = get_logger(__name__)
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
     try:
+        # Validate inputs
+        if not all([smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email]):
+            raise ValueError("All SMTP configuration fields are required")
+
+        if not isinstance(smtp_pwd, str) or not smtp_pwd.strip():
+            raise ValueError("SMTP password must be a non-empty string")
+
         db = await get_db()
-        smtp_pwd = EncryptionService.encrypt(smtp_pwd)
+
+        # Encrypt password
+        try:
+            encrypted_pwd = EncryptionService.encrypt(smtp_pwd)
+        except Exception as e:
+            logger.error(f"Error encrypting SMTP password: {e}")
+            raise ValueError(f"Failed to encrypt password: {e}")
+
         new_smtp_conf = SMTPConf(
             smtp_host=smtp_host,
             smtp_port=smtp_port,
             smtp_username=smtp_username,
-            smtp_password=smtp_pwd,
+            smtp_password=encrypted_pwd,
             sender_email=sender_email
         )
         db.add(new_smtp_conf)
@@ -24,7 +38,9 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
         await db.refresh(new_smtp_conf)
         return new_smtp_conf
     except Exception as e:
-        logger.error(f"Error creating new smtp configuration {e}")
+        logger.error(f"Error creating new smtp configuration: {e}")
+        if "encrypt" in str(e).lower():
+            raise ValueError(f"Encryption error: {e}")
         raise e
     finally:
         await db.close()
@@ -111,7 +127,9 @@ async def update_smtp_conf(config_id, smtp_host=None, smtp_port=None, smtp_usern
         db = await get_db()
         smtp_conf = await db.get(SMTPConf, config_id)
         if not smtp_conf:
-            return None
+            raise ValueError(
+                f"SMTP configuration with ID {config_id} not found")
+
         if smtp_host:
             smtp_conf.smtp_host = smtp_host
         if smtp_port:
@@ -119,12 +137,22 @@ async def update_smtp_conf(config_id, smtp_host=None, smtp_port=None, smtp_usern
         if smtp_username:
             smtp_conf.smtp_username = smtp_username
         if smtp_pwd:
-            smtp_conf.smtp_password = EncryptionService.encrypt(smtp_pwd)
+            if not isinstance(smtp_pwd, str) or not smtp_pwd.strip():
+                raise ValueError("SMTP password must be a non-empty string")
+
+            try:
+                smtp_conf.smtp_password = EncryptionService.encrypt(smtp_pwd)
+            except Exception as e:
+                logger.error(f"Error encrypting SMTP password: {e}")
+                raise ValueError(f"Failed to encrypt password: {e}")
+
         await db.commit()
         await db.refresh(smtp_conf)
         return smtp_conf
     except Exception as e:
-        logger.error(f"Error updating smtp conf {e}")
+        logger.error(f"Error updating smtp configuration: {e}")
+        if "encrypt" in str(e).lower():
+            raise ValueError(f"Encryption error: {e}")
         raise e
     finally:
         await db.close()
