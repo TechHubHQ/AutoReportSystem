@@ -125,39 +125,4 @@ def require_auth(func):
     return wrapper
 
 
-def session_timeout_check():
-    """
-    Check for session timeout and handle accordingly
-    This can be extended to implement actual session timeout logic
-    """
-    # For now, just check if user exists
-    # In the future, you could add timestamp-based session expiration
-    if "user" in st.session_state:
-        user = st.session_state.user
-        if not user or not isinstance(user, dict):
-            RouteProtection.clear_session()
-            return False
-    return True
 
-
-def get_user_role() -> str:
-    """
-    Get current user's role (for future role-based access control)
-    """
-    user = RouteProtection.get_current_user()
-    if user:
-        return user.get("role", "user")
-    return "anonymous"
-
-
-def has_permission(permission: str) -> bool:
-    """
-    Check if current user has specific permission
-    This is a placeholder for future role-based permissions
-    """
-    if not RouteProtection.is_authenticated():
-        return False
-
-    # For now, all authenticated users have all permissions
-    # This can be extended with actual role-based logic
-    return True

@@ -16,7 +16,7 @@ from collections import defaultdict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
-from .job_config import JOB_CONFIG
+from app.core.jobs.job_config import JOB_CONFIG
 
 logger = logging.getLogger("async_scheduler")
 
@@ -129,7 +129,7 @@ async def start_scheduler():
 
     try:
         while True:
-            await asyncio.sleep(2)
+            await asyncio.sleep(3600)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
         logger.info("Scheduler shutdown successfully.")

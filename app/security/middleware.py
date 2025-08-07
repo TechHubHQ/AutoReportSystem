@@ -181,20 +181,4 @@ def apply_security_middleware():
         "page_access", f"Accessed page: {current_page}")
 
 
-def require_fresh_login(max_age_minutes: int = 30):
-    """
-    Require a fresh login (within specified time)
-    Useful for sensitive operations
-    """
-    if not RouteProtection.is_authenticated():
-        st.error("🔒 Authentication required.")
-        st.stop()
 
-    session_info = SecurityMiddleware.get_session_info()
-    session_duration = session_info.get("session_duration", 0)
-
-    if session_duration > (max_age_minutes * 60):
-        st.error(
-            f"🔒 This operation requires a fresh login (within {max_age_minutes} minutes).")
-        st.info("Please log out and log back in to continue.")
-        st.stop()

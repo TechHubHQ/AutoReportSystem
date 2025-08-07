@@ -1,18 +1,23 @@
 import streamlit as st
 import asyncio
 from threading import Thread
-from app.database.db_connector import init_db
-from app.ui.login import login
-from app.ui.signup import signup
-from app.ui.dashboard import dashboard
-from app.ui.user_settings import settings
-from app.ui.template_designer import template_designer
-from app.ui.smtp_conf import smtp_conf
-from app.security.route_protection import RouteProtection
-from app.security.middleware import apply_security_middleware
-from app.security.backend_session_manager import BackendSessionManager
-from app.security.session_validator import SessionValidator
 from app.core.jobs.scheduler import run_scheduler
+from app.security.backend_session_manager import BackendSessionManager
+from app.security.middleware import apply_security_middleware
+from app.security.route_protection import RouteProtection
+from app.ui.smtp_conf import smtp_conf
+from app.ui.template_designer import template_designer
+from app.ui.user_settings import settings
+from app.ui.dashboard import dashboard
+from app.ui.jobs_dashboard import jobs_dashboard
+from app.ui.signup import signup
+from app.ui.login import login
+from app.database.db_connector import init_db
+from app.config.logging_config import setup_logging, get_logger
+
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
 st.set_page_config(page_title="Automate Report System", layout="wide")
 
@@ -26,15 +31,7 @@ if "db_initialized" not in st.session_state:
     st.session_state.db_initialized = True
 
 # Always attempt to restore session from URL parameters or existing state
-# This ensures sessions persist through page refreshes
 BackendSessionManager.restore_session()
-
-# Validate and refresh session if needed (but don't be too aggressive)
-if BackendSessionManager.is_authenticated():
-    # Only validate if we're on a protected route
-    current_page = st.session_state.get('page', 'home')
-    if RouteProtection.is_route_protected(current_page):
-        SessionValidator.validate_and_refresh()
 
 
 # Apply security middleware
@@ -218,6 +215,10 @@ elif st.session_state.page == "signup":
 elif st.session_state.page == "dashboard":
     # This route is protected by RouteProtection.check_route_access()
     dashboard()
+
+elif st.session_state.page == "jobs":
+    # This route is protected by RouteProtection.check_route_access()
+    jobs_dashboard()
 
 elif st.session_state.page == "settings":
     # This route is protected by RouteProtection.check_route_access()

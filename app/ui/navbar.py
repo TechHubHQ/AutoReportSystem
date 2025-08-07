@@ -80,6 +80,7 @@ def navbar(go_to_page, current_page="dashboard"):
         # Navigation items
         nav_items = [
             {"name": "Dashboard", "icon": "📊", "page": "dashboard"},
+            {"name": "Jobs & Scheduler", "icon": "⚙️", "page": "jobs"},
             {"name": "Template Designer", "icon": "🎨", "page": "template_designer"},
             {"name": "SMTP Config", "icon": "📧", "page": "smtp_conf"},
             {"name": "Settings", "icon": "🔧", "page": "settings"},

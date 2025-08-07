@@ -4,9 +4,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import asyncio
-import random
-import uuid
-from typing import List
 from app.ui.navbar import navbar
 from app.core.interface.task_interface import (
     get_tasks, create_task, update_task, delete_task, get_task_statistics
