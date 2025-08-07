@@ -35,7 +35,6 @@ class DashboardManager:
         return []
 
 
-
 def apply_custom_css():
     """Apply custom CSS for modern UI styling"""
     st.markdown("""
@@ -595,15 +594,9 @@ async def render_system_monitoring(dashboard_manager):
         """, unsafe_allow_html=True)
 
 
-def dashboard():
+def dashboard(go_to_page):
     """Main dashboard function"""
     apply_custom_css()
-
-    # Add navigation
-    def go_to_page(page_name):
-        st.session_state.page = page_name
-        st.query_params["page"] = page_name
-        st.rerun()
 
     navbar(go_to_page, "dashboard")
 

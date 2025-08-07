@@ -1,58 +1,109 @@
+"""Job interface for managing scheduled jobs and monitoring."""
+
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from sqlalchemy import select, func
-from app.database.db_connector import get_async_session
-from app.database.models import Job
-from app.core.jobs.scheduler import scheduler, execution_history
+from app.core.jobs.scheduler import get_scheduler_instance, is_scheduler_running, ensure_scheduler_running, get_scheduler_uptime, execution_history
 
 
 async def get_all_jobs() -> List[Dict[str, Any]]:
-    """Get all jobs from database."""
-    async with get_async_session() as session:
-        result = await session.execute(select(Job))
-        jobs = result.scalars().all()
+    """Get all jobs from scheduler with real-time information."""
+    from app.core.jobs.job_config import JOB_CONFIG
+    import asyncio
 
-        job_list = []
-        for job in jobs:
+    job_list = []
+
+    # Ensure scheduler is running
+    ensure_scheduler_running()
+
+    # Get scheduler instance with retry mechanism
+    scheduler = get_scheduler_instance()
+
+    # If scheduler is None, wait a bit and try again (it might be starting up)
+    if scheduler is None:
+        await asyncio.sleep(1)
+        scheduler = get_scheduler_instance()
+
+    # If scheduler is still not available, return basic config info
+    if not scheduler:
+        for job_config in JOB_CONFIG:
             job_data = {
-                'id': job.id,
-                'name': job.name,
-                'description': job.description,
-                'schedule_type': job.schedule_type,
-                'is_active': job.is_active,
-                'is_custom': job.is_custom,
-                'last_run': job.last_run,
-                'next_run': job.next_run,
-                'created_at': job.created_at,
-                'status': 'running' if job.is_active else 'stopped'
+                'id': job_config['id'],
+                'name': job_config['id'].replace('_', ' ').title(),
+                'description': f"Automated {job_config['id'].replace('_', ' ')} job",
+                'schedule_type': str(job_config['trigger']),
+                'is_active': False,
+                'is_custom': False,
+                'last_run': None,
+                'next_run': None,
+                'created_at': datetime.now(),
+                'status': 'not_scheduled'
             }
             job_list.append(job_data)
-
         return job_list
+
+    # Get real-time job information from scheduler
+    scheduled_jobs = scheduler.get_jobs()
+
+    for job_config in JOB_CONFIG:
+        # Find the corresponding scheduled job
+        scheduled_job = next(
+            (j for j in scheduled_jobs if j.id == job_config['id']), None)
+
+        # Get execution history for this job
+        job_history = execution_history.get(job_config['id'], [])
+        last_execution = job_history[-1] if job_history else None
+
+        job_data = {
+            'id': job_config['id'],
+            'name': job_config['id'].replace('_', ' ').title(),
+            'description': f"Automated {job_config['id'].replace('_', ' ')} job",
+            'schedule_type': str(job_config['trigger']),
+            'is_active': scheduled_job is not None,
+            'is_custom': False,
+            'last_run': last_execution.execution_time if last_execution else None,
+            'next_run': scheduled_job.next_run_time if scheduled_job else None,
+            'created_at': datetime.now(),
+            'status': 'running' if scheduled_job else 'not_scheduled'
+        }
+        job_list.append(job_data)
+
+    return job_list
 
 
 async def get_job_statistics() -> Dict[str, Any]:
-    """Get job statistics."""
-    async with get_async_session() as session:
-        total_jobs = await session.execute(select(func.count(Job.id)))
-        active_jobs = await session.execute(
-            select(func.count(Job.id)).where(Job.is_active == True)
-        )
-        custom_jobs = await session.execute(
-            select(func.count(Job.id)).where(Job.is_custom == True)
-        )
+    """Get job statistics from scheduler."""
+    from app.core.jobs.job_config import JOB_CONFIG
 
-        return {
-            'total': total_jobs.scalar() or 0,
-            'active': active_jobs.scalar() or 0,
-            'inactive': (total_jobs.scalar() or 0) - (active_jobs.scalar() or 0),
-            'custom': custom_jobs.scalar() or 0,
-            'system': (total_jobs.scalar() or 0) - (custom_jobs.scalar() or 0)
-        }
+    total = len(JOB_CONFIG)
+    active = 0
+
+    # Ensure scheduler is running
+    ensure_scheduler_running()
+
+    scheduler = get_scheduler_instance()
+    if scheduler:
+        scheduled_jobs = scheduler.get_jobs()
+        # Count how many of our configured jobs are actually scheduled
+        for job_config in JOB_CONFIG:
+            if any(j.id == job_config['id'] for j in scheduled_jobs):
+                active += 1
+
+    return {
+        'total': total,
+        'active': active,
+        'inactive': total - active,
+        'custom': 0,
+        'system': total
+    }
 
 
 async def get_scheduler_status() -> Dict[str, Any]:
     """Get current scheduler status."""
+    # Ensure scheduler is running
+    ensure_scheduler_running()
+
+    scheduler = get_scheduler_instance()
+
     if not scheduler:
         return {
             'running': False,
@@ -65,7 +116,7 @@ async def get_scheduler_status() -> Dict[str, Any]:
         'running': scheduler.running,
         'jobs_count': len(scheduler.get_jobs()),
         'health': 'healthy' if scheduler.running else 'unhealthy',
-        'uptime': str(datetime.now() - datetime.now().replace(hour=0, minute=0, second=0))
+        'uptime': get_scheduler_uptime()
     }
 
 

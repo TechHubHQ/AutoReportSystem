@@ -1,7 +1,7 @@
 import streamlit as st
 import asyncio
 from threading import Thread
-from app.core.jobs.scheduler import run_scheduler
+from app.core.jobs.scheduler import ensure_scheduler_running
 from app.security.backend_session_manager import BackendSessionManager
 from app.security.middleware import apply_security_middleware
 from app.security.route_protection import RouteProtection
@@ -27,8 +27,10 @@ if "db_initialized" not in st.session_state:
     asyncio.run(init_db())
     BackendSessionManager.init_session_table()
     BackendSessionManager.cleanup_expired_sessions()
-    Thread(target=run_scheduler).start()
     st.session_state.db_initialized = True
+
+# Ensure scheduler is always running on every page load
+ensure_scheduler_running()
 
 # Always attempt to restore session from URL parameters or existing state
 BackendSessionManager.restore_session()
@@ -214,11 +216,11 @@ elif st.session_state.page == "signup":
 
 elif st.session_state.page == "dashboard":
     # This route is protected by RouteProtection.check_route_access()
-    dashboard()
+    dashboard(go_to_page)
 
 elif st.session_state.page == "jobs":
     # This route is protected by RouteProtection.check_route_access()
-    jobs_dashboard()
+    jobs_dashboard(go_to_page)
 
 elif st.session_state.page == "settings":
     # This route is protected by RouteProtection.check_route_access()

@@ -179,6 +179,3 @@ def apply_security_middleware():
     current_page = st.session_state.get("page", "unknown")
     SecurityMiddleware.log_security_event(
         "page_access", f"Accessed page: {current_page}")
-
-
-

@@ -20,6 +20,7 @@ class RouteProtection:
         "settings",
         "template_designer",
         "smtp_conf",
+        "jobs",
         "job_management"
     }
 
@@ -123,6 +124,3 @@ def require_auth(func):
             st.stop()
         return func(*args, **kwargs)
     return wrapper
-
-
-
