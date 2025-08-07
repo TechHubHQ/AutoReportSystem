@@ -34,22 +34,26 @@ def security_dashboard():
         session_info = SecurityMiddleware.get_session_info()
 
         if session_info:
-            session_duration = session_info.get("session_duration", 0)
-            time_until_timeout = session_info.get("time_until_timeout", 0)
+            time_remaining = session_info.get("time_remaining", 0)
+            created_at = session_info.get("created_at")
 
-            # Format session duration
-            duration_minutes = int(session_duration // 60)
-            duration_seconds = int(session_duration % 60)
+            # Calculate session duration if created_at is available
+            if created_at:
+                from datetime import datetime
+                session_duration = (
+                    datetime.now() - created_at).total_seconds()
+                duration_minutes = int(session_duration // 60)
+                duration_seconds = int(session_duration % 60)
+                st.info(
+                    f"**Session Duration:** {duration_minutes}m {duration_seconds}s")
 
             st.info(
-                f"**Session Duration:** {duration_minutes}m {duration_seconds}s")
-            st.info(
-                f"**Time Until Timeout:** {SecurityMiddleware.format_time_remaining(time_until_timeout)}")
+                f"**Time Until Timeout:** {SecurityMiddleware.format_time_remaining(time_remaining)}")
 
             # Session status
-            if time_until_timeout > 300:  # More than 5 minutes
+            if time_remaining > 300:  # More than 5 minutes
                 st.success("✅ Session Active")
-            elif time_until_timeout > 0:
+            elif time_remaining > 0:
                 st.warning("⚠️ Session Expiring Soon")
             else:
                 st.error("❌ Session Expired")
@@ -133,13 +137,13 @@ def show_security_status():
         return
 
     session_info = SecurityMiddleware.get_session_info()
-    time_until_timeout = session_info.get("time_until_timeout", 0)
+    time_remaining = session_info.get("time_remaining", 0)
 
-    if time_until_timeout > 300:  # More than 5 minutes
+    if time_remaining > 300:  # More than 5 minutes
         st.sidebar.success("🔒 Session Secure")
-    elif time_until_timeout > 0:
+    elif time_remaining > 0:
         remaining = SecurityMiddleware.format_time_remaining(
-            time_until_timeout)
+            time_remaining)
         st.sidebar.warning(f"⚠️ Session expires in {remaining}")
     else:
         st.sidebar.error("❌ Session Expired")
