@@ -1,18 +1,21 @@
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 
 class AppSettings:
     """
-    settings module for ARS
+    Settings module for ARS (App Reporting System)
     """
 
     @property
     def db_url(self):
-        db_path = "/home/ars.db"
+        # Use a safe writable directory inside the project folder
+        db_dir = ".streamlit"
+        os.makedirs(db_dir, exist_ok=True)  # Ensure the directory exists
+
+        db_path = os.path.join(db_dir, "ars.db")
         return f"sqlite+aiosqlite:///{db_path}"
 
     @property
@@ -20,4 +23,5 @@ class AppSettings:
         return os.getenv("SMTP_ENV_KEY")
 
 
+# Instantiate settings
 settings = AppSettings()
