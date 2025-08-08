@@ -11,12 +11,7 @@ class AppSettings:
 
     @property
     def db_url(self):
-        # Use a safe writable directory inside the project folder
-        db_dir = ".streamlit"
-        os.makedirs(db_dir, exist_ok=True)  # Ensure the directory exists
-
-        db_path = os.path.join(db_dir, "ars.db")
-        return f"sqlite+aiosqlite:///{db_path}"
+        return os.getenv("DB_URL")
 
     @property
     def SMTP_ENV_KEY(self):
