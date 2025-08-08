@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from sqlalchemy import select, func
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Optional
+from sqlalchemy import select
 from app.database.db_connector import get_db
-from app.database.models import Task, User
+from app.database.models import Task
 from app.config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -33,11 +33,11 @@ async def get_dashboard_summary(user_id: Optional[int] = None) -> Dict:
             [t for t in tasks if t.priority in ['high', 'urgent']])
         overdue_tasks = len([
             t for t in tasks
-            if t.due_date and t.due_date < datetime.now() and t.status != 'completed'
+            if t.due_date and t.due_date < datetime.now(timezone.utc) and t.status != 'completed'
         ])
 
         # Recent activity (last 7 days)
-        week_ago = datetime.now() - timedelta(days=7)
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
         recent_tasks = len([t for t in tasks if t.created_at >= week_ago])
         recent_completions = len([
             t for t in tasks
@@ -70,7 +70,7 @@ async def get_task_completion_trends(user_id: Optional[int] = None, days: int = 
         db = await get_db()
 
         # Get tasks for the specified period
-        start_date = datetime.now() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
         base_query = select(Task).where(Task.created_at >= start_date)
         if user_id:
             base_query = base_query.where(Task.created_by == user_id)
@@ -81,7 +81,7 @@ async def get_task_completion_trends(user_id: Optional[int] = None, days: int = 
         # Generate daily completion data
         daily_data = {}
         for i in range(days):
-            date = (datetime.now() - timedelta(days=i)).date()
+            date = (datetime.now(timezone.utc) - timedelta(days=i)).date()
             daily_data[date.isoformat()] = {
                 'created': 0,
                 'completed': 0,
@@ -153,7 +153,7 @@ async def get_productivity_insights(user_id: Optional[int] = None) -> Dict:
         # Analyze overdue tasks
         overdue_tasks = [
             t for t in tasks
-            if t.due_date and t.due_date < datetime.now() and t.status != 'completed'
+            if t.due_date and t.due_date < datetime.now(timezone.utc) and t.status != 'completed'
         ]
 
         if overdue_tasks:
