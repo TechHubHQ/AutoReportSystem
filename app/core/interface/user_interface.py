@@ -7,28 +7,22 @@ from app.config.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-async def user_exists(email: str) -> bool:
-    """
-    Check if a user with the given email already exists in the database.
-    Returns True if exists, False otherwise.
-    """
+async def user_exists(email: str, db) -> bool:
     try:
-        db = await get_db()
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         return user is not None
     except Exception as e:
         logger.error(f"Error checking if user exists: {e}")
         raise e
-    finally:
-        await db.close()
 
 
 async def create_user(username: str, email: str, password: str, userrole: str = "Software Engineer"):
+    db = await get_db()
     try:
-        if await user_exists(email):
+        if await user_exists(email, db):  # Pass db here
             raise Exception("User with this email already exists.")
-        db = await get_db()
+
         password = hash_password(password)
         new_user = User(username=username, email=email,
                         password=password, userrole=userrole)
