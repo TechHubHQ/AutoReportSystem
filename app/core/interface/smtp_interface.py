@@ -1,6 +1,6 @@
 from app.database.db_connector import get_db
 from app.core.services.encryption_service import EncryptionService
-from app.database.models import SMTPConf
+from app.database.models import SMTPConf, User
 from sqlalchemy import select
 from typing import Optional
 from app.config.logging_config import get_logger
@@ -54,40 +54,29 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
 
 
 async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTPConf]:
-    """Get active SMTP configuration for a user or the first active one"""
+    """Get active SMTP configuration for the given user only.
+
+    Security note: Do NOT fall back to another user's active config.
+    Return None when the user has no active configuration.
+    """
     try:
         db = await get_db()
 
-        if user_id:
-            # Try to get user-specific SMTP config
-            result = await db.execute(
-                select(SMTPConf).where(
-                    SMTPConf.sender_email.in_(
-                        select(SMTPConf.sender_email).join(
-                            SMTPConf.user
-                        ).where(SMTPConf.user.has(id=user_id))
-                    ),
-                    SMTPConf.is_active == "True"
-                )
-            )
-            smtp_conf = result.scalar_one_or_none()
-            if smtp_conf:
-                # Decrypt password
-                smtp_conf.smtp_password = EncryptionService.decrypt(
-                    smtp_conf.smtp_password)
-                return smtp_conf
+        if not user_id:
+            return None
 
-        # Fallback to any active SMTP config
+        # User-specific active SMTP config
         result = await db.execute(
-            select(SMTPConf).where(SMTPConf.is_active == "True").limit(1)
+            select(SMTPConf)
+            .join(User, SMTPConf.sender_email == User.email)
+            .where(User.id == user_id, SMTPConf.is_active == "True")
+            .limit(1)
         )
         smtp_conf = result.scalar_one_or_none()
         if smtp_conf:
-            # Decrypt password
+            # Decrypt password for use/display
             smtp_conf.smtp_password = EncryptionService.decrypt(
                 smtp_conf.smtp_password)
-            return smtp_conf
-
         return smtp_conf
 
     except Exception as e:

@@ -69,7 +69,7 @@ def smtp_conf(go_to_page):
                 st.info(f"**Password:** {masked_pwd}")
         else:
             st.warning(
-                "⚠️ No SMTP configuration found. Please set up your email server below.")
+                "⚠️ No active SMTP configuration found for your account. Please set up your email server below.")
     except Exception as e:
         st.error(f"❌ Error loading current configuration: {str(e)}")
 
@@ -82,7 +82,7 @@ def smtp_conf(go_to_page):
         try:
             all_configs = asyncio.run(get_all_smtp_configs(user_email))
             if all_configs:
-                st.markdown("#### All SMTP Configurations")
+                st.markdown("#### All SMTP Configurations (Your Account)")
                 for i, config in enumerate(all_configs):
                     with st.expander(f"Config {i+1}: {config.smtp_host} ({'Active' if config.is_active == 'True' else 'Inactive'})"):
                         col1, col2 = st.columns(2)
@@ -97,7 +97,7 @@ def smtp_conf(go_to_page):
                             masked_pwd = '*' * 8 if config.smtp_password else 'Not set'
                             st.write(f"**Password:** {masked_pwd}")
             else:
-                st.info("No additional configurations found.")
+                st.info("No additional configurations found for your account.")
         except Exception as e:
             st.error(f"Error loading configurations: {str(e)}")
 
