@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time, date
 import pytz
 import asyncio
 from app.ui.navbar import navbar
@@ -14,6 +14,98 @@ from app.core.interface.job_interface import (
 )
 from app.security.route_protection import RouteProtection
 from app.ui.components.loader import LoaderContext
+
+# --- Time helpers (IST-aware and schedule-aware) ---
+IST_TZ = pytz.timezone('Asia/Kolkata')
+RUN_TIME_IST = time(hour=21, minute=50)
+
+def ist_now() -> datetime:
+    return datetime.now(IST_TZ)
+
+def last_day_of_month(year: int, month: int) -> date:
+    if month == 12:
+        return date(year, 12, 31)
+    first_next = date(year + (1 if month == 12 else 0), (1 if month == 12 else month + 1), 1)
+    return first_next - timedelta(days=1)
+
+def compute_last_friday(year: int, month: int) -> date:
+    last_dom = last_day_of_month(year, month)
+    # Friday=4
+    offset = (last_dom.weekday() - 4) % 7
+    return last_dom - timedelta(days=offset)
+
+def combine_ist(d: date, t: time) -> datetime:
+    return IST_TZ.localize(datetime(d.year, d.month, d.day, t.hour, t.minute, t.second))
+
+def next_month(year: int, month: int) -> tuple[int, int]:
+    return (year + (1 if month == 12 else 0), 1 if month == 12 else month + 1)
+
+def get_next_monthly_run_ist(now: datetime) -> datetime:
+    # Monthly reporter runs on the last Friday of the month at 21:50 IST
+    y, m = now.year, now.month
+    last_fri = compute_last_friday(y, m)
+    candidate = combine_ist(last_fri, RUN_TIME_IST)
+    if now >= candidate:
+        y2, m2 = next_month(y, m)
+        last_fri = compute_last_friday(y2, m2)
+        candidate = combine_ist(last_fri, RUN_TIME_IST)
+    return candidate
+
+def is_last_friday(d: date) -> bool:
+    return d == compute_last_friday(d.year, d.month)
+
+def get_next_weekly_run_ist(now: datetime) -> datetime:
+    # Weekly reporter runs every Friday except last Friday at 21:50 IST
+    today = now.date()
+    # If today is Friday
+    if today.weekday() == 4:
+        candidate_date = today
+        candidate_dt = combine_ist(candidate_date, RUN_TIME_IST)
+        # If already past today's run time or today is last Friday, move to next Friday
+        if now >= candidate_dt or is_last_friday(candidate_date):
+            days_ahead = 7
+        else:
+            days_ahead = 0
+    else:
+        # Days until Friday (4)
+        days_ahead = (4 - today.weekday()) % 7
+        if days_ahead == 0:
+            days_ahead = 7
+    candidate_date = today + timedelta(days=days_ahead)
+    # Skip last Friday
+    if is_last_friday(candidate_date):
+        candidate_date = candidate_date + timedelta(days=7)
+    return combine_ist(candidate_date, RUN_TIME_IST)
+
+def format_time_until(delta: timedelta) -> str:
+    total_seconds = int(delta.total_seconds())
+    if total_seconds <= 0:
+        return "very soon"
+    days = total_seconds // 86400
+    remainder = total_seconds % 86400
+    hours = remainder // 3600
+    minutes = (remainder % 3600) // 60
+    parts = []
+    if days:
+        parts.append(f"{days} day{'s' if days != 1 else ''}")
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes and not days:  # Show minutes; if many days, hours/mins may be noisy
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    return "in " + " ".join(parts) if parts else "very soon"
+
+def get_display_next_run(job: dict, now: datetime) -> datetime | None:
+    if not job.get('is_active'):
+        return None
+    job_id = job.get('id') or job.get('name', '').lower()
+    # Normalize id/name
+    jid = str(job_id).lower() if job_id else ''
+    if 'monthly_reporter' in jid:
+        return get_next_monthly_run_ist(now)
+    if 'weekly_reporter' in jid:
+        return get_next_weekly_run_ist(now)
+    # Fallback to scheduler-provided next_run (already tz-aware ideally)
+    return job.get('next_run')
 
 
 def apply_jobs_css():
@@ -360,35 +452,30 @@ async def render_scheduler_overview():
     if jobs:
         st.markdown("### 📅 Upcoming Schedule")
 
-        upcoming_jobs = [
-            job for job in jobs if job['next_run'] and job['is_active']]
-        upcoming_jobs.sort(key=lambda x: x['next_run'])
+        # Derive display next run using schedule rules for weekly/monthly
+        now_ist = ist_now()
+        upcoming_jobs = []
+        for job in jobs:
+            if job.get('is_active'):
+                disp_next = get_display_next_run(job, now_ist)
+                if disp_next:
+                    # Clone dict to avoid mutating original
+                    job_copy = dict(job)
+                    job_copy['display_next_run'] = disp_next
+                    upcoming_jobs.append(job_copy)
+        # Sort by display_next_run
+        upcoming_jobs.sort(key=lambda x: x['display_next_run'])
 
         if upcoming_jobs:
             for i, job in enumerate(upcoming_jobs[:3]):  # Show next 3 jobs
-                next_run_str = job['next_run'].strftime(
-                    '%Y-%m-%d %H:%M:%S %Z') if job['next_run'] else "Not scheduled"
+                next_run_dt = job.get('display_next_run')
+                next_run_str = next_run_dt.strftime('%Y-%m-%d %H:%M:%S %Z') if next_run_dt else "Not scheduled"
 
-                # Use timezone-aware datetime for comparison
-                if job['next_run']:
-                    # Get current time in IST timezone
-                    ist_tz = pytz.timezone('Asia/Kolkata')
-                    current_time_ist = datetime.now(ist_tz)
-                    time_until = job['next_run'] - current_time_ist
-                else:
-                    time_until = None
+                # Compute time until using IST now
+                time_until = (next_run_dt - now_ist) if next_run_dt else None
 
                 if time_until:
-                    if time_until.days > 0:
-                        time_str = f"in {time_until.days} days"
-                    elif time_until.seconds > 3600:
-                        hours = time_until.seconds // 3600
-                        time_str = f"in {hours} hours"
-                    elif time_until.seconds > 60:
-                        minutes = time_until.seconds // 60
-                        time_str = f"in {minutes} minutes"
-                    else:
-                        time_str = "very soon"
+                    time_str = format_time_until(time_until)
                 else:
                     time_str = "Not scheduled"
 
@@ -546,28 +633,13 @@ async def render_jobs_list():
         job_type_color = "#9C27B0" if job['is_custom'] else "#2196F3"
         job_type_icon = "🎨" if job['is_custom'] else "🛠️"
 
-        # Enhanced time formatting
-        if job['next_run']:
-            next_run = job['next_run'].strftime('%Y-%m-%d %H:%M:%S %Z')
-
-            # Use timezone-aware datetime for comparison
-            ist_tz = pytz.timezone('Asia/Kolkata')
-            current_time_ist = datetime.now(ist_tz)
-            time_until = job['next_run'] - current_time_ist
-
-            if time_until and time_until.total_seconds() > 0:
-                if time_until.days > 0:
-                    countdown = f"in {time_until.days} days"
-                elif time_until.seconds > 3600:
-                    hours = time_until.seconds // 3600
-                    countdown = f"in {hours} hours"
-                elif time_until.seconds > 60:
-                    minutes = time_until.seconds // 60
-                    countdown = f"in {minutes} minutes"
-                else:
-                    countdown = "very soon"
-            else:
-                countdown = "overdue"
+        # Enhanced time formatting with schedule-aware next run
+        now_ist = ist_now()
+        display_next = get_display_next_run(job, now_ist)
+        if display_next:
+            next_run = display_next.strftime('%Y-%m-%d %H:%M:%S %Z')
+            time_until = display_next - now_ist
+            countdown = format_time_until(time_until) if time_until else "very soon"
         else:
             next_run = "Not scheduled"
             countdown = "N/A"
