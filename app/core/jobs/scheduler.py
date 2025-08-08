@@ -221,7 +221,6 @@ def ensure_scheduler_running():
     with _scheduler_lock:
         # Check if scheduler is already running
         if _scheduler_instance and _scheduler_instance.running:
-            logger.info("Scheduler is already running")
             return True
 
         # Check if we already started the scheduler thread

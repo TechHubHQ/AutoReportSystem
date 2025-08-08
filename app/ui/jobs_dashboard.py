@@ -799,8 +799,8 @@ async def render_performance_charts():
                 color_continuous_scale='Greens'
             )
             fig.update_layout(height=400, showlegend=False)
-            fig.update_xaxis(title="Hour of Day")
-            fig.update_yaxis(title="Number of Executions")
+            fig.update_xaxes(title_text="Hour of Day")
+            fig.update_yaxes(title_text="Number of Executions")
             st.plotly_chart(fig, use_container_width=True)
 
     # Job performance comparison
@@ -828,8 +828,8 @@ async def render_performance_charts():
                 range_color=[0, 100]
             )
             fig.update_layout(height=400)
-            fig.update_xaxis(title="Job ID")
-            fig.update_yaxis(title="Success Rate (%)")
+            fig.update_xaxes(title_text="Job ID")
+            fig.update_yaxes(title_text="Success Rate (%)")
             st.plotly_chart(fig, use_container_width=True)
 
 
