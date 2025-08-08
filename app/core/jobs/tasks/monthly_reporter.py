@@ -7,6 +7,7 @@ from app.database.db_connector import get_db
 from app.database.models import User, SMTPConf
 from sqlalchemy import select
 from app.config.logging_config import get_logger
+from app.core.utils.datetime_utils import is_last_friday, get_date_in_timezone
 
 logger = get_logger(__name__)
 
@@ -71,9 +72,17 @@ async def send_report(to_email, user_id):
 
 
 async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com"):
-    """Send monthly reports for all users with SMTP config"""
+    """Send monthly reports only on the last Friday of the month (IST)."""
     db = None
     try:
+        # Determine today's date in IST
+        today_ist = get_date_in_timezone('Asia/Kolkata')
+
+        # Only proceed if last Friday
+        if today_ist.weekday() != 4 or not is_last_friday(today_ist):
+            logger.info("Today is not the last Friday (IST). Skipping monthly report.")
+            return
+
         db = await get_db()
         result = await db.execute(
             select(User).join(SMTPConf, User.email == SMTPConf.sender_email)

@@ -10,6 +10,7 @@ from app.integrations.email.email_client import EmailService
 from app.database.db_connector import get_db
 from app.database.models import User, SMTPConf
 from app.config.logging_config import get_logger
+from app.core.utils.datetime_utils import is_last_friday, get_date_in_timezone
 
 logger = get_logger(__name__)
 
@@ -65,30 +66,22 @@ async def send_report(to_email, user_id):
 
 
 async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com"):
-    """Send weekly reports only on 1st, 2nd, or 3rd Friday of the month"""
+    """Send weekly reports on every Friday except the last Friday of the month (IST)."""
     db = None
     try:
-        # Check if today is 1st, 2nd, or 3rd Friday
-        today = datetime.utcnow().date()
+        # Determine today's date in IST
+        today_ist = get_date_in_timezone('Asia/Kolkata')
 
-        if today.weekday() != 4:  # 4 = Friday
-            logger.info("Today is not Friday. Skipping weekly report.")
+        if today_ist.weekday() != 4:  # 4 = Friday
+            logger.info("Today is not Friday (IST). Skipping weekly report.")
             return
 
-        # Count how many Fridays have occurred so far this month
-        count = 0
-        current_day = today.replace(day=1)
-        while current_day <= today:
-            if current_day.weekday() == 4:
-                count += 1
-            current_day += timedelta(days=1)
-
-        if count > 3:
-            logger.info(
-                "Today is not 1st, 2nd, or 3rd Friday. Skipping weekly report.")
+        # Skip if today is the last Friday (monthly report day)
+        if is_last_friday(today_ist):
+            logger.info("Today is the last Friday (IST). Weekly report skipped; monthly will run.")
             return
 
-        # Continue only if 1st, 2nd, or 3rd Friday
+        # Continue for weekly report
         db = await get_db()
         result = await db.execute(
             select(User).join(SMTPConf, User.email == SMTPConf.sender_email)

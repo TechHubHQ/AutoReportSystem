@@ -5,8 +5,9 @@ This module provides utilities to safely compare and manipulate datetime objects
 that may have different timezone awareness.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
 from typing import Optional
+import pytz
 
 
 def ensure_timezone_aware(dt: Optional[datetime]) -> Optional[datetime]:
@@ -82,6 +83,38 @@ def get_current_utc_datetime() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def get_date_in_timezone(tz_name: str) -> date:
+    """
+    Get current date in a given timezone.
+    """
+    tz = pytz.timezone(tz_name)
+    return datetime.now(tz).date()
+
+
+def is_last_friday(d: date) -> bool:
+    """
+    Determine if the given date is the last Friday of its month.
+    """
+    # Get first day of next month
+    year = d.year
+    month = d.month
+    if month == 12:
+        next_month = 1
+        next_year = year + 1
+    else:
+        next_month = month + 1
+        next_year = year
+
+    first_of_next_month = date(next_year, next_month, 1)
+    last_day_of_month = first_of_next_month - timedelta(days=1)
+
+    # Friday is weekday() == 4
+    offset = (last_day_of_month.weekday() - 4) % 7
+    last_friday = last_day_of_month - timedelta(days=offset)
+
+    return d == last_friday
+
+
 def format_datetime_for_display(dt: Optional[datetime], format_str: str = "%Y-%m-%d %H:%M") -> str:
     """
     Format datetime for display, handling timezone-aware and naive datetimes.
@@ -140,7 +173,6 @@ def is_due_soon(due_date: Optional[datetime], days_ahead: int = 3, current_time:
         current_time = get_current_utc_datetime()
 
     # Add days to current time for comparison
-    from datetime import timedelta
     future_time = current_time + timedelta(days=days_ahead)
 
     # Task is due soon if due_date is between now and future_time
