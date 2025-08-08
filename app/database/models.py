@@ -32,7 +32,7 @@ class User(Base):
 
     # One-to-many: User → UserSessions
     sessions = relationship(
-        "UserSession", back_populates="user", cascade="all, delete-orphan")
+        lambda: UserSession, back_populates="user", cascade="all, delete-orphan")
 
 
 class Task(Base):

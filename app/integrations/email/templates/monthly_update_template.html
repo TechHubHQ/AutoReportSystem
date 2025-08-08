@@ -94,45 +94,58 @@
 
       <div class="section-title">🌟 Highlights</div>
       <ul>
-        {% for item in highlights %}
-        <li>
-          <strong>{{ task.title }}</strong>
-          <ul>
-            {% for line in task.description.split('\n') %}
-            <li>{{ line.strip() }}</li>
-            {% endfor %}
-          </ul>
-        </li>
+        {% for task in highlights %}
+          <li>
+            <strong>{{ task.title }}</strong>
+            <ul>
+              {% if task.description %}
+                {% for line in task.description.split('\n') %}
+                  <li>{{ line.strip() }}</li>
+                {% endfor %}
+              {% else %}
+                <li>No details provided</li>
+              {% endif %}
+            </ul>
+          </li>
         {% endfor %}
       </ul>
 
       <div class="section-title">✅ Accomplishments</div>
       <ul>
         {% for task in accomplishments %}
-        <li>
-          <strong>{{ task.title }}</strong>
-          <ul>
-            {% for line in task.description.split('\n') %}
-            <li>{{ line.strip() }}</li>
-            {% endfor %}
-          </ul>
-        </li>
+          <li>
+            <strong>{{ task.title }}</strong>
+            <ul>
+              {% if task.description %}
+                {% for line in task.description.split('\n') %}
+                  <li>{{ line.strip() }}</li>
+                {% endfor %}
+              {% else %}
+                <li>No details provided</li>
+              {% endif %}
+            </ul>
+          </li>
         {% endfor %}
       </ul>
 
       <div class="section-title">🔄 In Progress</div>
       <ul>
-        {% for item in in_progress %}
-        <li>
-          <strong>{{ task.title }}</strong>
-          <ul>
-            {% for line in task.description.split('\n') %}
-            <li>{{ line.strip() }}</li>
-            {% endfor %}
-          </ul>
-        </li>
+        {% for task in in_progress %}
+          <li>
+            <strong>{{ task.title }}</strong>
+            <ul>
+              {% if task.description %}
+                {% for line in task.description.split('\n') %}
+                  <li>{{ line.strip() }}</li>
+                {% endfor %}
+              {% else %}
+                <li>No details provided</li>
+              {% endif %}
+            </ul>
+          </li>
         {% endfor %}
       </ul>
+
 
       <div class="signature">
         Best regards,<br />

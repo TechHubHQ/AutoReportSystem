@@ -28,12 +28,19 @@ async def generate_report(user_id):
     in_progress = [
         task for task in tasks if task.category == "in progress"]
 
+    # Week/year for header
+    now = get_date_in_timezone('Asia/Kolkata')
+    week_num = datetime.now().isocalendar().week
+    year_num = datetime.now().year
+
     context = {
         'recipient_name': 'Santosh',
         'accomplishments': accomplishments,
         'in_progress': in_progress,
         'sender_name': user.username,
-        'sender_title': user.userrole
+        'sender_title': user.userrole,
+        'week': week_num,
+        'year': year_num,
     }
 
     rendered_content = await load_template(context, 'weekly_update_template.html')
@@ -51,10 +58,11 @@ async def send_report(to_email, user_id):
     report_content = await generate_report(user_id)
 
     email_service = EmailService(
-        email=smtp_config.sender_email,
+        from_email=smtp_config.sender_email,
         host=smtp_config.smtp_host,
         pwd=smtp_config.smtp_password,
-        port=smtp_config.smtp_port
+        port=smtp_config.smtp_port,
+        username=smtp_config.smtp_username
     )
 
     await email_service.send_email(

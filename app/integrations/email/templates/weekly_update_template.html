@@ -98,9 +98,13 @@
           <li>
             <strong>{{ task.title }}</strong>
             <ul>
-              {% for line in task.description.split('\n') %}
-                <li>{{ line.strip() }}</li>
-              {% endfor %}
+              {% if task.description %}
+                {% for line in task.description.split('\n') %}
+                  <li>{{ line.strip() }}</li>
+                {% endfor %}
+              {% else %}
+                <li>No details provided</li>
+              {% endif %}
             </ul>
           </li>
         {% endfor %}
@@ -109,17 +113,22 @@
 
       <div class="section-title">🔄 In Progress</div>
       <ul>
-        {% for item in in_progress %}
-        <li>
-          <strong>{{ task.title }}</strong>
-          <ul>
-            {% for line in task.description.split('\n') %}
-              <li>{{ line.strip() }}</li>
-            {% endfor %}
-          </ul>
-        </li>
+        {% for task in in_progress %}
+          <li>
+            <strong>{{ task.title }}</strong>
+            <ul>
+              {% if task.description %}
+                {% for line in task.description.split('\n') %}
+                  <li>{{ line.strip() }}</li>
+                {% endfor %}
+              {% else %}
+                <li>No details provided</li>
+              {% endif %}
+            </ul>
+          </li>
         {% endfor %}
       </ul>
+
 
       <div class="signature">
         Best regards,<br />

@@ -212,7 +212,12 @@ def smtp_conf(go_to_page):
             with LoaderContext("🔍 Testing SMTP connection...", "inline"):
                 try:
                     email_service = EmailService(
-                        smtp_username, smtp_host, smtp_password, smtp_port)
+                        from_email=smtp_username,
+                        host=smtp_host,
+                        pwd=smtp_password,
+                        port=smtp_port,
+                        username=smtp_username
+                    )
                     st.success("✅ Connection test successful!")
                 except Exception as e:
                     st.error(f"❌ Connection failed: {str(e)}")

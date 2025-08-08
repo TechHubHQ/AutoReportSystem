@@ -22,19 +22,27 @@ async def generate_report(user_id):
     # Get monthly tasks
     tasks = await get_monthly_tasks(user_id)
 
-    # Categorize tasks
+    # Categorize tasks (pass full task objects so template can access title/description)
     accomplishments = [
-        task.description for task in tasks if task.category == "accomplishments"]
+        task for task in tasks if task.category == "accomplishments"]
     in_progress = [
-        task.description for task in tasks if task.category == "in progress"]
+        task for task in tasks if task.category == "in progress"]
+
+    # Month/year for header
+    now = get_date_in_timezone('Asia/Kolkata')
+    month_name = now.strftime('%B')
+    year_num = now.year
 
     # Template context with dynamic sender info
     context = {
         'recipient_name': 'Santosh',
         'accomplishments': accomplishments,
         'in_progress': in_progress,
+        'highlights': accomplishments,  # basic highlight = accomplishments
         'sender_name': user.username,
-        'sender_title': user.userrole
+        'sender_title': user.userrole,
+        'month': month_name,
+        'year': year_num,
     }
 
     # Load and render template
@@ -56,10 +64,11 @@ async def send_report(to_email, user_id):
 
     # Create email service
     email_service = EmailService(
-        email=smtp_config.sender_email,
+        from_email=smtp_config.sender_email,
         host=smtp_config.smtp_host,
         pwd=smtp_config.smtp_password,
-        port=smtp_config.smtp_port
+        port=smtp_config.smtp_port,
+        username=smtp_config.smtp_username
     )
 
     # Send email

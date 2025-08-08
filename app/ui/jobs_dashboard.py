@@ -10,7 +10,7 @@ import asyncio
 from app.ui.navbar import navbar
 from app.core.interface.job_interface import (
     get_all_jobs, get_job_statistics, get_scheduler_status,
-    get_job_execution_history, get_job_health_metrics
+    get_job_execution_history, get_job_health_metrics, run_job_now
 )
 from app.security.route_protection import RouteProtection
 from app.ui.components.loader import LoaderContext
@@ -699,6 +699,20 @@ async def render_jobs_list():
                 <span style="color: #666;">{last_run}</span>
             </div>
             """, unsafe_allow_html=True)
+
+        # Inline actions
+        action_col1, action_col2 = st.columns([1, 3])
+        with action_col1:
+            if job['is_active'] and st.button("▶️ Run Now", key=f"run_now_{job['id']}"):
+                with LoaderContext("Scheduling job run...", "inline"):
+                    try:
+                        result = await run_job_now(job['id'])
+                        if result.get('ok'):
+                            st.success(f"{result.get('message')}")
+                        else:
+                            st.error(result.get('message'))
+                    except Exception as e:
+                        st.error(f"Failed to schedule run: {e}")
 
         # Close the job card
         st.markdown("</div>", unsafe_allow_html=True)
