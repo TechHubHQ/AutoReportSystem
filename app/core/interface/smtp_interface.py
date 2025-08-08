@@ -9,6 +9,12 @@ logger = get_logger(__name__)
 
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
+    """Create a new SMTP configuration for the specific user (by sender_email).
+
+    - Ensures the sender_email belongs to an existing user.
+    - Deactivates any existing SMTP configs for that user to keep only one active.
+    - Stores the new config as active for that user.
+    """
     db = None
     try:
         # Validate inputs
@@ -20,6 +26,12 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
 
         db = await get_db()
 
+        # Ensure the sender_email maps to a valid user
+        user_result = await db.execute(select(User).where(User.email == sender_email))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise ValueError("Invalid sender email: no matching user found")
+
         # Encrypt password
         try:
             encrypted_pwd = EncryptionService.encrypt(smtp_pwd)
@@ -27,12 +39,23 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
             logger.error(f"Error encrypting SMTP password: {e}")
             raise ValueError(f"Failed to encrypt password: {e}")
 
+        # Deactivate existing configs for this user (keep history but only one active)
+        existing_result = await db.execute(
+            select(SMTPConf).where(SMTPConf.sender_email == sender_email)
+        )
+        existing_configs = existing_result.scalars().all()
+        for cfg in existing_configs:
+            if cfg.is_active == "True":
+                cfg.is_active = "False"
+
+        # Create and activate new configuration for this user
         new_smtp_conf = SMTPConf(
             smtp_host=smtp_host,
             smtp_port=smtp_port,
             smtp_username=smtp_username,
             smtp_password=encrypted_pwd,
-            sender_email=sender_email
+            sender_email=sender_email,
+            is_active="True",
         )
         db.add(new_smtp_conf)
         await db.commit()
