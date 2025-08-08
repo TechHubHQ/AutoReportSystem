@@ -1,7 +1,7 @@
 import streamlit as st
 import asyncio
 from app.ui.navbar import navbar
-from app.core.interface.smtp_interface import setup_smtp, get_smtp_conf, update_smtp_conf, get_active_smtp_config, get_all_smtp_configs
+from app.core.interface.smtp_interface import setup_smtp, get_smtp_conf, update_smtp_conf, get_active_smtp_config, get_all_smtp_configs, delete_smtp_conf
 from app.integrations.email.email_client import EmailService
 from app.ui.components.loader import LoaderContext
 from app.core.services.encryption_service import EncryptionService
@@ -67,6 +67,16 @@ def smtp_conf(go_to_page):
                 masked_pwd = '*' * \
                     len(current_config.smtp_password) if current_config.smtp_password else 'Not set'
                 st.info(f"**Password:** {masked_pwd}")
+
+            # Delete active configuration button
+            if st.button("🗑️ Delete Active Configuration", key="delete_active_config"):
+                try:
+                    with LoaderContext("Deleting SMTP configuration...", "inline"):
+                        asyncio.run(delete_smtp_conf(current_config.id, user_email))
+                    st.success("✅ SMTP configuration deleted successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error deleting configuration: {str(e)}")
         else:
             st.warning(
                 "⚠️ No active SMTP configuration found for your account. Please set up your email server below.")
@@ -96,6 +106,16 @@ def smtp_conf(go_to_page):
                                 f"**Status:** {'Active' if config.is_active == 'True' else 'Inactive'}")
                             masked_pwd = '*' * 8 if config.smtp_password else 'Not set'
                             st.write(f"**Password:** {masked_pwd}")
+
+                        # Delete button for each configuration
+                        if st.button("🗑️ Delete This Configuration", key=f"delete_config_{config.id}"):
+                            try:
+                                with LoaderContext("Deleting SMTP configuration...", "inline"):
+                                    asyncio.run(delete_smtp_conf(config.id, user_email))
+                                st.success("✅ Configuration deleted")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Error deleting configuration: {str(e)}")
             else:
                 st.info("No additional configurations found for your account.")
         except Exception as e:
@@ -104,9 +124,9 @@ def smtp_conf(go_to_page):
     st.markdown("---")
 
     # Pre-fill form with current config if available
-    default_host = current_config.smtp_host if current_config else ""
-    default_port = current_config.smtp_port if current_config else 587
-    default_username = current_config.smtp_username if current_config else ""
+    default_host = current_config.smtp_host if 'current_config' in locals() and current_config else ""
+    default_port = current_config.smtp_port if 'current_config' in locals() and current_config else 587
+    default_username = current_config.smtp_username if 'current_config' in locals() and current_config else ""
 
     with st.form("smtp_form"):
         st.markdown("### 🔧 Server Configuration")
@@ -167,7 +187,7 @@ def smtp_conf(go_to_page):
             )
 
         with col8:
-            if current_config:
+            if 'current_config' in locals() and current_config:
                 save_config = st.form_submit_button(
                     "🔄 Update Configuration",
                     type="primary",
@@ -187,7 +207,7 @@ def smtp_conf(go_to_page):
             )
 
     # Handle form submissions
-    if test_connection:
+    if 'test_connection' in locals() and test_connection:
         if smtp_host and smtp_username and smtp_password:
             with LoaderContext("🔍 Testing SMTP connection...", "inline"):
                 try:
@@ -199,9 +219,9 @@ def smtp_conf(go_to_page):
         else:
             st.error("⚠️ Please fill in all required fields")
 
-    if save_config:
+    if 'save_config' in locals() and save_config:
         if smtp_host and smtp_username and smtp_password:
-            action_text = "Updating" if current_config else "Saving"
+            action_text = "Updating" if ('current_config' in locals() and current_config) else "Saving"
             with LoaderContext(f"💾 {action_text} SMTP configuration...", "inline"):
                 try:
                     # Debug information
@@ -212,7 +232,7 @@ def smtp_conf(go_to_page):
                     st.write(f"- Password length: {len(smtp_password) if smtp_password else 0}")
                     st.write(f"- User email: {user_email}")
                     
-                    if current_config:
+                    if 'current_config' in locals() and current_config:
                         # Update existing configuration
                         asyncio.run(update_smtp_conf(
                             current_config.id, smtp_host, smtp_port, smtp_username, smtp_password
@@ -242,7 +262,7 @@ def smtp_conf(go_to_page):
             if not smtp_password:
                 st.error("🔒 Password field appears to be empty")
 
-    if clear_form:
+    if 'clear_form' in locals() and clear_form:
         st.rerun()
 
     # Show Gmail instructions if requested

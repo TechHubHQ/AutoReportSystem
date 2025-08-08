@@ -175,3 +175,31 @@ async def update_smtp_conf(config_id, smtp_host=None, smtp_port=None, smtp_usern
         raise e
     finally:
         await db.close()
+
+
+async def delete_smtp_conf(config_id: int, user_email: str) -> bool:
+    """Delete an SMTP configuration if it belongs to the given user.
+
+    Returns True if deleted. Raises if not found or unauthorized.
+    """
+    db = await get_db()
+    try:
+        smtp_conf = await db.get(SMTPConf, config_id)
+        if not smtp_conf:
+            raise ValueError(f"SMTP configuration with ID {config_id} not found")
+
+        if smtp_conf.sender_email != user_email:
+            raise PermissionError("Not authorized to delete this SMTP configuration")
+
+        await db.delete(smtp_conf)
+        await db.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting smtp configuration {config_id}: {e}")
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        raise e
+    finally:
+        await db.close()
