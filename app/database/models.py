@@ -1,11 +1,15 @@
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Boolean
+from sqlalchemy.pool import NullPool
 from app.config.config import settings
 
 
 DATABASEURL = settings.db_url
-engine = create_async_engine(DATABASEURL)
+# Use NullPool to avoid sharing async connections across multiple event loops/threads.
+# This prevents "another operation is in progress" errors when the app uses asyncio in
+# different contexts (e.g., Streamlit UI and background scheduler thread).
+engine = create_async_engine(DATABASEURL, poolclass=NullPool)
 Base = declarative_base()
 
 

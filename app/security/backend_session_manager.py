@@ -38,30 +38,38 @@ class BackendSessionManager:
         expires_at = datetime.now() + timedelta(seconds=BackendSessionManager.SESSION_DURATION)
 
         async def _create_session():
+            db = None
             try:
                 db = await get_db()
-                async with db:
-                    # Clean up any existing sessions for this user
-                    cleanup_stmt = delete(UserSession).where(
-                        UserSession.user_id == user_data.get('id')
-                    )
-                    await db.execute(cleanup_stmt)
+                # Clean up any existing sessions for this user
+                cleanup_stmt = delete(UserSession).where(
+                    UserSession.user_id == user_data.get('id')
+                )
+                await db.execute(cleanup_stmt)
 
-                    # Create new session
-                    new_session = UserSession(
-                        session_token=session_token,
-                        user_id=user_data.get('id'),
-                        user_data=json.dumps(user_data),
-                        expires_at=expires_at,
-                        created_at=datetime.now(),
-                        last_accessed=datetime.now()
-                    )
-                    db.add(new_session)
-                    await db.commit()
-                    return True
+                # Create new session
+                new_session = UserSession(
+                    session_token=session_token,
+                    user_id=user_data.get('id'),
+                    user_data=json.dumps(user_data),
+                    expires_at=expires_at,
+                    created_at=datetime.now(),
+                    last_accessed=datetime.now()
+                )
+                db.add(new_session)
+                await db.commit()
+                return True
             except Exception as e:
                 logger.error(f"Database error creating session: {e}")
+                if db is not None:
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
                 return False
+            finally:
+                if db is not None:
+                    await db.close()
 
         try:
             success = asyncio.run(_create_session())
@@ -94,26 +102,34 @@ class BackendSessionManager:
             return None
 
         async def _validate_session():
+            db = None
             try:
                 db = await get_db()
-                async with db:
-                    # Find valid session
-                    stmt = select(UserSession).where(
-                        UserSession.session_token == session_token,
-                        UserSession.expires_at > datetime.now()
-                    )
-                    result = await db.execute(stmt)
-                    session = result.scalar_one_or_none()
+                # Find valid session
+                stmt = select(UserSession).where(
+                    UserSession.session_token == session_token,
+                    UserSession.expires_at > datetime.now()
+                )
+                result = await db.execute(stmt)
+                session = result.scalar_one_or_none()
 
-                    if session:
-                        # Update last accessed time
-                        session.last_accessed = datetime.now()
-                        await db.commit()
-                        return session
-                    return None
+                if session:
+                    # Update last accessed time
+                    session.last_accessed = datetime.now()
+                    await db.commit()
+                    return session
+                return None
             except Exception as e:
                 logger.error(f"Database error in session validation: {e}")
+                if db is not None:
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
                 return None
+            finally:
+                if db is not None:
+                    await db.close()
 
         try:
             session = asyncio.run(_validate_session())
@@ -215,24 +231,32 @@ class BackendSessionManager:
         new_expires_at = datetime.now() + timedelta(seconds=BackendSessionManager.SESSION_DURATION)
 
         async def _extend_session():
+            db = None
             try:
                 db = await get_db()
-                async with db:
-                    stmt = select(UserSession).where(
-                        UserSession.session_token == session_token
-                    )
-                    result = await db.execute(stmt)
-                    session = result.scalar_one_or_none()
+                stmt = select(UserSession).where(
+                    UserSession.session_token == session_token
+                )
+                result = await db.execute(stmt)
+                session = result.scalar_one_or_none()
 
-                    if session:
-                        session.expires_at = new_expires_at
-                        session.last_accessed = datetime.now()
-                        await db.commit()
-                        return True
-                    return False
+                if session:
+                    session.expires_at = new_expires_at
+                    session.last_accessed = datetime.now()
+                    await db.commit()
+                    return True
+                return False
             except Exception as e:
                 logger.error(f"Database error extending session: {e}")
+                if db is not None:
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
                 return False
+            finally:
+                if db is not None:
+                    await db.close()
 
         try:
             success = asyncio.run(_extend_session())
@@ -254,16 +278,24 @@ class BackendSessionManager:
 
         if session_token:
             async def _destroy_session():
+                db = None
                 try:
                     db = await get_db()
-                    async with db:
-                        stmt = delete(UserSession).where(
-                            UserSession.session_token == session_token
-                        )
-                        await db.execute(stmt)
-                        await db.commit()
+                    stmt = delete(UserSession).where(
+                        UserSession.session_token == session_token
+                    )
+                    await db.execute(stmt)
+                    await db.commit()
                 except Exception as e:
                     logger.error(f"Database error destroying session: {e}")
+                    if db is not None:
+                        try:
+                            await db.rollback()
+                        except Exception:
+                            pass
+                finally:
+                    if db is not None:
+                        await db.close()
 
             try:
                 asyncio.run(_destroy_session())
@@ -293,18 +325,21 @@ class BackendSessionManager:
     def cleanup_expired_sessions():
         """Remove expired sessions from database"""
         async def _cleanup_sessions():
+            db = None
             try:
                 db = await get_db()
-                async with db:
-                    stmt = delete(UserSession).where(
-                        UserSession.expires_at < datetime.now()
-                    )
-                    result = await db.execute(stmt)
-                    await db.commit()
-                    logger.info(
-                        f"Cleaned up {result.rowcount} expired sessions")
+                stmt = delete(UserSession).where(
+                    UserSession.expires_at < datetime.now()
+                )
+                result = await db.execute(stmt)
+                await db.commit()
+                logger.info(
+                    f"Cleaned up {result.rowcount} expired sessions")
             except Exception as e:
                 logger.error(f"Failed to cleanup sessions: {e}")
+            finally:
+                if db is not None:
+                    await db.close()
 
         try:
             asyncio.run(_cleanup_sessions())

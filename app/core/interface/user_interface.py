@@ -32,6 +32,10 @@ async def create_user(username: str, email: str, password: str, userrole: str = 
         return new_user
     except Exception as e:
         logger.error(f"Error creating user: {e}")
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         raise e
     finally:
         await db.close()
@@ -66,6 +70,10 @@ async def update_user(user_id: int, username: str = None, email: str = None, pas
         return user
     except Exception as e:
         logger.error(f"Error updating user: {e}")
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         raise e
     finally:
         await db.close()

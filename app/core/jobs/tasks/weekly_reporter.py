@@ -66,6 +66,7 @@ async def send_report(to_email, user_id):
 
 async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com"):
     """Send weekly reports only on 1st, 2nd, or 3rd Friday of the month"""
+    db = None
     try:
         # Check if today is 1st, 2nd, or 3rd Friday
         today = datetime.utcnow().date()
@@ -106,4 +107,5 @@ async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com"):
         logger.error(f"Error sending weekly reports for all users: {e}")
         raise e
     finally:
-        await db.close()
+        if db is not None:
+            await db.close()

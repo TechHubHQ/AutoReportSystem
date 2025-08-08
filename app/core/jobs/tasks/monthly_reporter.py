@@ -72,6 +72,7 @@ async def send_report(to_email, user_id):
 
 async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com"):
     """Send monthly reports for all users with SMTP config"""
+    db = None
     try:
         db = await get_db()
         result = await db.execute(
@@ -90,4 +91,5 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com"):
         logger.error(f"Error sending monthly reports for all users: {e}")
         raise e
     finally:
-        await db.close()
+        if db is not None:
+            await db.close()

@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 
 
 async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email):
+    db = None
     try:
         # Validate inputs
         if not all([smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email]):
@@ -39,11 +40,17 @@ async def setup_smtp(smtp_host, smtp_port, smtp_username, smtp_pwd, sender_email
         return new_smtp_conf
     except Exception as e:
         logger.error(f"Error creating new smtp configuration: {e}")
+        if db is not None:
+            try:
+                await db.rollback()
+            except Exception:
+                pass
         if "encrypt" in str(e).lower():
             raise ValueError(f"Encryption error: {e}")
         raise e
     finally:
-        await db.close()
+        if db is not None:
+            await db.close()
 
 
 async def get_active_smtp_config(user_id: Optional[int] = None) -> Optional[SMTPConf]:
