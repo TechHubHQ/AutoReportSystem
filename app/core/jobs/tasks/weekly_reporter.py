@@ -23,9 +23,9 @@ async def generate_report(user_id):
     tasks = await get_weekly_tasks(user_id)
 
     accomplishments = [
-        task.description for task in tasks if task.category == "accomplishments"]
+        task for task in tasks if task.category == "accomplishments"]
     in_progress = [
-        task.description for task in tasks if task.category == "in progress"]
+        task for task in tasks if task.category == "in progress"]
 
     context = {
         'recipient_name': 'Santosh',

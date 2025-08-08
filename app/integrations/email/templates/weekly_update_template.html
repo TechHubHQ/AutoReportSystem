@@ -94,15 +94,30 @@
 
       <div class="section-title">✅ Accomplishments</div>
       <ul>
-        {% for item in accomplishments %}
-        <li>{{ item }}</li>
+        {% for task in accomplishments %}
+          <li>
+            <strong>{{ task.title }}</strong>
+            <ul>
+              {% for line in task.description.split('\n') %}
+                <li>{{ line.strip() }}</li>
+              {% endfor %}
+            </ul>
+          </li>
         {% endfor %}
       </ul>
+
 
       <div class="section-title">🔄 In Progress</div>
       <ul>
         {% for item in in_progress %}
-        <li>{{ item }}</li>
+        <li>
+          <strong>{{ task.title }}</strong>
+          <ul>
+            {% for line in task.description.split('\n') %}
+              <li>{{ line.strip() }}</li>
+            {% endfor %}
+          </ul>
+        </li>
         {% endfor %}
       </ul>
 
