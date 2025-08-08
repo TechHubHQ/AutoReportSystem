@@ -9,7 +9,7 @@ import streamlit as st
 import uuid
 import json
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from app.database.db_connector import get_db
 from app.database.models import UserSession, User
@@ -35,7 +35,7 @@ class BackendSessionManager:
     def create_session(user_data: Dict[str, Any]) -> str:
         """Create a new backend session"""
         session_token = BackendSessionManager.generate_session_token()
-        expires_at = datetime.now() + timedelta(seconds=BackendSessionManager.SESSION_DURATION)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=BackendSessionManager.SESSION_DURATION)
 
         async def _create_session():
             db = None
@@ -53,8 +53,8 @@ class BackendSessionManager:
                     user_id=user_data.get('id'),
                     user_data=json.dumps(user_data),
                     expires_at=expires_at,
-                    created_at=datetime.now(),
-                    last_accessed=datetime.now()
+                    created_at=datetime.now(timezone.utc),
+                    last_accessed=datetime.now(timezone.utc)
                 )
                 db.add(new_session)
                 await db.commit()
@@ -78,7 +78,7 @@ class BackendSessionManager:
                 st.session_state.user = user_data
                 st.session_state.session_token = session_token
                 st.session_state.session_expires_at = expires_at
-                st.session_state.session_created_at = datetime.now()
+                st.session_state.session_created_at = datetime.now(timezone.utc)
 
                 # Store session token in URL params for persistence across refreshes
                 st.query_params["session"] = session_token
@@ -108,14 +108,14 @@ class BackendSessionManager:
                 # Find valid session
                 stmt = select(UserSession).where(
                     UserSession.session_token == session_token,
-                    UserSession.expires_at > datetime.now()
+                    UserSession.expires_at > datetime.now(timezone.utc)
                 )
                 result = await db.execute(stmt)
                 session = result.scalar_one_or_none()
 
                 if session:
                     # Update last accessed time
-                    session.last_accessed = datetime.now()
+                    session.last_accessed = datetime.now(timezone.utc)
                     await db.commit()
                     return session
                 return None
@@ -187,7 +187,7 @@ class BackendSessionManager:
             return False
 
         # Check if session has expired
-        if datetime.now() > expires_at:
+        if datetime.now(timezone.utc) > expires_at:
             BackendSessionManager.clear_session()
             return False
 
@@ -210,7 +210,7 @@ class BackendSessionManager:
         if not expires_at:
             return {}
 
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         time_remaining = (expires_at - now).total_seconds()
 
         return {
@@ -228,7 +228,7 @@ class BackendSessionManager:
         if not session_token:
             return False
 
-        new_expires_at = datetime.now() + timedelta(seconds=BackendSessionManager.SESSION_DURATION)
+        new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=BackendSessionManager.SESSION_DURATION)
 
         async def _extend_session():
             db = None
@@ -242,7 +242,7 @@ class BackendSessionManager:
 
                 if session:
                     session.expires_at = new_expires_at
-                    session.last_accessed = datetime.now()
+                    session.last_accessed = datetime.now(timezone.utc)
                     await db.commit()
                     return True
                 return False
@@ -329,7 +329,7 @@ class BackendSessionManager:
             try:
                 db = await get_db()
                 stmt = delete(UserSession).where(
-                    UserSession.expires_at < datetime.now()
+                    UserSession.expires_at < datetime.now(timezone.utc)
                 )
                 result = await db.execute(stmt)
                 await db.commit()
