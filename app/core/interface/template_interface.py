@@ -75,42 +75,72 @@ class TemplateInterface:
 
     @staticmethod
     async def sync_templates_from_files():
-        """Sync database templates with files in template directory"""
+        """Sync database templates with files in template directory.
+
+        - Creates new DB records for templates that exist as files but not in DB
+        - Updates existing DB records' html_content/file_path when file content changes
+        """
         try:
             db = await get_db()
             template_files = await get_template_files()
 
+            updated_count = 0
+            created_count = 0
+
             for filename in template_files:
-                # Check if template exists in database
-                template_name = filename.replace(
-                    '.html', '').replace('_', ' ').title()
+                # Derive template name from filename
+                template_name = filename.replace('.html', '').replace('_', ' ').title()
+                file_content = await load_template_from_file(filename)
+                file_path = os.path.join(TEMPLATE_DIR, filename)
+
+                # Skip empty files
+                if file_content is None:
+                    file_content = ""
+
                 result = await db.execute(
-                    select(EmailTemplate).where(
-                        EmailTemplate.name == template_name)
+                    select(EmailTemplate).where(EmailTemplate.name == template_name)
                 )
                 existing_template = result.scalar_one_or_none()
 
                 if not existing_template:
                     # Create new template from file
-                    file_content = await load_template_from_file(filename)
-                    if file_content:
-                        new_template = EmailTemplate(
-                            name=template_name,
-                            subject=template_name,
-                            description=f"Template loaded from {filename}",
-                            category="File Import",
-                            html_content=file_content,
-                            file_path=os.path.join(TEMPLATE_DIR, filename),
-                            created_by=1  # Default user
-                        )
-                        db.add(new_template)
+                    new_template = EmailTemplate(
+                        name=template_name,
+                        subject=template_name,
+                        description=f"Template loaded from {filename}",
+                        category="File Import",
+                        html_content=file_content,
+                        file_path=file_path,
+                        created_by=1  # Default user
+                    )
+                    db.add(new_template)
+                    created_count += 1
+                    logger.info(f"Created template from file: {filename} -> {template_name}")
+                else:
+                    # Update existing template if file changed
+                    needs_update = False
+                    if existing_template.html_content != file_content:
+                        existing_template.html_content = file_content
+                        needs_update = True
+                    if existing_template.file_path != file_path:
+                        existing_template.file_path = file_path
+                        needs_update = True
+
+                    if needs_update:
+                        updated_count += 1
+                        logger.info(f"Updated template from file: {filename} -> {template_name}")
 
             await db.commit()
+            logger.info(f"Templates sync complete. Created: {created_count}, Updated: {updated_count}")
         except Exception as e:
             logger.error(f"Error syncing templates: {e}")
-            await db.rollback()
+            try:
+                await db.rollback()
+            except Exception:
+                pass
         finally:
-            await db.close()
+            if db is not None:
+                await db.close()
 
 
 async def create_template(name: str, subject: str, html_content: str, created_by: int):
