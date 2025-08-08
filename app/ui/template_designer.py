@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import asyncio
 from app.security.route_protection import RouteProtection
 from app.ui.navbar import navbar
@@ -8,6 +7,11 @@ from app.core.interface.template_interface import TemplateInterface, get_templat
 from app.core.utils.template_validator import TemplateValidator
 from app.integrations.git.auto_commit import GitAutoCommit
 from app.integrations.git.config import is_auto_commit_enabled, is_auto_push_enabled
+from app.core.utils.datetime_utils import (
+    ensure_timezone_aware,
+    get_current_utc_datetime,
+    format_datetime_for_display,
+)
 
 
 def apply_custom_css():
@@ -151,40 +155,41 @@ def render_git_status():
     """Render Git status information"""
     try:
         git_client = GitAutoCommit()
-        
+
         # Check if Git is available and auto-commit is enabled
         is_git_repo = git_client.is_git_repository()
         auto_commit_enabled = is_auto_commit_enabled()
         auto_push_enabled = is_auto_push_enabled()
-        
+
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             if is_git_repo:
                 st.success("🔗 Git Repository")
             else:
                 st.warning("⚠️ Not a Git Repository")
-        
+
         with col2:
             if auto_commit_enabled:
                 st.success("✅ Auto-Commit Enabled")
             else:
                 st.info("ℹ️ Auto-Commit Disabled")
-        
+
         with col3:
             if auto_push_enabled:
                 st.success("🚀 Auto-Push Enabled")
             else:
                 st.info("📝 Auto-Push Disabled")
-        
+
         # Show Git status if it's a repository
         if is_git_repo:
             status = git_client.get_git_status()
             if status['success'] and status['has_changes']:
-                st.warning(f"⚠️ Uncommitted changes: {len(status['modified_files'])} modified, {len(status['new_files'])} new, {len(status['deleted_files'])} deleted")
+                st.warning(
+                    f"⚠️ Uncommitted changes: {len(status['modified_files'])} modified, {len(status['new_files'])} new, {len(status['deleted_files'])} deleted")
             elif status['success']:
                 st.success("✅ Working directory clean")
-    
+
     except Exception as e:
         st.error(f"❌ Error checking Git status: {str(e)}")
 
@@ -202,7 +207,7 @@ def render_template_list():
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Error syncing templates: {str(e)}")
-    
+
     # Show Git status
     with st.expander("🔗 Git Integration Status", expanded=False):
         render_git_status()
@@ -246,8 +251,17 @@ def render_template_list():
             """, unsafe_allow_html=True)
 
         with col4:
-            recent_templates = len([t for t in templates if (
-                datetime.now() - t.created_at).days <= 7])
+            now_utc = get_current_utc_datetime()
+
+            def is_recent(t):
+                try:
+                    if not getattr(t, 'created_at', None):
+                        return False
+                    created_at = ensure_timezone_aware(t.created_at)
+                    return (now_utc - created_at).days <= 7
+                except Exception:
+                    return False
+            recent_templates = len([t for t in templates if is_recent(t)])
             st.markdown(f"""
             <div class="stat-card">
                 <div class="stat-number" style="color: #ffd93d;">{recent_templates}</div>
@@ -270,8 +284,8 @@ def render_template_list():
                         <div class="category-badge">{getattr(template, 'category', 'General')}</div>
                     </div>
                     <div class="template-meta">
-                        <span>📅 Created: {template.created_at.strftime('%Y-%m-%d')}</span>
-                        <span>🔄 Updated: {template.updated_at.strftime('%Y-%m-%d')}</span>
+                        <span>📅 Created: {format_datetime_for_display(getattr(template, 'created_at', None), '%Y-%m-%d')}</span>
+                        <span>🔄 Updated: {format_datetime_for_display(getattr(template, 'updated_at', None), '%Y-%m-%d')}</span>
                         <span>📊 Status: {'Active' if template.is_active else 'Inactive'}</span>
                     </div>
                 </div>
@@ -760,7 +774,6 @@ def render_template_variables():
 
 def template_designer(go_to_page=None):
     """Main entry point for the Template Designer UI, rendering all sections."""
-    from app.ui.navbar import navbar
 
     # Add navbar
     if go_to_page:
