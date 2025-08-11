@@ -108,6 +108,206 @@ def get_display_next_run(job: dict, now: datetime) -> datetime | None:
     return job.get('next_run')
 
 
+def render_job_result(job_result):
+    """Render detailed job execution results."""
+    status = job_result.get('status', 'unknown')
+    
+    # Status color mapping
+    status_colors = {
+        'success': '#4CAF50',
+        'partial_success': '#ff9800', 
+        'error': '#f44336',
+        'skipped': '#2196F3'
+    }
+    
+    status_icons = {
+        'success': '✅',
+        'partial_success': '⚠️',
+        'error': '❌',
+        'skipped': '⏭️'
+    }
+    
+    color = status_colors.get(status, '#666')
+    icon = status_icons.get(status, '🔄')
+    
+    st.markdown(f"""
+    <div style="background: linear-gradient(145deg, {color}10 0%, {color}05 100%); 
+               border: 1px solid {color}30; border-radius: 12px; padding: 1.5rem; margin: 1rem 0;">
+        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+            <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icon}</span>
+            <h4 style="margin: 0; color: {color};">Job Execution Result</h4>
+            <span style="margin-left: auto; background: {color}20; color: {color}; 
+                        padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">
+                {status.replace('_', ' ').title()}
+            </span>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Summary metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Users Processed", job_result.get('users_processed', 0))
+    with col2:
+        st.metric("Emails Sent", job_result.get('emails_sent', 0))
+    with col3:
+        st.metric("Errors", len(job_result.get('errors', [])))
+    with col4:
+        execution_time = job_result.get('execution_time')
+        if execution_time:
+            st.metric("Executed At", execution_time.strftime('%H:%M:%S'))
+    
+    # Main message
+    st.markdown(f"""
+    <div style="background: white; padding: 1rem; border-radius: 8px; margin: 1rem 0; 
+               border-left: 4px solid {color};">
+        <strong>Result:</strong> {job_result.get('message', 'No message available')}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Execution details
+    if job_result.get('details'):
+        st.markdown("**Execution Details:**")
+        details_container = st.container()
+        with details_container:
+            for detail in job_result['details']:
+                st.markdown(f"• {detail}")
+    
+    # Errors section
+    if job_result.get('errors'):
+        st.markdown("**Errors:**")
+        for error in job_result['errors']:
+            st.error(f"❌ {error}")
+    
+    # Force execution indicator
+    if job_result.get('forced'):
+        st.info("⚡ This was a forced execution (schedule checks were bypassed)")
+    
+    # Close button (removed since we're in expanders now)
+    # Users can just collapse the expander to "close" the results
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_job_results_tab():
+    """Render the job results tab showing all recent job executions."""
+    from app.core.jobs.job_results_store import get_all_job_results, get_job_results_summary, clear_job_results, debug_storage_state
+    
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h2 style="color: #333; margin-bottom: 0.5rem;">📊 Job Execution Results</h2>
+        <p style="color: #666; font-size: 1.1rem;">View detailed results from recent job executions</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Get job results from global storage
+    job_results = get_all_job_results()
+    
+    # Check if there are any job results
+    if not job_results:
+        st.markdown("""
+        <div style="text-align: center; padding: 4rem 2rem; 
+                   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+                   border-radius: 20px; margin: 2rem 0; border: 2px dashed #dee2e6;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+            <h3 style="color: #666; margin-bottom: 1rem;">No Job Results Yet</h3>
+            <p style="color: #888; margin-bottom: 2rem; font-size: 1.1rem;">
+                Execute jobs using the "Run Now" button to see detailed results here.
+            </p>
+            <p style="color: #888; font-size: 0.9rem;">
+                Results will show execution status, emails sent, errors, and detailed logs.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+    
+    # Filter and sort results to avoid duplicates
+    from datetime import datetime
+    
+    # Group results by base job type (weekly_reporter, monthly_reporter)
+    base_job_results = {}
+    for job_id, result in job_results.items():
+        # Extract base job type
+        if 'weekly_reporter' in job_id:
+            base_type = 'weekly_reporter'
+        elif 'monthly_reporter' in job_id:
+            base_type = 'monthly_reporter'
+        else:
+            base_type = job_id
+        
+        # Keep only the most recent result for each base type
+        if base_type not in base_job_results:
+            base_job_results[base_type] = (job_id, result)
+        else:
+            current_time = base_job_results[base_type][1].get('execution_time', datetime.min)
+            new_time = result.get('execution_time', datetime.min)
+            if new_time > current_time:
+                base_job_results[base_type] = (job_id, result)
+    
+    # Display summary metrics (calculate from filtered results to avoid duplicates)
+    st.markdown("### 📈 Results Summary")
+    
+    # Calculate summary from filtered results
+    total_jobs = len(base_job_results)
+    status_counts = {'success': 0, 'partial_success': 0, 'error': 0, 'skipped': 0}
+    
+    for _, result in base_job_results.values():
+        status = result.get('status', 'unknown')
+        if status in status_counts:
+            status_counts[status] += 1
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.metric("Total Jobs", total_jobs)
+    with col2:
+        st.metric("Successful", status_counts['success'])
+    with col3:
+        st.metric("Partial Success", status_counts['partial_success'])
+    with col4:
+        st.metric("Failed", status_counts['error'])
+    with col5:
+        st.metric("Skipped", status_counts['skipped'])
+    
+    # Display job results
+    st.markdown("### 📈 Recent Job Executions")
+    
+    # Sort results by execution time (most recent first)
+    sorted_results = sorted(
+        base_job_results.values(),
+        key=lambda x: x[1].get('execution_time', datetime.min),
+        reverse=True
+    )
+    
+    for job_id, result in sorted_results:
+        # Extract display name from base job type
+        display_name = job_id.replace('_', ' ').title()
+        if 'manual' in job_id:
+            base_name = job_id.split('_manual')[0].replace('_', ' ').title()
+            display_name = f"{base_name} (Manual Run)"
+        
+        with st.expander(f"📄 {display_name} - {result.get('status', 'unknown').replace('_', ' ').title()}", expanded=False):
+            render_job_result(result)
+    
+    # Action buttons
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        if st.button("🔄 Refresh Results", use_container_width=True):
+            st.rerun()
+    
+    with col3:
+        if st.button("🗑️ Clear All Results", type="secondary", use_container_width=True):
+            if st.session_state.get('confirm_clear_results', False):
+                clear_job_results()
+                st.session_state.confirm_clear_results = False
+                st.success("✅ All job results cleared!")
+                st.rerun()
+            else:
+                st.session_state.confirm_clear_results = True
+                st.warning("⚠️ Click again to confirm clearing all results")
+
+
 def apply_jobs_css():
     """Apply custom CSS for jobs dashboard."""
     st.markdown("""
@@ -701,18 +901,35 @@ async def render_jobs_list():
             """, unsafe_allow_html=True)
 
         # Inline actions
-        action_col1, action_col2 = st.columns([1, 3])
+        action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
         with action_col1:
             if job['is_active'] and st.button("▶️ Run Now", key=f"run_now_{job['id']}"):
-                with LoaderContext("Scheduling job run...", "inline"):
+                with LoaderContext("Executing job...", "inline"):
                     try:
                         result = await run_job_now(job['id'])
                         if result.get('ok'):
-                            st.success(f"{result.get('message')}")
+                            st.success(f"✅ {result.get('message')}")
+                            # Set flag to show results
+                            st.session_state[f"show_results_{job['id']}"] = True
                         else:
-                            st.error(result.get('message'))
+                            st.error(f"❌ {result.get('message')}")
                     except Exception as e:
-                        st.error(f"Failed to schedule run: {e}")
+                        st.error(f"❌ Failed to execute job: {e}")
+        
+        with action_col2:
+            # Check if results are available in global storage
+            from app.core.jobs.job_results_store import get_job_result
+            has_results = get_job_result(job['id']) is not None
+            
+            if st.button("📊 View Results", key=f"view_results_{job['id']}", disabled=not has_results):
+                st.session_state[f"show_results_{job['id']}"] = not st.session_state.get(f"show_results_{job['id']}", False)
+        
+        # Show job execution results if available
+        if st.session_state.get(f"show_results_{job['id']}", False):
+            from app.core.jobs.job_results_store import get_job_result
+            job_result = get_job_result(job['id'])
+            if job_result:
+                render_job_result(job_result)
 
         # Close the job card
         st.markdown("</div>", unsafe_allow_html=True)
@@ -864,11 +1081,12 @@ def jobs_dashboard(go_to_page):
     """, unsafe_allow_html=True)
 
     # Tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🔧 Scheduler Status",
         "📋 Jobs Overview",
         "📈 Execution History",
-        "📊 Performance"
+        "📊 Performance",
+        "📊 Job Results"
     ])
 
     with tab1:
@@ -882,6 +1100,9 @@ def jobs_dashboard(go_to_page):
 
     with tab4:
         asyncio.run(render_performance_charts())
+    
+    with tab5:
+        render_job_results_tab()
 
 
 if __name__ == "__main__":

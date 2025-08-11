@@ -45,58 +45,6 @@ async def get_all_jobs() -> List[Dict[str, Any]]:
             job_list.append(job_data)
         return job_list
 
-
-async def run_job_now(job_id: str) -> Dict[str, Any]:
-    """Schedule a one-off immediate run of a configured job.
-
-    Returns a dict with status and scheduling info.
-    """
-    from app.core.jobs.job_config import JOB_CONFIG
-
-    # Ensure scheduler running
-    ensure_scheduler_running()
-    scheduler = get_scheduler_instance()
-    if not scheduler:
-        return {"ok": False, "message": "Scheduler is not available"}
-
-    # Find job config
-    job_config = next((j for j in JOB_CONFIG if j['id'] == job_id), None)
-    if not job_config:
-        return {"ok": False, "message": f"Job '{job_id}' not found"}
-
-    job_func = job_config["func"]
-
-    # Schedule a one-off run a moment in the future
-    run_date = datetime.now(pytz.utc) + timedelta(seconds=2)
-    manual_id = f"{job_id}_manual_{int(time.time())}"
-
-    # Prepare kwargs to support force-run if the function accepts it
-    kwargs = {}
-    try:
-        sig = inspect.signature(job_func)
-        if 'force' in sig.parameters:
-            kwargs['force'] = True
-    except Exception:
-        pass
-
-    try:
-        scheduler.add_job(
-            id=manual_id,
-            func=job_func,
-            trigger=DateTrigger(run_date=run_date),
-            replace_existing=False,
-            max_instances=job_config.get("max_instances", 1),
-            kwargs=kwargs if kwargs else None,
-        )
-        return {
-            "ok": True,
-            "message": f"Job '{job_id}' scheduled to run now",
-            "scheduled_id": manual_id,
-            "run_date": run_date,
-        }
-    except Exception as e:
-        return {"ok": False, "message": f"Failed to schedule job: {e}"}
-
     # Get real-time job information from scheduler
     scheduled_jobs = scheduler.get_jobs()
 
@@ -124,6 +72,60 @@ async def run_job_now(job_id: str) -> Dict[str, Any]:
         job_list.append(job_data)
 
     return job_list
+
+
+async def run_job_now(job_id: str) -> Dict[str, Any]:
+    """Schedule a one-off immediate run of a configured job.
+
+    Returns a dict with status and scheduling info.
+    """
+    from app.core.jobs.job_config import JOB_CONFIG
+
+    # Ensure scheduler running
+    ensure_scheduler_running()
+    scheduler = get_scheduler_instance()
+    if not scheduler:
+        return {"ok": False, "message": "Scheduler is not available"}
+
+    # Find job config
+    job_config = next((j for j in JOB_CONFIG if j['id'] == job_id), None)
+    if not job_config:
+        return {"ok": False, "message": f"Job '{job_id}' not found"}
+
+    job_func = job_config["func"]
+
+    # Schedule a one-off run a moment in the future
+    run_date = datetime.now(pytz.utc) + timedelta(seconds=2)
+    manual_id = f"{job_id}_manual_{int(time.time())}"
+
+    # Prepare kwargs to support force-run and job_id if the function accepts them
+    kwargs = {}
+    try:
+        sig = inspect.signature(job_func)
+        if 'force' in sig.parameters:
+            kwargs['force'] = True
+        if 'job_id' in sig.parameters:
+            kwargs['job_id'] = manual_id
+    except Exception:
+        pass
+
+    try:
+        scheduler.add_job(
+            id=manual_id,
+            func=job_func,
+            trigger=DateTrigger(run_date=run_date),
+            replace_existing=False,
+            max_instances=job_config.get("max_instances", 1),
+            kwargs=kwargs if kwargs else None,
+        )
+        return {
+            "ok": True,
+            "message": f"Job '{job_id}' scheduled to run now",
+            "scheduled_id": manual_id,
+            "run_date": run_date,
+        }
+    except Exception as e:
+        return {"ok": False, "message": f"Failed to schedule job: {e}"}
 
 
 async def get_job_statistics() -> Dict[str, Any]:
@@ -233,4 +235,14 @@ async def get_job_health_metrics() -> Dict[str, Any]:
         'success_rate': success_rate,
         'avg_execution_time': '0:00:03',  # Mock average
         'last_execution': now - timedelta(minutes=5) if total_executions > 0 else None
+    }
+
+
+async def get_job_results() -> Dict[str, Any]:
+    """Get job execution results from global storage."""
+    from app.core.jobs.job_results_store import get_all_job_results, get_job_results_summary
+    
+    return {
+        'results': get_all_job_results(),
+        'summary': get_job_results_summary()
     }

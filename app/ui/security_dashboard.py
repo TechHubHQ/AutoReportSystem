@@ -39,9 +39,10 @@ def security_dashboard():
 
             # Calculate session duration if created_at is available
             if created_at:
-                from datetime import datetime
-                session_duration = (
-                    datetime.now() - created_at).total_seconds()
+                from datetime import datetime, timezone
+                # Ensure both datetimes are timezone-aware for proper comparison
+                now = datetime.now(timezone.utc)
+                session_duration = (now - created_at).total_seconds()
                 duration_minutes = int(session_duration // 60)
                 duration_seconds = int(session_duration % 60)
                 st.info(
