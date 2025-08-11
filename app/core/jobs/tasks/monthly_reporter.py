@@ -132,7 +132,7 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
 
         for user in users:
             try:
-                await send_report("kalyankanuri497@gmail.com", user.id)
+                await send_report(to_email, user.id)
                 execution_result['emails_sent'] += 1
                 execution_result['details'].append(
                     f"✅ Report sent for user: {user.username}")

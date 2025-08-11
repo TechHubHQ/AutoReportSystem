@@ -73,7 +73,7 @@ async def send_report(to_email, user_id):
     )
 
 
-async def send_weekly_report(to_email="kalyankanuri497@gmail.com", force=False, job_id=None):
+async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com", force=False, job_id=None):
     """Send weekly reports on every Friday except the last Friday of the month (IST)."""
     db = None
     # Use provided job_id or default to 'weekly_reporter'
