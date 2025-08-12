@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 
 from app.integrations.email.template_loader import load_template
-from app.core.interface.task_interface import get_weekly_tasks
+from app.core.interface.task_interface import get_weekly_tasks, get_tasks_for_weekly_report_enhanced
 from app.core.interface.smtp_interface import get_active_smtp_config
 from app.core.interface.user_interface import get_user
 from app.integrations.email.email_client import EmailService
@@ -21,12 +21,20 @@ async def generate_report(user_id):
     if not user:
         raise Exception(f"User {user_id} not found")
 
-    tasks = await get_weekly_tasks(user_id)
-
-    accomplishments = [
-        task for task in tasks if task.category == "accomplishments"]
-    in_progress = [
-        task for task in tasks if task.category == "in progress"]
+    # Use enhanced function that includes status change tracking
+    try:
+        task_data = await get_tasks_for_weekly_report_enhanced(user_id)
+        accomplishments = task_data['accomplishments']
+        in_progress = task_data['in_progress']
+        status_changed_tasks = task_data['status_changed_tasks']
+        
+        logger.info(f"Weekly report for user {user_id}: {len(accomplishments)} accomplishments, {len(in_progress)} in progress, {len(status_changed_tasks)} status changes")
+    except Exception as e:
+        logger.warning(f"Enhanced weekly report failed for user {user_id}, falling back to basic: {e}")
+        # Fallback to basic method if enhanced fails
+        tasks = await get_weekly_tasks(user_id)
+        accomplishments = [task for task in tasks if task.category == "accomplishments"]
+        in_progress = [task for task in tasks if task.category == "in progress"]
 
     # Week/year for header
     now = get_date_in_timezone('Asia/Kolkata')

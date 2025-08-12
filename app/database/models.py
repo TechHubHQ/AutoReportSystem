@@ -56,6 +56,30 @@ class Task(Base):
 
     # Many-to-one: Task → User
     creator = relationship("User", back_populates="tasks")
+    
+    # One-to-many: Task → TaskStatusHistory
+    status_history = relationship("TaskStatusHistory", back_populates="task",
+                                 cascade="all, delete-orphan")
+
+
+class TaskStatusHistory(Base):
+    __tablename__ = "task_status_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    old_status = Column(String, nullable=True)  # Previous status (null for initial creation)
+    new_status = Column(String, nullable=False)  # New status
+    old_category = Column(String, nullable=True)  # Previous category
+    new_category = Column(String, nullable=False)  # New category
+    changed_at = Column(DateTime(timezone=True),
+                       server_default=func.now(), nullable=False)
+    changed_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Many-to-one: TaskStatusHistory → Task
+    task = relationship("Task", back_populates="status_history")
+    
+    # Many-to-one: TaskStatusHistory → User
+    user = relationship("User", backref="task_status_changes")
 
 
 class SMTPConf(Base):

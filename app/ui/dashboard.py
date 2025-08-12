@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 import asyncio
 from app.ui.navbar import navbar
 from app.core.interface.task_interface import (
-    get_tasks, create_task, update_task, delete_task, get_task_statistics
+    get_tasks, create_task, update_task, delete_task, get_task_statistics,
+    get_current_month_tasks, get_archived_tasks
 )
 from app.core.interface.analytics_interface import (
     get_task_completion_trends, get_productivity_insights
@@ -32,6 +33,20 @@ class DashboardManager:
         user = RouteProtection.get_current_user()
         if user:
             return await get_tasks(user_id=user.get('id'))
+        return []
+
+    async def get_current_month_user_tasks(self):
+        """Get current month tasks for current user"""
+        user = RouteProtection.get_current_user()
+        if user:
+            return await get_current_month_tasks(user_id=user.get('id'))
+        return []
+
+    async def get_archived_user_tasks(self):
+        """Get archived tasks for current user"""
+        user = RouteProtection.get_current_user()
+        if user:
+            return await get_archived_tasks(user_id=user.get('id'))
         return []
 
 
@@ -129,9 +144,22 @@ async def render_kanban_board(dashboard_manager):
     """Render the Kanban board interface"""
     st.markdown("### 📋 Kanban Board")
 
-    # Get current user tasks with loader
+    # Add toggle for current month vs all tasks
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        view_mode = st.radio(
+            "View Mode:",
+            ["Current Month", "All Tasks"],
+            horizontal=True,
+            help="Current Month shows only tasks created this month. All Tasks shows everything."
+        )
+
+    # Get tasks based on view mode
     with LoaderContext("Loading tasks...", "inline"):
-        tasks = await dashboard_manager.get_user_tasks()
+        if view_mode == "Current Month":
+            tasks = await dashboard_manager.get_current_month_user_tasks()
+        else:
+            tasks = await dashboard_manager.get_user_tasks()
 
     # Add new task button
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -222,7 +250,8 @@ async def render_kanban_board(dashboard_manager):
                     if new_status != task.status:
                         with LoaderContext("Updating task...", "inline"):
                             try:
-                                await update_task(task.id, status=new_status)
+                                user = RouteProtection.get_current_user()
+                                await update_task(task.id, status=new_status, updated_by=user.get('id') if user else None)
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error updating task: {str(e)}")
@@ -251,6 +280,7 @@ async def render_kanban_board(dashboard_manager):
                     if st.form_submit_button("Update Task"):
                         with LoaderContext("Updating task...", "inline"):
                             try:
+                                user = RouteProtection.get_current_user()
                                 await update_task(
                                     task.id,
                                     title=new_title,
@@ -258,7 +288,8 @@ async def render_kanban_board(dashboard_manager):
                                     priority=new_priority,
                                     category=new_category,
                                     due_date=datetime.combine(
-                                        new_due_date, datetime.min.time()) if new_due_date else None
+                                        new_due_date, datetime.min.time()) if new_due_date else None,
+                                    updated_by=user.get('id') if user else None
                                 )
                                 st.session_state.selected_task = None
                                 st.success("Task updated successfully!")
@@ -594,6 +625,168 @@ async def render_system_monitoring(dashboard_manager):
         """, unsafe_allow_html=True)
 
 
+async def render_archived_tasks(dashboard_manager):
+    """Render archived tasks (older than current month)"""
+    st.markdown("### 📦 Archived Tasks")
+    st.markdown("*Tasks created before the current month*")
+
+    # Get archived tasks with loader
+    with LoaderContext("Loading archived tasks...", "inline"):
+        archived_tasks = await dashboard_manager.get_archived_user_tasks()
+
+    if not archived_tasks:
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem 2rem; 
+                   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+                   border-radius: 20px; margin: 2rem 0; border: 2px dashed #dee2e6;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📦</div>
+            <h3 style="color: #666; margin-bottom: 1rem;">No Archived Tasks</h3>
+            <p style="color: #888; margin-bottom: 2rem; font-size: 1.1rem;">
+                Tasks created before this month will appear here.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # Show archived task statistics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    archived_stats = {
+        'total': len(archived_tasks),
+        'completed': len([t for t in archived_tasks if t.status == 'completed']),
+        'inprogress': len([t for t in archived_tasks if t.status == 'inprogress']),
+        'pending': len([t for t in archived_tasks if t.status == 'pending'])
+    }
+
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #667eea; margin: 0;">📋 {archived_stats['total']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Total Archived</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #6bcf7f; margin: 0;">✅ {archived_stats['completed']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Completed</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #4fc3f7; margin: 0;">🔄 {archived_stats['inprogress']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">In Progress</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #ff9800; margin: 0;">⏳ {archived_stats['pending']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Pending</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Archived Kanban columns
+    st.markdown("#### 📋 Archived Kanban Board")
+    col1, col2, col3, col4 = st.columns(4)
+
+    columns = {
+        "todo": ("📝 To Do", col1),
+        "inprogress": ("🔄 In Progress", col2),
+        "pending": ("⏳ Pending", col3),
+        "completed": ("✅ Completed", col4)
+    }
+
+    for status, (title, column) in columns.items():
+        with column:
+            st.markdown(f"**{title}**")
+            status_tasks = [task for task in archived_tasks if task.status == status]
+
+            for task in status_tasks:
+                priority_class = f"priority-{task.priority}"
+                due_date_str = task.due_date.strftime(
+                    '%Y-%m-%d') if task.due_date else "No due date"
+                description_preview = (task.description[:50] + "...") if task.description and len(
+                    task.description) > 50 else (task.description or "No description")
+                created_date_str = task.created_at.strftime('%Y-%m-%d') if task.created_at else "Unknown"
+
+                st.markdown(f"""
+                <div class="task-card {priority_class}" style="opacity: 0.8;">
+                    <strong>{task.title}</strong><br>
+                    <small>{description_preview}</small><br>
+                    <small>📅 Created: {created_date_str}</small><br>
+                    <small>📅 Due: {due_date_str}</small><br>
+                    <small>🏷️ {task.category}</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Minimal actions for archived tasks
+                if st.button("✏️ Edit", key=f"edit_archived_{task.id}", help="Edit archived task"):
+                    st.session_state.selected_task = task
+
+    # Edit task modal (reuse the same modal from main kanban)
+    if st.session_state.get("selected_task"):
+        task = st.session_state.selected_task
+        with st.expander(f"Edit Archived Task: {task.title}", expanded=True):
+            with st.form("edit_archived_task_form"):
+                new_title = st.text_input("Title", value=task.title)
+                new_description = st.text_area(
+                    "Description", value=task.description or "")
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_priority = st.selectbox("Priority", ["low", "medium", "high", "urgent"],
+                                                index=["low", "medium", "high", "urgent"].index(task.priority))
+                with col2:
+                    new_category = st.selectbox("Category", ["in progress", "accomplishments"],
+                                                index=["in progress", "accomplishments"].index(task.category))
+
+                due_date_value = task.due_date.date() if task.due_date else None
+                new_due_date = st.date_input("Due Date", value=due_date_value)
+                new_status = st.selectbox("Status", ["todo", "inprogress", "pending", "completed"],
+                                         index=["todo", "inprogress", "pending", "completed"].index(task.status))
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.form_submit_button("Update Task"):
+                        with LoaderContext("Updating task...", "inline"):
+                            try:
+                                user = RouteProtection.get_current_user()
+                                await update_task(
+                                    task.id,
+                                    title=new_title,
+                                    description=new_description,
+                                    priority=new_priority,
+                                    category=new_category,
+                                    status=new_status,
+                                    due_date=datetime.combine(
+                                        new_due_date, datetime.min.time()) if new_due_date else None,
+                                    updated_by=user.get('id') if user else None
+                                )
+                                st.session_state.selected_task = None
+                                st.success("Archived task updated successfully!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating task: {str(e)}")
+                with col2:
+                    if st.form_submit_button("Delete Task", type="secondary"):
+                        with LoaderContext("Deleting task...", "inline"):
+                            try:
+                                await delete_task(task.id)
+                                st.session_state.selected_task = None
+                                st.success("Archived task deleted successfully!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting task: {str(e)}")
+                with col3:
+                    if st.form_submit_button("Cancel"):
+                        st.session_state.selected_task = None
+                        st.rerun()
+
+
 def dashboard(go_to_page):
     """Main dashboard function"""
     apply_custom_css()
@@ -614,8 +807,8 @@ def dashboard(go_to_page):
     dashboard_manager = DashboardManager()
 
     # Tabs
-    tab1, tab2, tab3 = st.tabs(
-        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor", "📦 Archive"])
 
     with tab1:
         asyncio.run(render_kanban_board(dashboard_manager))
@@ -625,6 +818,9 @@ def dashboard(go_to_page):
 
     with tab3:
         asyncio.run(render_system_monitoring(dashboard_manager))
+
+    with tab4:
+        asyncio.run(render_archived_tasks(dashboard_manager))
 
 
 if __name__ == "__main__":
