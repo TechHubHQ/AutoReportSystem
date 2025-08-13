@@ -20,7 +20,12 @@ from app.config.logging_config import setup_logging, get_logger
 setup_logging()
 logger = get_logger(__name__)
 
-st.set_page_config(page_title="Automate Report System", layout="wide")
+st.set_page_config(
+    page_title="Automate Report System",
+    page_icon="ars.ico",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 
 # Initialize DB and session system only once
