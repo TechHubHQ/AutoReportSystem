@@ -17,6 +17,9 @@ from app.core.interface.metrics_interface import (
 )
 from app.security.route_protection import RouteProtection
 from app.ui.components.loader import LoaderContext
+from app.core.utils.task_color_utils import (
+    get_combined_task_color, format_date_display, get_days_until_due, get_completion_date_display
+)
 
 
 class DashboardManager:
@@ -63,7 +66,7 @@ def apply_custom_css():
         text-align: center;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
-    
+
     .metric-card {
         background: white;
         padding: 1.5rem;
@@ -73,48 +76,207 @@ def apply_custom_css():
         margin-bottom: 1rem;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    
+
     .metric-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }
-    
+
     .task-card {
         background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border-left: 4px solid #667eea;
-        margin-bottom: 0.8rem;
-        transition: all 0.2s ease;
+        padding: 1.2rem;
+        border-radius: 16px;
+        box-shadow: -6px 6px 20px rgba(0,0,0,0.15);
+        border-left: 5px solid #667eea;
+        margin-bottom: 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(0,0,0,0.08);
+        position: relative;
+        overflow: hidden;
     }
-    
+
     .task-card:hover {
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        transform: translateX(2px);
+        box-shadow: -8px 8px 30px rgba(0,0,0,0.25);
+        transform: translateY(-3px) translateX(2px);
+        border-left-width: 6px;
     }
-    
-    .priority-high { border-left-color: #ff6b6b !important; }
+
+    .priority-high { border-left-color: #f44336 !important; }
     .priority-urgent { border-left-color: #d32f2f !important; }
-    .priority-medium { border-left-color: #ffd93d !important; }
-    .priority-low { border-left-color: #6bcf7f !important; }
-    
-    .status-todo { background: #fff3cd; }
-    .status-in_progress { background: #d1ecf1; }
-    .status-pending { background: #f8d7da; }
-    .status-completed { background: #d4edda; }
-    
+    .priority-medium { border-left-color: #ff9800 !important; }
+    .priority-low { border-left-color: #4caf50 !important; }
+
+    /* Status-based background colors - will be combined with due date colors diagonally */
+    .status-todo {
+        border-left-color: #2196F3 !important;
+    }
+    .status-inprogress {
+        border-left-color: #9C27B0 !important;
+    }
+    .status-pending {
+        border-left-color: #FF9800 !important;
+        border-left-style: double !important;
+        border-left-width: 8px !important;
+    }
+    .status-completed {
+        background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
+        border-left-color: #4CAF50 !important;
+        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+    }
+
+    /* Due date-based colors (override status when urgent) - Enhanced with brighter colors */
+    /* Overdue + Status combinations */
+    .due-overdue.status-todo {
+        background: linear-gradient(135deg, #FFCDD2 50%, #E3F2FD 50%) !important;
+        border-left-color: #F44336 !important;
+        box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
+    }
+    .due-overdue.status-inprogress {
+        background: linear-gradient(135deg, #FFCDD2 50%, #F3E5F5 50%) !important;
+        border-left-color: #F44336 !important;
+        box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
+    }
+    .due-overdue.status-pending {
+        background: linear-gradient(135deg, #FFCDD2 50%, #FFF3E0 50%) !important;
+        border-left-color: #F44336 !important;
+        box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
+    }
+    /* Due today + Status combinations */
+    .due-today.status-todo {
+        background: linear-gradient(135deg, #FFAB91 50%, #E3F2FD 50%) !important;
+        border-left-color: #FF5722 !important;
+        box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
+    }
+    .due-today.status-inprogress {
+        background: linear-gradient(135deg, #FFAB91 50%, #F3E5F5 50%) !important;
+        border-left-color: #FF5722 !important;
+        box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
+    }
+    .due-today.status-pending {
+        background: linear-gradient(135deg, #FFAB91 50%, #FFF3E0 50%) !important;
+        border-left-color: #FF5722 !important;
+        box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
+    }
+    /* Due tomorrow + Status combinations */
+    .due-tomorrow.status-todo {
+        background: linear-gradient(135deg, #FFCC80 50%, #E3F2FD 50%) !important;
+        border-left-color: #FF9800 !important;
+        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+    }
+    .due-tomorrow.status-inprogress {
+        background: linear-gradient(135deg, #FFCC80 50%, #F3E5F5 50%) !important;
+        border-left-color: #FF9800 !important;
+        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+    }
+    .due-tomorrow.status-pending {
+        background: linear-gradient(135deg, #FFCC80 50%, #FFF3E0 50%) !important;
+        border-left-color: #FF9800 !important;
+        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+    }
+    /* Due soon/later + Status combinations */
+    .due-soon.status-todo, .due-later.status-todo {
+        background: linear-gradient(135deg, #C8E6C9 50%, #E3F2FD 50%) !important;
+        border-left-color: #2196F3 !important;
+        box-shadow: -6px 6px 20px rgba(33, 150, 243, 0.25) !important;
+    }
+    .due-soon.status-inprogress, .due-later.status-inprogress {
+        background: linear-gradient(135deg, #C8E6C9 50%, #F3E5F5 50%) !important;
+        border-left-color: #9C27B0 !important;
+        box-shadow: -6px 6px 20px rgba(156, 39, 176, 0.25) !important;
+    }
+    .due-soon.status-pending, .due-later.status-pending {
+        background: linear-gradient(135deg, #C8E6C9 50%, #FFF3E0 50%) !important;
+        border-left-color: #FF9800 !important;
+        border-left-style: double !important;
+        border-left-width: 8px !important;
+        box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.25) !important;
+    }
+    /* No due date - use only status colors */
+    .due-none.status-todo {
+        background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%) !important;
+        border-left-color: #2196F3 !important;
+        box-shadow: -6px 6px 20px rgba(33, 150, 243, 0.25) !important;
+    }
+    .due-none.status-inprogress {
+        background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%) !important;
+        border-left-color: #9C27B0 !important;
+        box-shadow: -6px 6px 20px rgba(156, 39, 176, 0.25) !important;
+    }
+    .due-none.status-pending {
+        background: linear-gradient(135deg, #FFF3E0 0%, #FFCC80 100%) !important;
+        border-left-color: #FF9800 !important;
+        border-left-style: double !important;
+        border-left-width: 8px !important;
+        box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.25) !important;
+    }
+    .due-completed {
+        /* Completed tasks always use green, regardless of due date */
+        background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
+        border-left-color: #4CAF50 !important;
+        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+    }
+
+    /* Date display styling */
+    .date-display {
+        font-size: 0.9rem;
+        color: #424242;
+        margin: 0.3rem 0;
+        font-weight: 500;
+        text-shadow: 0 1px 1px rgba(255,255,255,0.6);
+    }
+
+    .due-date-urgent {
+        color: #C62828 !important;
+        font-weight: 700;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    }
+
+    .due-date-warning {
+        color: #E65100 !important;
+        font-weight: 700;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    }
+
+    .created-date {
+        color: #424242;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-shadow: 0 1px 1px rgba(255,255,255,0.6);
+    }
+
+    /* Enhanced text visibility for task cards */
+    .task-card strong {
+        color: #1a1a1a !important;
+        font-weight: 700;
+        text-shadow: 0 1px 3px rgba(255,255,255,0.9);
+        font-size: 1.1rem;
+    }
+
+    .task-card small {
+        color: #2c2c2c !important;
+        font-weight: 500;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.7);
+        line-height: 1.4;
+    }
+
+    .completion-date {
+        color: #1B5E20 !important;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    }
+
     .job-progress {
         background: #f8f9fa;
         border-radius: 10px;
         padding: 0.5rem;
         margin: 0.5rem 0;
     }
-    
+
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
     }
-    
+
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         background-color: #f8f9fa;
@@ -122,17 +284,17 @@ def apply_custom_css():
         padding: 0 1.5rem;
         font-weight: 600;
     }
-    
+
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
     }
-    
+
     /* Custom loader styles */
     .stSpinner > div {
         border-top-color: #667eea !important;
     }
-    
+
     .stSpinner {
         text-align: center;
     }
@@ -163,9 +325,79 @@ async def render_kanban_board(dashboard_manager):
 
     # Add new task button
     col1, col2, col3 = st.columns([2, 1, 1])
+    with col2:
+        if st.button("ℹ️ Color Guide", help="Show color system information"):
+            st.session_state.show_color_guide = not st.session_state.get(
+                "show_color_guide", False)
+
     with col3:
         if st.button("➕ New Task", type="primary"):
             st.session_state.show_task_modal = True
+
+    # Color system information panel
+    if st.session_state.get("show_color_guide", False):
+        with st.expander("🎨 Task Color System Guide", expanded=True):
+            st.markdown("""
+            ### Diagonal Split Color System
+            Each task card uses a **diagonal split** showing two types of information:
+
+            **Left Side = Due Date Urgency:**
+            - 🔴 **Light Red**: Overdue tasks (need immediate attention)
+            - 🟠 **Light Orange**: Due today (urgent)
+            - 🟡 **Light Amber**: Due tomorrow (prepare for action)
+            - 🟢 **Light Green**: Due in future (on track)
+
+            **Right Side = Task Status:**
+            - 🔵 **Light Blue**: To Do (ready to start)
+            - 🟣 **Light Purple**: In Progress (actively working)
+            - 🟠 **Light Orange**: On Hold (blocked/waiting) - *dashed border*
+            - 🟢 **Light Green**: Completed (finished) - *always full green*
+
+            **Special Cases:**
+            - **No Due Date**: Shows only status color (full background)
+            - **Completed Tasks**: Always light green regardless of due date
+            - **Enhanced Shadows**: Urgent tasks have stronger shadows
+
+            **Example:** A task due tomorrow that's in progress shows amber→purple diagonal split.
+            """)
+
+            # Color examples
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #ffcdd2 50%, #e3f2fd 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #e57373; 
+                           box-shadow: 0 4px 8px rgba(244, 67, 54, 0.2); margin: 0.5rem 0;">
+                    <small><strong>Overdue + To Do</strong><br>Red → Blue</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #ffcc80 50%, #f3e5f5 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #ffb74d; 
+                           box-shadow: 0 4px 8px rgba(255, 152, 0, 0.15); margin: 0.5rem 0;">
+                    <small><strong>Due Tomorrow + In Progress</strong><br>Amber → Purple</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #c8e6c9 50%, #fff3e0 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px dashed #ffa726; 
+                           box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 0.5rem 0;">
+                    <small><strong>Future + On Hold</strong><br>Green → Orange (dashed)</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col4:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #66bb6a; 
+                           box-shadow: 0 4px 8px rgba(76, 175, 80, 0.15); margin: 0.5rem 0;">
+                    <small><strong>Completed</strong><br>Always Light Green</small>
+                </div>
+                """, unsafe_allow_html=True)
 
     # Task creation modal
     if st.session_state.get("show_task_modal", False):
@@ -218,18 +450,57 @@ async def render_kanban_board(dashboard_manager):
             status_tasks = [task for task in tasks if task.status == status]
 
             for task in status_tasks:
-                priority_class = f"priority-{task.priority}"
-                due_date_str = task.due_date.strftime(
-                    '%Y-%m-%d') if task.due_date else "No due date"
+                # Get color information based on due date, status, and priority
+                color_info = get_combined_task_color(
+                    task.due_date, task.status, task.priority)
+
+                # Format dates for display
+                created_date_str = format_date_display(task.created_at)
+
+                # For completed tasks, show completion date instead of due date
+                if task.status == "completed":
+                    completion_date_str = get_completion_date_display(
+                        task.status, task.updated_at)
+                    due_date_display = completion_date_str
+                    due_date_class = "completion-date"
+                else:
+                    # For non-completed tasks, show due date with context
+                    due_date_str = format_date_display(
+                        task.due_date) if task.due_date else "No due date"
+
+                    # Get days until due for additional context
+                    days_until_due = get_days_until_due(task.due_date)
+                    due_context = ""
+                    if days_until_due is not None:
+                        if days_until_due < 0:
+                            due_context = f" (Overdue by {abs(days_until_due)} day(s))"
+                        elif days_until_due == 0:
+                            due_context = " (Due today!)"
+                        elif days_until_due == 1:
+                            due_context = " (Due tomorrow)"
+                        elif days_until_due <= 7:
+                            due_context = f" (Due in {days_until_due} day(s))"
+
+                    due_date_display = f"⏰ Due: {due_date_str}{due_context}"
+
+                    # Determine due date text color
+                    due_date_class = ""
+                    if days_until_due is not None:
+                        if days_until_due <= 0:
+                            due_date_class = "due-date-urgent"
+                        elif days_until_due <= 1:
+                            due_date_class = "due-date-warning"
+
                 description_preview = (task.description[:50] + "...") if task.description and len(
                     task.description) > 50 else (task.description or "No description")
 
                 st.markdown(f"""
-                <div class="task-card {priority_class}">
+                <div class="task-card {color_info['all_classes']}">
                     <strong>{task.title}</strong><br>
                     <small>{description_preview}</small><br>
-                    <small>📅 {due_date_str}</small><br>
-                    <small>🏷️ {task.category}</small>
+                    <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                    <div class="date-display {due_date_class}">{due_date_display}</div>
+                    <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -650,7 +921,7 @@ async def render_archived_tasks(dashboard_manager):
 
     # Show archived task statistics
     col1, col2, col3, col4 = st.columns(4)
-    
+
     archived_stats = {
         'total': len(archived_tasks),
         'completed': len([t for t in archived_tasks if t.status == 'completed']),
@@ -704,23 +975,61 @@ async def render_archived_tasks(dashboard_manager):
     for status, (title, column) in columns.items():
         with column:
             st.markdown(f"**{title}**")
-            status_tasks = [task for task in archived_tasks if task.status == status]
+            status_tasks = [
+                task for task in archived_tasks if task.status == status]
 
             for task in status_tasks:
-                priority_class = f"priority-{task.priority}"
-                due_date_str = task.due_date.strftime(
-                    '%Y-%m-%d') if task.due_date else "No due date"
+                # Get color information based on due date, status, and priority
+                color_info = get_combined_task_color(
+                    task.due_date, task.status, task.priority)
+
+                # Format dates for display
+                created_date_str = format_date_display(task.created_at)
+
+                # For completed tasks, show completion date instead of due date
+                if task.status == "completed":
+                    completion_date_str = get_completion_date_display(
+                        task.status, task.updated_at)
+                    due_date_display = completion_date_str
+                    due_date_class = "completion-date"
+                else:
+                    # For non-completed tasks, show due date with context
+                    due_date_str = format_date_display(
+                        task.due_date) if task.due_date else "No due date"
+
+                    # Get days until due for additional context
+                    days_until_due = get_days_until_due(task.due_date)
+                    due_context = ""
+                    if days_until_due is not None:
+                        if days_until_due < 0:
+                            due_context = f" (Overdue by {abs(days_until_due)} day(s))"
+                        elif days_until_due == 0:
+                            due_context = " (Due today!)"
+                        elif days_until_due == 1:
+                            due_context = " (Due tomorrow)"
+                        elif days_until_due <= 7:
+                            due_context = f" (Due in {days_until_due} day(s))"
+
+                    due_date_display = f"⏰ Due: {due_date_str}{due_context}"
+
+                    # Determine due date text color
+                    due_date_class = ""
+                    if days_until_due is not None:
+                        if days_until_due <= 0:
+                            due_date_class = "due-date-urgent"
+                        elif days_until_due <= 1:
+                            due_date_class = "due-date-warning"
+
                 description_preview = (task.description[:50] + "...") if task.description and len(
                     task.description) > 50 else (task.description or "No description")
-                created_date_str = task.created_at.strftime('%Y-%m-%d') if task.created_at else "Unknown"
 
                 st.markdown(f"""
-                <div class="task-card {priority_class}" style="opacity: 0.8;">
+                <div class="task-card {color_info['all_classes']}" style="opacity: 0.8;">
                     <strong>{task.title}</strong><br>
                     <small>{description_preview}</small><br>
-                    <small>📅 Created: {created_date_str}</small><br>
-                    <small>📅 Due: {due_date_str}</small><br>
-                    <small>🏷️ {task.category}</small>
+                    <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                    <div class="date-display {due_date_class}">{due_date_display}</div>
+                    <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -747,7 +1056,7 @@ async def render_archived_tasks(dashboard_manager):
                 due_date_value = task.due_date.date() if task.due_date else None
                 new_due_date = st.date_input("Due Date", value=due_date_value)
                 new_status = st.selectbox("Status", ["todo", "inprogress", "pending", "completed"],
-                                         index=["todo", "inprogress", "pending", "completed"].index(task.status))
+                                          index=["todo", "inprogress", "pending", "completed"].index(task.status))
 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -767,7 +1076,8 @@ async def render_archived_tasks(dashboard_manager):
                                     updated_by=user.get('id') if user else None
                                 )
                                 st.session_state.selected_task = None
-                                st.success("Archived task updated successfully!")
+                                st.success(
+                                    "Archived task updated successfully!")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error updating task: {str(e)}")
@@ -777,7 +1087,8 @@ async def render_archived_tasks(dashboard_manager):
                             try:
                                 await delete_task(task.id)
                                 st.session_state.selected_task = None
-                                st.success("Archived task deleted successfully!")
+                                st.success(
+                                    "Archived task deleted successfully!")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error deleting task: {str(e)}")

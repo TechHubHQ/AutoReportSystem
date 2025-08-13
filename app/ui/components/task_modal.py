@@ -2,6 +2,9 @@ import streamlit as st
 import asyncio
 from datetime import datetime
 from app.core.interface.task_interface import update_task
+from app.core.utils.task_color_utils import (
+    get_combined_task_color, format_date_display, get_days_until_due, get_completion_date_display
+)
 
 
 def show_edit_task_modal(task):
@@ -11,7 +14,45 @@ def show_edit_task_modal(task):
 
     if st.session_state.get(modal_key, False):
         with st.container():
-            st.markdown("### ✏️ Edit Task")
+            # Get color information for the task
+            color_info = get_combined_task_color(
+                task.due_date, task.status, task.priority)
+
+            # Display task information with colors
+            created_date_str = format_date_display(task.created_at)
+
+            # For completed tasks, show completion date instead of due date
+            if task.status == "completed":
+                completion_date_str = get_completion_date_display(
+                    task.status, task.updated_at)
+                due_date_display = completion_date_str if completion_date_str else "Completed"
+            else:
+                # For non-completed tasks, show due date with context
+                due_date_str = format_date_display(
+                    task.due_date) if task.due_date else "No due date"
+                days_until_due = get_days_until_due(task.due_date)
+
+                due_context = ""
+                if days_until_due is not None:
+                    if days_until_due < 0:
+                        due_context = f" (Overdue by {abs(days_until_due)} day(s))"
+                    elif days_until_due == 0:
+                        due_context = " (Due today!)"
+                    elif days_until_due == 1:
+                        due_context = " (Due tomorrow)"
+
+                due_date_display = f"Due: {due_date_str}{due_context}"
+
+            st.markdown(f"""
+            <div style="padding: 1rem; border-radius: 10px; margin-bottom: 1rem; 
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+                        border-left: 4px solid #667eea;">
+                <h3 style="margin: 0;">✏️ Edit Task: {task.title}</h3>
+                <p style="margin: 0.5rem 0; color: #666;">📅 Created: {created_date_str}</p>
+                <p style="margin: 0.5rem 0; color: #666;">⏰ {due_date_display}</p>
+                <p style="margin: 0.5rem 0; color: #666;">🏷️ Category: {task.category} | 🔥 Priority: {task.priority.title()} | 📊 Status: {color_info['status_description']}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
             with st.form(f"edit_task_form_{task.id}"):
                 col1, col2 = st.columns(2)
