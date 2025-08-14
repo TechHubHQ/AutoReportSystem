@@ -20,6 +20,8 @@ from app.ui.components.loader import LoaderContext
 from app.core.utils.task_color_utils import (
     get_combined_task_color, format_date_display, get_days_until_due, get_completion_date_display
 )
+from app.ui.components.task_modal import show_edit_task_modal
+from app.ui.dashboard_task_analysis import render_task_analysis
 
 
 class DashboardManager:
@@ -51,6 +53,106 @@ class DashboardManager:
         if user:
             return await get_archived_tasks(user_id=user.get('id'))
         return []
+
+    async def get_task_notes_counts(self, tasks):
+        """Get notes counts for a list of tasks"""
+        from app.core.interface.task_notes_interface import get_task_notes
+        notes_counts = {}
+        for task in tasks:
+            try:
+                task_notes = await get_task_notes(task.id)
+                notes_counts[task.id] = len(task_notes) if task_notes else 0
+            except:
+                notes_counts[task.id] = 0
+        return notes_counts
+
+    async def get_task_notes_for_modal(self, task_id):
+        """Get all notes for a specific task for modal display"""
+        from app.core.interface.task_notes_interface import get_task_notes
+        try:
+            return await get_task_notes(task_id)
+        except:
+            return []
+
+    async def handle_notes_operations(self, task_id):
+        """Handle pending notes operations (create, update, delete)"""
+        from app.core.interface.task_notes_interface import (
+            create_task_note, update_task_note, delete_task_note,
+            create_task_issue, create_task_resolution, get_task_issue, get_task_resolution
+        )
+
+        # Handle note creation
+        if 'pending_note_creation' in st.session_state:
+            note_data = st.session_state['pending_note_creation']
+            try:
+                await create_task_note(**note_data)
+                # Refresh notes
+                task_notes = await self.get_task_notes_for_modal(task_id)
+                st.session_state[f'task_notes_{task_id}'] = task_notes
+                del st.session_state['pending_note_creation']
+            except Exception as e:
+                st.error(f"Error creating note: {e}")
+
+        # Handle note update
+        if 'pending_note_update' in st.session_state:
+            update_data = st.session_state['pending_note_update']
+            try:
+                await update_task_note(
+                    note_id=update_data['note_id'],
+                    analysis_content=update_data['analysis_content']
+                )
+                # Refresh notes
+                task_notes = await self.get_task_notes_for_modal(task_id)
+                st.session_state[f'task_notes_{task_id}'] = task_notes
+                del st.session_state['pending_note_update']
+            except Exception as e:
+                st.error(f"Error updating note: {e}")
+
+        # Handle note deletion
+        if 'pending_note_deletion' in st.session_state:
+            note_id = st.session_state['pending_note_deletion']
+            try:
+                await delete_task_note(note_id)
+                # Refresh notes
+                task_notes = await self.get_task_notes_for_modal(task_id)
+                st.session_state[f'task_notes_{task_id}'] = task_notes
+                del st.session_state['pending_note_deletion']
+            except Exception as e:
+                st.error(f"Error deleting note: {e}")
+
+        # Handle issue update
+        if 'pending_issue_update' in st.session_state:
+            issue_data = st.session_state['pending_issue_update']
+            try:
+                await create_task_issue(
+                    task_id=issue_data['task_id'],
+                    issue_description=issue_data['issue_description'],
+                    created_by=issue_data['created_by']
+                )
+                # Refresh issue data
+                task_issue = await get_task_issue(task_id)
+                st.session_state[f'task_issue_{task_id}'] = task_issue
+                del st.session_state['pending_issue_update']
+                st.success("✅ Issue description updated successfully!")
+            except Exception as e:
+                st.error(f"Error updating issue: {e}")
+
+        # Handle resolution update
+        if 'pending_resolution_update' in st.session_state:
+            resolution_data = st.session_state['pending_resolution_update']
+            try:
+                await create_task_resolution(
+                    task_id=resolution_data['task_id'],
+                    resolution_notes=resolution_data['resolution_notes'],
+                    created_by=resolution_data['created_by']
+                )
+                # Refresh resolution data
+                task_resolution = await get_task_resolution(task_id)
+                st.session_state[f'task_resolution_{task_id}'] = task_resolution
+                del st.session_state['pending_resolution_update']
+                st.success("✅ Resolution notes updated successfully!")
+            except Exception as e:
+                st.error(f"Error updating resolution: {e}")
 
 
 def apply_custom_css():
@@ -175,42 +277,49 @@ def apply_custom_css():
     }
     /* Due soon/later + Status combinations */
     .due-soon.status-todo, .due-later.status-todo {
-        background: linear-gradient(135deg, #C8E6C9 50%, #E3F2FD 50%) !important;
-        border-left-color: #2196F3 !important;
-        box-shadow: -6px 6px 20px rgba(33, 150, 243, 0.25) !important;
-    }
-    .due-soon.status-inprogress, .due-later.status-inprogress {
-        background: linear-gradient(135deg, #C8E6C9 50%, #F3E5F5 50%) !important;
-        border-left-color: #9C27B0 !important;
-        box-shadow: -6px 6px 20px rgba(156, 39, 176, 0.25) !important;
-    }
-    .due-soon.status-pending, .due-later.status-pending {
-        background: linear-gradient(135deg, #C8E6C9 50%, #FFF3E0 50%) !important;
-        border-left-color: #FF9800 !important;
-        border-left-style: double !important;
-        border-left-width: 8px !important;
-        box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.25) !important;
-    }
-    /* No due date - use only status colors */
-    .due-none.status-todo {
-        background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%) !important;
-        border-left-color: #2196F3 !important;
-        box-shadow: -6px 6px 20px rgba(33, 150, 243, 0.25) !important;
-    }
-    .due-none.status-inprogress {
-        background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%) !important;
-        border-left-color: #9C27B0 !important;
-        box-shadow: -6px 6px 20px rgba(156, 39, 176, 0.25) !important;
-    }
-    .due-none.status-pending {
-        background: linear-gradient(135deg, #FFF3E0 0%, #FFCC80 100%) !important;
-        border-left-color: #FF9800 !important;
-        border-left-style: double !important;
-        border-left-width: 8px !important;
-        box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.25) !important;
-    }
-    .due-completed {
-        /* Completed tasks always use green, regardless of due date */
+        # Load detailed analysis data for all filtered tasks
+        from app.core.interface.task_notes_interface import (
+            get_task_issue, get_task_resolution, get_task_progress_notes
+        )
+        
+        analysis_data = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, task in enumerate(filtered_tasks):
+            status_text.text(f"Loading analysis for task {i+1}/{len(filtered_tasks)}: {task.title}")
+            progress_bar.progress((i + 1) / len(filtered_tasks))
+            
+            # Get issue, resolution, and progress notes
+            task_issue = await get_task_issue(task.id)
+            task_resolution = await get_task_resolution(task.id)
+            progress_notes = await get_task_progress_notes(task.id)
+            
+            # Create a record for each progress note
+            if progress_notes:
+                for note in progress_notes:
+                    analysis_data.append({
+                        'ID': task.id,
+                        'Created At': task.created_at.strftime('%Y-%m-%d') if task.created_at else 'N/A',
+                        'Title': task.title,
+                        'Issue': task_issue.issue_description if task_issue else 'No issue documented',
+                        'Notes Date': note.note_date.strftime('%Y-%m-%d'),
+                        'Analysis': note.analysis_content,
+                        'Resolution Notes': task_resolution.resolution_notes if task_resolution else 'No resolution documented',
+                        'Task Object': task  # Keep for reference
+                    })
+            else:
+                # If no progress notes, still show the task with empty analysis
+                analysis_data.append({
+                    'ID': task.id,
+                    'Created At': task.created_at.strftime('%Y-%m-%d') if task.created_at else 'N/A',
+                    'Title': task.title,
+                    'Issue': task_issue.issue_description if task_issue else 'No issue documented',
+                    'Notes Date': 'No notes',
+                    'Analysis': 'No progress notes',
+                    'Resolution Notes': task_resolution.resolution_notes if task_resolution else 'No resolution documented',
+                    'Task Object': task  # Keep for reference
+                })
         background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
         border-left-color: #4CAF50 !important;
         box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
@@ -323,6 +432,9 @@ async def render_kanban_board(dashboard_manager):
         else:
             tasks = await dashboard_manager.get_user_tasks()
 
+        # Get notes counts for all tasks
+        notes_counts = await dashboard_manager.get_task_notes_counts(tasks)
+
     # Add new task button
     col1, col2, col3 = st.columns([2, 1, 1])
     with col2:
@@ -336,7 +448,8 @@ async def render_kanban_board(dashboard_manager):
 
     # Color system information panel
     if st.session_state.get("show_color_guide", False):
-        with st.expander("🎨 Task Color System Guide", expanded=True):
+        @st.dialog("🎨 Task Color System Guide", width="large")
+        def color_guide_dialog():
             st.markdown("""
             ### Diagonal Split Color System
             Each task card uses a **diagonal split** showing two types of information:
@@ -399,9 +512,16 @@ async def render_kanban_board(dashboard_manager):
                 </div>
                 """, unsafe_allow_html=True)
 
+            if st.button("Close Guide"):
+                st.session_state.show_color_guide = False
+                st.rerun()
+
+        color_guide_dialog()
+
     # Task creation modal
     if st.session_state.get("show_task_modal", False):
-        with st.expander("Create New Task", expanded=True):
+        @st.dialog("➕ Create New Task", width="large")
+        def create_task_dialog():
             with st.form("new_task_form"):
                 title = st.text_input("Task Title")
                 description = st.text_area("Description")
@@ -414,25 +534,41 @@ async def render_kanban_board(dashboard_manager):
                         "Category", ["in progress", "accomplishments", "highlights"])
                 due_date = st.date_input("Due Date")
 
-                if st.form_submit_button("Create Task"):
-                    with LoaderContext("Creating task...", "inline"):
-                        try:
-                            user = RouteProtection.get_current_user()
-                            await create_task(
-                                title=title,
-                                description=description,
-                                status="todo",
-                                priority=priority,
-                                category=category,
-                                due_date=datetime.combine(
-                                    due_date, datetime.min.time()) if due_date else None,
-                                created_by=user.get('id')
-                            )
-                            st.session_state.show_task_modal = False
-                            st.success("Task created successfully!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error creating task: {str(e)}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("💾 Create Task", type="primary"):
+                        # Store task creation data for the parent async context to handle
+                        st.session_state['pending_task_creation'] = {
+                            'title': title,
+                            'description': description,
+                            'status': 'todo',
+                            'priority': priority,
+                            'category': category,
+                            'due_date': datetime.combine(due_date, datetime.min.time()) if due_date else None,
+                            'created_by': RouteProtection.get_current_user().get('id') if RouteProtection.get_current_user() else None
+                        }
+                        st.session_state.show_task_modal = False
+                        st.rerun()
+                with col2:
+                    if st.form_submit_button("❌ Cancel"):
+                        st.session_state.show_task_modal = False
+                        st.rerun()
+
+        # Show the dialog
+        create_task_dialog()
+
+    # Handle pending task creation
+    if 'pending_task_creation' in st.session_state:
+        task_data = st.session_state['pending_task_creation']
+        try:
+            with LoaderContext("Creating task...", "inline"):
+                await create_task(**task_data)
+                st.success("Task created successfully!")
+                del st.session_state['pending_task_creation']
+                st.rerun()
+        except Exception as e:
+            st.error(f"Error creating task: {str(e)}")
+            del st.session_state['pending_task_creation']
 
     # Kanban columns
     col1, col2, col3, col4 = st.columns(4)
@@ -453,6 +589,10 @@ async def render_kanban_board(dashboard_manager):
                 # Get color information based on due date, status, and priority
                 color_info = get_combined_task_color(
                     task.due_date, task.status, task.priority)
+
+                # Check if task has notes
+                notes_count = notes_counts.get(task.id, 0)
+                notes_indicator = f" 📝({notes_count})" if notes_count > 0 else ""
 
                 # Format dates for display
                 created_date_str = format_date_display(task.created_at)
@@ -496,7 +636,7 @@ async def render_kanban_board(dashboard_manager):
 
                 st.markdown(f"""
                 <div class="task-card {color_info['all_classes']}">
-                    <strong>{task.title}</strong><br>
+                    <strong>{task.title}{notes_indicator}</strong><br>
                     <small>{description_preview}</small><br>
                     <div class="date-display created-date">📅 Created: {created_date_str}</div>
                     <div class="date-display {due_date_class}">{due_date_display}</div>
@@ -505,10 +645,13 @@ async def render_kanban_board(dashboard_manager):
                 """, unsafe_allow_html=True)
 
                 # Task actions
-                col_edit, col_move = st.columns(2)
+                col_edit, col_notes, col_move = st.columns(3)
                 with col_edit:
                     if st.button("✏️", key=f"edit_{task.id}", help="Edit task"):
-                        st.session_state.selected_task = task
+                        st.session_state[f"edit_modal_{task.id}"] = True
+                with col_notes:
+                    if st.button("📝", key=f"notes_{task.id}", help="Manage daily progress notes"):
+                        st.session_state[f"show_notes_{task.id}"] = True
                 with col_move:
                     new_status = st.selectbox(
                         "Move to:",
@@ -527,60 +670,52 @@ async def render_kanban_board(dashboard_manager):
                             except Exception as e:
                                 st.error(f"Error updating task: {str(e)}")
 
-    # Edit task modal
-    if st.session_state.get("selected_task"):
-        task = st.session_state.selected_task
-        with st.expander(f"Edit Task: {task.title}", expanded=True):
-            with st.form("edit_task_form"):
-                new_title = st.text_input("Title", value=task.title)
-                new_description = st.text_area(
-                    "Description", value=task.description or "")
-                col1, col2 = st.columns(2)
-                with col1:
-                    new_priority = st.selectbox("Priority", ["low", "medium", "high", "urgent"],
-                                                index=["low", "medium", "high", "urgent"].index(task.priority))
-                with col2:
-                    new_category = st.selectbox("Category", ["in progress", "accomplishments"],
-                                                index=["in progress", "accomplishments"].index(task.category))
+    # Handle pending task updates
+    for task in tasks:
+        if f'pending_task_update_{task.id}' in st.session_state:
+            update_data = st.session_state[f'pending_task_update_{task.id}']
+            try:
+                with LoaderContext("Updating task...", "inline"):
+                    await update_task(
+                        update_data['task_id'],
+                        title=update_data['title'],
+                        description=update_data['description'],
+                        status=update_data['status'],
+                        priority=update_data['priority'],
+                        category=update_data['category'],
+                        due_date=update_data['due_date']
+                    )
+                    st.success("✅ Task updated successfully!")
+                    del st.session_state[f'pending_task_update_{task.id}']
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error updating task: {str(e)}")
+                del st.session_state[f'pending_task_update_{task.id}']
 
-                due_date_value = task.due_date.date() if task.due_date else None
-                new_due_date = st.date_input("Due Date", value=due_date_value)
+    # Show task modals for any tasks that have been clicked
+    for task in tasks:
+        if st.session_state.get(f"edit_modal_{task.id}", False):
+            show_edit_task_modal(task)
 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    if st.form_submit_button("Update Task"):
-                        with LoaderContext("Updating task...", "inline"):
-                            try:
-                                user = RouteProtection.get_current_user()
-                                await update_task(
-                                    task.id,
-                                    title=new_title,
-                                    description=new_description,
-                                    priority=new_priority,
-                                    category=new_category,
-                                    due_date=datetime.combine(
-                                        new_due_date, datetime.min.time()) if new_due_date else None,
-                                    updated_by=user.get('id') if user else None
-                                )
-                                st.session_state.selected_task = None
-                                st.success("Task updated successfully!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error updating task: {str(e)}")
-                with col2:
-                    if st.form_submit_button("Delete Task", type="secondary"):
-                        with LoaderContext("Deleting task...", "inline"):
-                            try:
-                                await delete_task(task.id)
-                                st.session_state.selected_task = None
-                                st.success("Task deleted successfully!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error deleting task: {str(e)}")
-                with col3:
-                    if st.form_submit_button("Cancel"):
-                        st.session_state.selected_task = None
-                        st.rerun()
+        # Handle notes modal
+        if st.session_state.get(f"show_notes_{task.id}", False):
+            # Load notes, issue, and resolution for this task
+            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
+
+            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
+            task_issue = await get_task_issue(task.id)
+            task_resolution = await get_task_resolution(task.id)
+
+            st.session_state[f'task_notes_{task.id}'] = task_notes
+            st.session_state[f'task_issue_{task.id}'] = task_issue
+            st.session_state[f'task_resolution_{task.id}'] = task_resolution
+
+            # Handle pending operations
+            await dashboard_manager.handle_notes_operations(task.id)
+
+            from app.ui.components.task_notes_modal import show_task_notes_modal
+            show_task_notes_modal(task)
+            st.session_state[f"show_notes_{task.id}"] = False
 
 
 async def render_productivity_analytics(dashboard_manager):
@@ -905,6 +1040,9 @@ async def render_archived_tasks(dashboard_manager):
     with LoaderContext("Loading archived tasks...", "inline"):
         archived_tasks = await dashboard_manager.get_archived_user_tasks()
 
+        # Get notes counts for all archived tasks
+        archived_notes_counts = await dashboard_manager.get_task_notes_counts(archived_tasks)
+
     if not archived_tasks:
         st.markdown("""
         <div style="text-align: center; padding: 3rem 2rem; 
@@ -983,6 +1121,10 @@ async def render_archived_tasks(dashboard_manager):
                 color_info = get_combined_task_color(
                     task.due_date, task.status, task.priority)
 
+                # Check if task has notes
+                notes_count = archived_notes_counts.get(task.id, 0)
+                notes_indicator = f" 📝({notes_count})" if notes_count > 0 else ""
+
                 # Format dates for display
                 created_date_str = format_date_display(task.created_at)
 
@@ -1025,7 +1167,7 @@ async def render_archived_tasks(dashboard_manager):
 
                 st.markdown(f"""
                 <div class="task-card {color_info['all_classes']}" style="opacity: 0.8;">
-                    <strong>{task.title}</strong><br>
+                    <strong>{task.title}{notes_indicator}</strong><br>
                     <small>{description_preview}</small><br>
                     <div class="date-display created-date">📅 Created: {created_date_str}</div>
                     <div class="date-display {due_date_class}">{due_date_display}</div>
@@ -1033,69 +1175,64 @@ async def render_archived_tasks(dashboard_manager):
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Minimal actions for archived tasks
-                if st.button("✏️ Edit", key=f"edit_archived_{task.id}", help="Edit archived task"):
-                    st.session_state.selected_task = task
+                # Actions for archived tasks
+                col_edit, col_notes = st.columns(2)
+                with col_edit:
+                    if st.button("✏️ Edit", key=f"edit_archived_{task.id}", help="Edit archived task"):
+                        st.session_state[f"edit_modal_{task.id}"] = True
+                with col_notes:
+                    if st.button("📝 Notes", key=f"notes_archived_{task.id}", help="View progress notes"):
+                        st.session_state[f"show_notes_{task.id}"] = True
 
-    # Edit task modal (reuse the same modal from main kanban)
-    if st.session_state.get("selected_task"):
-        task = st.session_state.selected_task
-        with st.expander(f"Edit Archived Task: {task.title}", expanded=True):
-            with st.form("edit_archived_task_form"):
-                new_title = st.text_input("Title", value=task.title)
-                new_description = st.text_area(
-                    "Description", value=task.description or "")
-                col1, col2 = st.columns(2)
-                with col1:
-                    new_priority = st.selectbox("Priority", ["low", "medium", "high", "urgent"],
-                                                index=["low", "medium", "high", "urgent"].index(task.priority))
-                with col2:
-                    new_category = st.selectbox("Category", ["in progress", "accomplishments"],
-                                                index=["in progress", "accomplishments"].index(task.category))
+    # Handle pending task updates for archived tasks
+    for task in archived_tasks:
+        if f'pending_task_update_{task.id}' in st.session_state:
+            update_data = st.session_state[f'pending_task_update_{task.id}']
+            try:
+                with LoaderContext("Updating task...", "inline"):
+                    await update_task(
+                        update_data['task_id'],
+                        title=update_data['title'],
+                        description=update_data['description'],
+                        status=update_data['status'],
+                        priority=update_data['priority'],
+                        category=update_data['category'],
+                        due_date=update_data['due_date']
+                    )
+                    st.success("✅ Task updated successfully!")
+                    del st.session_state[f'pending_task_update_{task.id}']
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error updating task: {str(e)}")
+                del st.session_state[f'pending_task_update_{task.id}']
 
-                due_date_value = task.due_date.date() if task.due_date else None
-                new_due_date = st.date_input("Due Date", value=due_date_value)
-                new_status = st.selectbox("Status", ["todo", "inprogress", "pending", "completed"],
-                                          index=["todo", "inprogress", "pending", "completed"].index(task.status))
+    # Show task modals for any archived tasks that have been clicked
+    for task in archived_tasks:
+        if st.session_state.get(f"edit_modal_{task.id}", False):
+            show_edit_task_modal(task)
 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    if st.form_submit_button("Update Task"):
-                        with LoaderContext("Updating task...", "inline"):
-                            try:
-                                user = RouteProtection.get_current_user()
-                                await update_task(
-                                    task.id,
-                                    title=new_title,
-                                    description=new_description,
-                                    priority=new_priority,
-                                    category=new_category,
-                                    status=new_status,
-                                    due_date=datetime.combine(
-                                        new_due_date, datetime.min.time()) if new_due_date else None,
-                                    updated_by=user.get('id') if user else None
-                                )
-                                st.session_state.selected_task = None
-                                st.success(
-                                    "Archived task updated successfully!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error updating task: {str(e)}")
-                with col2:
-                    if st.form_submit_button("Delete Task", type="secondary"):
-                        with LoaderContext("Deleting task...", "inline"):
-                            try:
-                                await delete_task(task.id)
-                                st.session_state.selected_task = None
-                                st.success(
-                                    "Archived task deleted successfully!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error deleting task: {str(e)}")
-                with col3:
-                    if st.form_submit_button("Cancel"):
-                        st.session_state.selected_task = None
-                        st.rerun()
+        # Handle notes modal for archived tasks
+        if st.session_state.get(f"show_notes_{task.id}", False):
+            # Load notes, issue, and resolution for this task
+            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
+
+            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
+            task_issue = await get_task_issue(task.id)
+            task_resolution = await get_task_resolution(task.id)
+
+            st.session_state[f'task_notes_{task.id}'] = task_notes
+            st.session_state[f'task_issue_{task.id}'] = task_issue
+            st.session_state[f'task_resolution_{task.id}'] = task_resolution
+
+            # Handle pending operations
+            await dashboard_manager.handle_notes_operations(task.id)
+
+            from app.ui.components.task_notes_modal import show_task_notes_modal
+            show_task_notes_modal(task)
+            st.session_state[f"show_notes_{task.id}"] = False
+
+
+# Removed corrupted function - now imported from dashboard_task_analysis.py
 
 
 def dashboard(go_to_page):
@@ -1118,8 +1255,8 @@ def dashboard(go_to_page):
     dashboard_manager = DashboardManager()
 
     # Tabs
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor", "📦 Archive"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor", "📈 Task Analysis", "📦 Archive"])
 
     with tab1:
         asyncio.run(render_kanban_board(dashboard_manager))
@@ -1131,6 +1268,9 @@ def dashboard(go_to_page):
         asyncio.run(render_system_monitoring(dashboard_manager))
 
     with tab4:
+        asyncio.run(render_task_analysis(dashboard_manager))
+
+    with tab5:
         asyncio.run(render_archived_tasks(dashboard_manager))
 
 

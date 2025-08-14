@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Boolean, Date, UniqueConstraint
 from sqlalchemy.pool import NullPool
 from app.config.config import settings
 
@@ -56,10 +56,14 @@ class Task(Base):
 
     # Many-to-one: Task → User
     creator = relationship("User", back_populates="tasks")
-    
+
     # One-to-many: Task → TaskStatusHistory
     status_history = relationship("TaskStatusHistory", back_populates="task",
-                                 cascade="all, delete-orphan")
+                                  cascade="all, delete-orphan")
+
+    # One-to-many: Task → TaskNotes
+    notes = relationship("TaskNote", back_populates="task",
+                         cascade="all, delete-orphan")
 
 
 class TaskStatusHistory(Base):
@@ -67,19 +71,48 @@ class TaskStatusHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
-    old_status = Column(String, nullable=True)  # Previous status (null for initial creation)
+    # Previous status (null for initial creation)
+    old_status = Column(String, nullable=True)
     new_status = Column(String, nullable=False)  # New status
     old_category = Column(String, nullable=True)  # Previous category
     new_category = Column(String, nullable=False)  # New category
     changed_at = Column(DateTime(timezone=True),
-                       server_default=func.now(), nullable=False)
+                        server_default=func.now(), nullable=False)
     changed_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Many-to-one: TaskStatusHistory → Task
     task = relationship("Task", back_populates="status_history")
-    
+
     # Many-to-one: TaskStatusHistory → User
     user = relationship("User", backref="task_status_changes")
+
+
+class TaskNote(Base):
+    __tablename__ = "task_notes"
+    __table_args__ = (UniqueConstraint(
+        'task_id', 'note_date', name='unique_task_note_per_date'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    # Date for this specific note entry
+    note_date = Column(Date, nullable=False)
+    # Clear explanation of the issue
+    issue_description = Column(Text, nullable=False)
+    # Detailed progress analysis
+    analysis_content = Column(Text, nullable=False)
+    # Resolution information (can be null until resolved)
+    resolution_notes = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Many-to-one: TaskNote → Task
+    task = relationship("Task", back_populates="notes")
+
+    # Many-to-one: TaskNote → User
+    creator = relationship("User", backref="task_notes")
 
 
 class SMTPConf(Base):

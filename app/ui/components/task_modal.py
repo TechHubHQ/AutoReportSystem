@@ -13,7 +13,8 @@ def show_edit_task_modal(task):
     modal_key = f"edit_modal_{task.id}"
 
     if st.session_state.get(modal_key, False):
-        with st.container():
+        @st.dialog(f"✏️ Edit Task: {task.title}", width="large")
+        def edit_task_dialog():
             # Get color information for the task
             color_info = get_combined_task_color(
                 task.due_date, task.status, task.priority)
@@ -47,7 +48,6 @@ def show_edit_task_modal(task):
             <div style="padding: 1rem; border-radius: 10px; margin-bottom: 1rem; 
                         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
                         border-left: 4px solid #667eea;">
-                <h3 style="margin: 0;">✏️ Edit Task: {task.title}</h3>
                 <p style="margin: 0.5rem 0; color: #666;">📅 Created: {created_date_str}</p>
                 <p style="margin: 0.5rem 0; color: #666;">⏰ {due_date_display}</p>
                 <p style="margin: 0.5rem 0; color: #666;">🏷️ Category: {task.category} | 🔥 Priority: {task.priority.title()} | 📊 Status: {color_info['status_description']}</p>
@@ -97,24 +97,23 @@ def show_edit_task_modal(task):
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.form_submit_button("💾 Save Changes", type="primary"):
-                        try:
-                            asyncio.run(update_task(
-                                task.id,
-                                title=new_title,
-                                description=new_description,
-                                status=new_status,
-                                priority=new_priority,
-                                category=new_category,
-                                due_date=datetime.combine(
-                                    new_due_date, datetime.min.time()) if new_due_date else None
-                            ))
-                            st.success("✅ Task updated successfully!")
-                            st.session_state[modal_key] = False
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error updating task: {str(e)}")
+                        # Store task update data for the parent async context to handle
+                        st.session_state[f'pending_task_update_{task.id}'] = {
+                            'task_id': task.id,
+                            'title': new_title,
+                            'description': new_description,
+                            'status': new_status,
+                            'priority': new_priority,
+                            'category': new_category,
+                            'due_date': datetime.combine(new_due_date, datetime.min.time()) if new_due_date else None
+                        }
+                        st.session_state[modal_key] = False
+                        st.rerun()
 
                 with col2:
                     if st.form_submit_button("❌ Cancel"):
                         st.session_state[modal_key] = False
                         st.rerun()
+
+        # Show the dialog
+        edit_task_dialog()

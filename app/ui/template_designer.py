@@ -324,7 +324,9 @@ def render_template_list():
         # Preview modal
         if st.session_state.get("preview_template"):
             template = st.session_state.preview_template
-            with st.expander(f"🔍 Preview: {template.name}", expanded=True):
+
+            @st.dialog(f"🔍 Preview: {template.name}", width="large")
+            def preview_template_dialog():
                 col1, col2 = st.columns([1, 1])
 
                 with col1:
@@ -339,28 +341,39 @@ def render_template_list():
                     st.session_state.preview_template = None
                     st.rerun()
 
+            preview_template_dialog()
+
         # Show code modal
         if st.session_state.get("show_code"):
             template = st.session_state.show_code
-            with st.expander(f"📋 HTML Code: {template.name}", expanded=True):
+
+            @st.dialog(f"📋 HTML Code: {template.name}", width="large")
+            def show_code_dialog():
                 st.code(template.html_content, language='html')
 
-                if st.download_button(
-                    label="📥 Download HTML",
-                    data=template.html_content,
-                    file_name=f"{template.name.replace(' ', '_').lower()}.html",
-                    mime="text/html"
-                ):
-                    st.success("✅ Template downloaded!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.download_button(
+                        label="📥 Download HTML",
+                        data=template.html_content,
+                        file_name=f"{template.name.replace(' ', '_').lower()}.html",
+                        mime="text/html"
+                    ):
+                        st.success("✅ Template downloaded!")
 
-                if st.button("Close Code View"):
-                    st.session_state.show_code = None
-                    st.rerun()
+                with col2:
+                    if st.button("Close Code View"):
+                        st.session_state.show_code = None
+                        st.rerun()
+
+            show_code_dialog()
 
         # Edit template modal
         if st.session_state.get("edit_template"):
             template = st.session_state.edit_template
-            with st.expander(f"✏️ Edit Template: {template.name}", expanded=True):
+
+            @st.dialog(f"✏️ Edit Template: {template.name}", width="large")
+            def edit_template_dialog():
                 with st.form("edit_template_form"):
                     new_name = st.text_input(
                         "Template Name", value=template.name)
@@ -405,6 +418,8 @@ def render_template_list():
                         if st.form_submit_button("❌ Cancel"):
                             st.session_state.edit_template = None
                             st.rerun()
+
+            edit_template_dialog()
 
     except Exception as e:
         st.error(f"❌ Error loading templates: {str(e)}")
