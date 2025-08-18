@@ -7,7 +7,7 @@ import asyncio
 from app.ui.navbar import navbar
 from app.core.interface.task_interface import (
     get_tasks, create_task, update_task, delete_task, get_task_statistics,
-    get_current_month_tasks, get_archived_tasks
+    get_current_month_tasks, get_archived_tasks, get_task
 )
 from app.core.interface.analytics_interface import (
     get_task_completion_trends, get_productivity_insights
@@ -21,7 +21,6 @@ from app.core.utils.task_color_utils import (
     get_combined_task_color, format_date_display, get_days_until_due, get_completion_date_display
 )
 from app.ui.components.task_modal import show_edit_task_modal
-from app.ui.components.automation_notifications import show_automation_notifications, show_automation_summary_card
 from app.ui.dashboard_task_analysis import render_task_analysis
 
 
@@ -408,6 +407,28 @@ def apply_custom_css():
     .stSpinner {
         text-align: center;
     }
+
+    /* Delete button styling */
+    .stButton > button[title="Delete task"],
+    .stButton > button[title="Delete archived task"] {
+        background-color: #ff4444 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .stButton > button[title="Delete task"]:hover,
+    .stButton > button[title="Delete archived task"]:hover {
+        background-color: #cc0000 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 8px rgba(255, 68, 68, 0.3) !important;
+    }
+
+    /* Confirmation dialog styling */
+    .stDialog {
+        border-radius: 15px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -646,7 +667,7 @@ async def render_kanban_board(dashboard_manager):
                 """, unsafe_allow_html=True)
 
                 # Task actions
-                col_edit, col_notes, col_move = st.columns(3)
+                col_edit, col_notes, col_move, col_delete = st.columns(4)
                 with col_edit:
                     if st.button("✏️", key=f"edit_{task.id}", help="Edit task"):
                         st.session_state[f"edit_modal_{task.id}"] = True
@@ -666,10 +687,26 @@ async def render_kanban_board(dashboard_manager):
                         with LoaderContext("Updating task...", "inline"):
                             try:
                                 user = RouteProtection.get_current_user()
-                                await update_task(task.id, status=new_status, updated_by=user.get('id') if user else None)
+                                old_status = task.status
+                                old_category = task.category
+
+                                # Update the task
+                                updated_task = await update_task(task.id, status=new_status, updated_by=user.get('id') if user else None)
+
+                                # Check if category was automatically changed
+                                if updated_task and updated_task.category != old_category:
+                                    st.success(
+                                        f"✅ Task status updated to '{new_status}' and category automatically changed from '{old_category}' to '{updated_task.category}'!")
+                                else:
+                                    st.success(
+                                        f"✅ Task status updated to '{new_status}'!")
+
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error updating task: {str(e)}")
+                with col_delete:
+                    if st.button("🗑️", key=f"delete_current_{task.id}", help="Delete task"):
+                        st.session_state[f"pending_delete_current_{task.id}"] = True
 
     # Handle pending task updates
     for task in tasks:
@@ -692,6 +729,21 @@ async def render_kanban_board(dashboard_manager):
             except Exception as e:
                 st.error(f"❌ Error updating task: {str(e)}")
                 del st.session_state[f'pending_task_update_{task.id}']
+
+    # Removed confirmation dialog - tasks are deleted immediately when delete button is clicked
+
+    # Handle pending task deletions
+    for task in tasks:
+        if st.session_state.get(f"pending_delete_current_{task.id}", False):
+            try:
+                with LoaderContext("Deleting task...", "inline"):
+                    await delete_task(task.id)
+                    st.success(f"✅ Task '{task.title}' deleted successfully!")
+                    del st.session_state[f"pending_delete_current_{task.id}"]
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error deleting task: {str(e)}")
+                del st.session_state[f"pending_delete_current_{task.id}"]
 
     # Show task modals for any tasks that have been clicked
     for task in tasks:
@@ -1177,13 +1229,16 @@ async def render_archived_tasks(dashboard_manager):
                 """, unsafe_allow_html=True)
 
                 # Actions for archived tasks
-                col_edit, col_notes = st.columns(2)
+                col_edit, col_notes, col_delete = st.columns(3)
                 with col_edit:
                     if st.button("✏️ Edit", key=f"edit_archived_{task.id}", help="Edit archived task"):
                         st.session_state[f"edit_modal_{task.id}"] = True
                 with col_notes:
                     if st.button("📝 Notes", key=f"notes_archived_{task.id}", help="View progress notes"):
                         st.session_state[f"show_notes_{task.id}"] = True
+                with col_delete:
+                    if st.button("🗑️ Delete", key=f"delete_archived_{task.id}", help="Delete archived task"):
+                        st.session_state[f"pending_delete_archived_{task.id}"] = True
 
     # Handle pending task updates for archived tasks
     for task in archived_tasks:
@@ -1206,6 +1261,22 @@ async def render_archived_tasks(dashboard_manager):
             except Exception as e:
                 st.error(f"❌ Error updating task: {str(e)}")
                 del st.session_state[f'pending_task_update_{task.id}']
+
+    # Removed confirmation dialog - archived tasks are deleted immediately when delete button is clicked
+
+    # Handle pending archived task deletions
+    for task in archived_tasks:
+        if st.session_state.get(f"pending_delete_archived_{task.id}", False):
+            try:
+                with LoaderContext("Deleting archived task...", "inline"):
+                    await delete_task(task.id)
+                    st.success(
+                        f"✅ Archived task '{task.title}' deleted successfully!")
+                    del st.session_state[f"pending_delete_archived_{task.id}"]
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error deleting archived task: {str(e)}")
+                del st.session_state[f"pending_delete_archived_{task.id}"]
 
     # Show task modals for any archived tasks that have been clicked
     for task in archived_tasks:
@@ -1254,10 +1325,6 @@ def dashboard(go_to_page):
 
     # Initialize dashboard manager
     dashboard_manager = DashboardManager()
-
-    # Show automation summary and notifications
-    show_automation_summary_card()
-    show_automation_notifications()
 
     # Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(

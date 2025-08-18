@@ -148,10 +148,25 @@ class Job(Base):
     is_custom = Column(Boolean, default=False, nullable=False)
     last_run = Column(DateTime(timezone=True), nullable=True)
     next_run = Column(DateTime(timezone=True), nullable=True)
+    # Execution statistics
+    total_runs = Column(Integer, default=0, nullable=False)
+    successful_runs = Column(Integer, default=0, nullable=False)
+    failed_runs = Column(Integer, default=0, nullable=False)
+    # Average duration in seconds
+    average_duration = Column(Integer, nullable=True)
+    last_success = Column(DateTime(timezone=True), nullable=True)
+    last_failure = Column(DateTime(timezone=True), nullable=True)
+    last_error_message = Column(Text, nullable=True)
+    # Job status: active, paused, disabled, error
+    status = Column(String, default="active", nullable=False)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(
     ), onupdate=func.now(), nullable=False)
+
+    # One-to-many: Job → JobExecutions
+    executions = relationship("JobExecution", back_populates="job",
+                              cascade="all, delete-orphan", order_by="JobExecution.started_at.desc()")
 
 
 class EmailTemplate(Base):
@@ -173,6 +188,59 @@ class EmailTemplate(Base):
 
     # Many-to-one: EmailTemplate → User
     creator = relationship("User", back_populates="templates")
+
+
+class JobExecution(Base):
+    __tablename__ = "job_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+    # Unique execution identifier
+    execution_id = Column(String, nullable=False, index=True)
+    scheduled_time = Column(DateTime(timezone=True), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    duration = Column(Integer, nullable=True)  # Duration in seconds
+    # success, failure, timeout, cancelled
+    status = Column(String, nullable=False)
+    result_data = Column(Text, nullable=True)  # JSON result data
+    error_message = Column(Text, nullable=True)
+    error_traceback = Column(Text, nullable=True)
+    # Execution context information
+    trigger_type = Column(String, nullable=True)  # manual, scheduled, retry
+    triggered_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    retry_count = Column(Integer, default=0, nullable=False)
+    parent_execution_id = Column(String, nullable=True)  # For retry tracking
+    # System information during execution
+    cpu_usage_start = Column(Integer, nullable=True)
+    cpu_usage_end = Column(Integer, nullable=True)
+    memory_usage_start = Column(Integer, nullable=True)
+    memory_usage_end = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+
+    # Many-to-one: JobExecution → Job
+    job = relationship("Job", back_populates="executions")
+
+    # Many-to-one: JobExecution → User (who triggered it)
+    triggered_by_user = relationship(
+        "User", backref="triggered_job_executions")
+
+
+class JobExecutionLog(Base):
+    __tablename__ = "job_execution_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    execution_id = Column(String, ForeignKey(
+        "job_executions.execution_id"), nullable=False)
+    log_level = Column(String, nullable=False)  # INFO, WARNING, ERROR, DEBUG
+    message = Column(Text, nullable=False)
+    timestamp = Column(DateTime(timezone=True),
+                       server_default=func.now(), nullable=False)
+    source = Column(String, nullable=True)  # Source module/function
+
+    # Many-to-one: JobExecutionLog → JobExecution
+    execution = relationship("JobExecution", backref="logs")
 
 
 class UserSession(Base):

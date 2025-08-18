@@ -138,12 +138,22 @@ class TaskAutomationNotifier:
                 'timestamp': datetime.now(),
                 'message': message,
                 'type': 'category_change',
-                'task_id': task_id
+                'task_id': task_id,
+                'task_title': task_title,
+                'old_category': old_category,
+                'new_category': new_category,
+                'user_id': user_id,
+                'details': {
+                    'change_type': 'automatic_category_change',
+                    'trigger': 'status_change',
+                    'from_category': old_category,
+                    'to_category': new_category
+                }
             })
 
-            # Keep only the last 10 notifications
-            if len(st.session_state.automation_notifications) > 10:
-                st.session_state.automation_notifications = st.session_state.automation_notifications[-10:]
+            # Keep only the last 50 notifications for better history
+            if len(st.session_state.automation_notifications) > 50:
+                st.session_state.automation_notifications = st.session_state.automation_notifications[-50:]
 
         except ImportError:
             # Streamlit not available, skip session state storage

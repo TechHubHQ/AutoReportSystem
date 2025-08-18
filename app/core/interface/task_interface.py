@@ -157,8 +157,14 @@ async def update_task(task_id: int, title: str = None, description: str = None,
         # AUTOMATIC CATEGORY CHANGES:
         auto_category_changed = False
 
+        # Log the current state for debugging
+        logger.info(
+            f"Updating task {task_id}: current_status='{current_task.status}', new_status='{status}', current_category='{current_task.category}'")
+
         # 1. If status is being changed to "completed", automatically set category to "accomplishments"
         if should_auto_categorize_to_accomplishments(current_task.status, status):
+            logger.info(
+                f"Auto-categorizing task {task_id} to 'accomplishments' (status: {current_task.status} -> {status})")
             update_data['category'] = "accomplishments"
             category = "accomplishments"  # Update the local variable for logging
             auto_category_changed = True
@@ -169,18 +175,25 @@ async def update_task(task_id: int, title: str = None, description: str = None,
         # 2. If status is being changed from "completed" to any other status,
         # automatically set category back to "in progress"
         elif should_auto_categorize_to_in_progress(current_task.status, status):
+            logger.info(
+                f"Auto-categorizing task {task_id} to 'in progress' (status: {current_task.status} -> {status})")
             update_data['category'] = "in progress"
             category = "in progress"  # Update the local variable for logging
             auto_category_changed = True
             log_automatic_category_change(
                 task_id, current_task.category, "in progress", status, updated_by
             )
+        else:
+            logger.info(
+                f"No automatic category change needed for task {task_id}")
 
         update_data['updated_at'] = get_current_utc_datetime()
 
         # Check if status or category changed
         status_changed = status is not None and status != current_task.status
-        category_changed = category is not None and category != current_task.category
+        # Check category change based on what will actually be updated (including automatic changes)
+        final_category = update_data.get('category', current_task.category)
+        category_changed = final_category != current_task.category
 
         # Update the task
         query = update(Task).where(Task.id == task_id).values(**update_data)
@@ -193,7 +206,7 @@ async def update_task(task_id: int, title: str = None, description: str = None,
                 old_status=current_task.status,
                 new_status=status if status is not None else current_task.status,
                 old_category=current_task.category,
-                new_category=category if category is not None else current_task.category,
+                new_category=final_category,
                 changed_by=updated_by
             )
             db.add(status_history)
@@ -204,7 +217,7 @@ async def update_task(task_id: int, title: str = None, description: str = None,
         if auto_category_changed:
             TaskAutomationNotifier.notify_category_change(
                 task_id, current_task.title, current_task.category,
-                category, updated_by
+                final_category, updated_by
             )
 
         # Return updated task
