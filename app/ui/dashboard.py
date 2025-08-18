@@ -7,7 +7,7 @@ import asyncio
 from app.ui.navbar import navbar
 from app.core.interface.task_interface import (
     get_tasks, create_task, update_task, delete_task, get_task_statistics,
-    get_current_month_tasks, get_archived_tasks, get_task
+    get_current_month_tasks, get_archived_tasks, archive_task, revive_task
 )
 from app.core.interface.analytics_interface import (
     get_task_completion_trends, get_productivity_insights
@@ -32,6 +32,22 @@ class DashboardManager:
         """Initialize session state"""
         if "selected_task" not in st.session_state:
             st.session_state.selected_task = None
+        if "kanban_view_mode" not in st.session_state:
+            st.session_state.kanban_view_mode = "active"  # "active" or "archived"
+
+        # Initialize pending operations only if they don't exist (don't overwrite existing values)
+        if "pending_task_deletion" not in st.session_state:
+            st.session_state.pending_task_deletion = None
+        if "pending_task_archive" not in st.session_state:
+            st.session_state.pending_task_archive = None
+        if "pending_task_revive" not in st.session_state:
+            st.session_state.pending_task_revive = None
+
+        # Initialize confirmation states only if they don't exist
+        if "show_delete_confirmation" not in st.session_state:
+            st.session_state.show_delete_confirmation = False
+        if "task_to_delete" not in st.session_state:
+            st.session_state.task_to_delete = None
 
     async def get_user_tasks(self):
         """Get tasks for current user"""
@@ -156,7 +172,7 @@ class DashboardManager:
 
 
 def apply_custom_css():
-    """Apply custom CSS for modern UI styling with responsive design"""
+    """Apply custom CSS for modern UI styling"""
     st.markdown("""
     <style>
     .main-header {
@@ -203,85 +219,12 @@ def apply_custom_css():
         border-left-width: 6px;
     }
 
-    /* Task Actions Container - Responsive Design */
-    .task-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 1rem;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .task-actions > div {
-        flex: 1;
-        min-width: 0;
-    }
-
-    /* Responsive breakpoints */
-    @media (max-width: 768px) {
-        .task-actions {
-            flex-direction: column;
-            gap: 0.3rem;
-        }
-        
-        .task-actions > div {
-            width: 100%;
-        }
-        
-        .task-card {
-            padding: 1rem;
-        }
-        
-        .main-header {
-            padding: 1.5rem;
-        }
-        
-        .main-header h1 {
-            font-size: 1.8rem !important;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .task-card {
-            padding: 0.8rem;
-        }
-        
-        .task-actions {
-            gap: 0.2rem;
-        }
-        
-        .main-header {
-            padding: 1rem;
-        }
-        
-        .main-header h1 {
-            font-size: 1.5rem !important;
-        }
-    }
-
-    /* Button styling for consistent appearance */
-    .stButton > button {
-        width: 100% !important;
-        border-radius: 6px !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
-
-    /* Selectbox styling */
-    .stSelectbox > div > div {
-        border-radius: 6px !important;
-    }
-
-    /* Priority and status colors */
     .priority-high { border-left-color: #f44336 !important; }
     .priority-urgent { border-left-color: #d32f2f !important; }
     .priority-medium { border-left-color: #ff9800 !important; }
     .priority-low { border-left-color: #4caf50 !important; }
 
+    /* Status-based background colors - will be combined with due date colors diagonally */
     .status-todo {
         border-left-color: #2196F3 !important;
     }
@@ -299,7 +242,8 @@ def apply_custom_css():
         box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
     }
 
-    /* Due date combinations */
+    /* Due date-based colors (override status when urgent) - Enhanced with brighter colors */
+    /* Overdue + Status combinations */
     .due-overdue.status-todo {
         background: linear-gradient(135deg, #FFCDD2 50%, #E3F2FD 50%) !important;
         border-left-color: #F44336 !important;
@@ -315,6 +259,7 @@ def apply_custom_css():
         border-left-color: #F44336 !important;
         box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
     }
+    /* Due today + Status combinations */
     .due-today.status-todo {
         background: linear-gradient(135deg, #FFAB91 50%, #E3F2FD 50%) !important;
         border-left-color: #FF5722 !important;
@@ -330,6 +275,7 @@ def apply_custom_css():
         border-left-color: #FF5722 !important;
         box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
     }
+    /* Due tomorrow + Status combinations */
     .due-tomorrow.status-todo {
         background: linear-gradient(135deg, #FFCC80 50%, #E3F2FD 50%) !important;
         border-left-color: #FF9800 !important;
@@ -344,6 +290,12 @@ def apply_custom_css():
         background: linear-gradient(135deg, #FFCC80 50%, #FFF3E0 50%) !important;
         border-left-color: #FF9800 !important;
         box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+    }
+    /* Due soon/later + Status combinations */
+    .due-soon.status-todo, .due-later.status-todo {
+        background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
+        border-left-color: #4CAF50 !important;
+        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
     }
 
     /* Date display styling */
@@ -396,21 +348,13 @@ def apply_custom_css():
         text-shadow: 0 1px 2px rgba(255,255,255,0.8);
     }
 
-    /* Delete button styling */
-    .stButton > button[title*="Delete"] {
-        background-color: #dc3545 !important;
-        color: white !important;
-        border: 2px solid #dc3545 !important;
+    .job-progress {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
     }
 
-    .stButton > button[title*="Delete"]:hover {
-        background-color: #c82333 !important;
-        border-color: #c82333 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
-    }
-
-    /* Tabs styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
     }
@@ -428,39 +372,137 @@ def apply_custom_css():
         color: white;
     }
 
-    /* Confirmation dialog styling */
-    .stDialog {
-        border-radius: 15px !important;
+    /* Custom loader styles */
+    .stSpinner > div {
+        border-top-color: #667eea !important;
+    }
+
+    .stSpinner {
+        text-align: center;
+    }
+
+    /* Action button styling */
+    .stButton > button[title="Delete task permanently"] {
+        background-color: #ff4444 !important;
+        color: white !important;
+        border: 1px solid #ff4444 !important;
+    }
+
+    .stButton > button[title="Delete task permanently"]:hover {
+        background-color: #cc0000 !important;
+        border: 1px solid #cc0000 !important;
+    }
+
+    .stButton > button[title="Archive task"] {
+        background-color: #666666 !important;
+        color: white !important;
+        border: 1px solid #666666 !important;
+    }
+
+    .stButton > button[title="Archive task"]:hover {
+        background-color: #444444 !important;
+        border: 1px solid #444444 !important;
+    }
+
+    .stButton > button[title="Revive task (move back to active)"] {
+        background-color: #28a745 !important;
+        color: white !important;
+        border: 1px solid #28a745 !important;
+    }
+
+    .stButton > button[title="Revive task (move back to active)"]:hover {
+        background-color: #1e7e34 !important;
+        border: 1px solid #1e7e34 !important;
+    }
+
+    /* Archived task card styling */
+    .archived-task {
+        opacity: 0.7 !important;
+        background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%) !important;
+        border-left-color: #999999 !important;
+        box-shadow: -4px 4px 15px rgba(0,0,0,0.1) !important;
+        position: relative;
+    }
+
+    .archived-task:hover {
+        opacity: 0.85 !important;
+        transform: translateY(-1px) translateX(1px) !important;
+        box-shadow: -6px 6px 20px rgba(0,0,0,0.15) !important;
+    }
+
+    .archive-indicator {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: #666666;
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        text-shadow: none;
+    }
+
+    .archived-task strong {
+        color: #666666 !important;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.8) !important;
+    }
+
+    .archived-task small {
+        color: #777777 !important;
+        text-shadow: 0 1px 1px rgba(255,255,255,0.7) !important;
+    }
+
+    .archive-date {
+        color: #666666 !important;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-shadow: 0 1px 1px rgba(255,255,255,0.6);
     }
     </style>
     """, unsafe_allow_html=True)
 
 
 async def render_kanban_board(dashboard_manager):
-    """Render the Kanban board interface with responsive design"""
+    """Render the Kanban board interface"""
     st.markdown("### 📋 Kanban Board")
 
-    # Add toggle for current month vs all tasks
+    # Add toggle for active vs archived tasks
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        view_mode = st.radio(
-            "View Mode:",
-            ["Current Month", "All Tasks"],
+        task_view_mode = st.radio(
+            "Task View:",
+            ["Active Tasks", "Archived Tasks"],
             horizontal=True,
-            help="Current Month shows only tasks created this month. All Tasks shows everything."
+            help="Active Tasks shows current tasks. Archived Tasks shows previously archived tasks."
         )
+
+    with col2:
+        # Add secondary toggle for active tasks time filtering
+        if task_view_mode == "Active Tasks":
+            time_filter = st.radio(
+                "Time Filter:",
+                ["Current Month", "All Time"],
+                horizontal=True,
+                help="Current Month shows only tasks created this month. All Time shows all active tasks."
+            )
+        else:
+            time_filter = "All Time"  # Archived tasks always show all time
 
     # Get tasks based on view mode
     with LoaderContext("Loading tasks...", "inline"):
-        if view_mode == "Current Month":
-            tasks = await dashboard_manager.get_current_month_user_tasks()
-        else:
-            tasks = await dashboard_manager.get_user_tasks()
+        if task_view_mode == "Active Tasks":
+            if time_filter == "Current Month":
+                tasks = await dashboard_manager.get_current_month_user_tasks()
+            else:
+                tasks = await dashboard_manager.get_user_tasks()
+        else:  # Archived Tasks
+            tasks = await dashboard_manager.get_archived_user_tasks()
 
         # Get notes counts for all tasks
         notes_counts = await dashboard_manager.get_task_notes_counts(tasks)
 
-    # Add new task button
+    # Add action buttons
     col1, col2, col3 = st.columns([2, 1, 1])
     with col2:
         if st.button("ℹ️ Color Guide", help="Show color system information"):
@@ -468,8 +510,12 @@ async def render_kanban_board(dashboard_manager):
                 "show_color_guide", False)
 
     with col3:
-        if st.button("➕ New Task", type="primary"):
-            st.session_state.show_task_modal = True
+        # Only show "New Task" button for active tasks view
+        if task_view_mode == "Active Tasks":
+            if st.button("➕ New Task", type="primary"):
+                st.session_state.show_task_modal = True
+        else:
+            st.write("")  # Empty space to maintain layout
 
     # Color system information panel
     if st.session_state.get("show_color_guide", False):
@@ -498,6 +544,44 @@ async def render_kanban_board(dashboard_manager):
 
             **Example:** A task due tomorrow that's in progress shows amber→purple diagonal split.
             """)
+
+            # Color examples
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #ffcdd2 50%, #e3f2fd 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #e57373; 
+                           box-shadow: 0 4px 8px rgba(244, 67, 54, 0.2); margin: 0.5rem 0;">
+                    <small><strong>Overdue + To Do</strong><br>Red → Blue</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #ffcc80 50%, #f3e5f5 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #ffb74d; 
+                           box-shadow: 0 4px 8px rgba(255, 152, 0, 0.15); margin: 0.5rem 0;">
+                    <small><strong>Due Tomorrow + In Progress</strong><br>Amber → Purple</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #c8e6c9 50%, #fff3e0 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px dashed #ffa726; 
+                           box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 0.5rem 0;">
+                    <small><strong>Future + On Hold</strong><br>Green → Orange (dashed)</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col4:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #66bb6a; 
+                           box-shadow: 0 4px 8px rgba(76, 175, 80, 0.15); margin: 0.5rem 0;">
+                    <small><strong>Completed</strong><br>Always Light Green</small>
+                </div>
+                """, unsafe_allow_html=True)
 
             if st.button("Close Guide"):
                 st.session_state.show_color_guide = False
@@ -556,6 +640,95 @@ async def render_kanban_board(dashboard_manager):
         except Exception as e:
             st.error(f"Error creating task: {str(e)}")
             del st.session_state['pending_task_creation']
+
+    # Delete confirmation dialog
+    if st.session_state.get("show_delete_confirmation", False):
+        task_to_delete = st.session_state.get("task_to_delete")
+        if task_to_delete:
+            @st.dialog("🗑️ Confirm Task Deletion", width="medium")
+            def delete_confirmation_dialog():
+                st.warning("⚠️ **This action cannot be undone!**")
+                st.markdown(f"**Task:** {task_to_delete.title}")
+                if task_to_delete.description:
+                    st.markdown(
+                        f"**Description:** {task_to_delete.description[:100]}{'...' if len(task_to_delete.description) > 100 else ''}")
+
+                st.markdown("---")
+                st.markdown(
+                    "This will permanently delete the task and all its related data including:")
+                st.markdown("- Task notes and progress history")
+                st.markdown("- Status change history")
+                st.markdown("- All associated records")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🗑️ Delete Permanently", type="primary", use_container_width=True):
+                        # Store deletion data for the parent async context to handle
+                        st.session_state['pending_task_deletion'] = task_to_delete.id
+                        st.session_state.show_delete_confirmation = False
+                        st.session_state.task_to_delete = None
+                        st.rerun()
+                with col2:
+                    if st.button("❌ Cancel", use_container_width=True):
+                        st.session_state.show_delete_confirmation = False
+                        st.session_state.task_to_delete = None
+                        st.rerun()
+
+            delete_confirmation_dialog()
+
+    # Handle pending task deletion
+    if 'pending_task_deletion' in st.session_state and st.session_state['pending_task_deletion'] is not None:
+        task_id = st.session_state['pending_task_deletion']
+        st.info(f"Processing deletion for task {task_id}")  # Debug message
+        try:
+            with LoaderContext("Deleting task...", "inline"):
+                success = await delete_task(task_id)
+                if success:
+                    st.success("✅ Task deleted successfully!")
+                else:
+                    st.error("❌ Failed to delete task - task may not exist")
+                del st.session_state['pending_task_deletion']
+                st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error deleting task: {str(e)}")
+            del st.session_state['pending_task_deletion']
+
+    # Handle pending task archive
+    if 'pending_task_archive' in st.session_state and st.session_state['pending_task_archive'] is not None:
+        archive_data = st.session_state['pending_task_archive']
+        # Debug message
+        st.info(f"Processing archive for task {archive_data['task_id']}")
+        try:
+            with LoaderContext("Archiving task...", "inline"):
+                success = await archive_task(archive_data['task_id'], archive_data['archived_by'])
+                if success:
+                    st.success("✅ Task archived successfully!")
+                else:
+                    st.error(
+                        "❌ Failed to archive task - task may not exist or already archived")
+                del st.session_state['pending_task_archive']
+                st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error archiving task: {str(e)}")
+            del st.session_state['pending_task_archive']
+
+    # Handle pending task revive
+    if 'pending_task_revive' in st.session_state and st.session_state['pending_task_revive'] is not None:
+        task_id = st.session_state['pending_task_revive']
+        st.info(f"Processing revive for task {task_id}")  # Debug message
+        try:
+            with LoaderContext("Reviving task...", "inline"):
+                success = await revive_task(task_id)
+                if success:
+                    st.success("✅ Task revived successfully!")
+                else:
+                    st.error(
+                        "❌ Failed to revive task - task may not exist or not archived")
+                del st.session_state['pending_task_revive']
+                st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error reviving task: {str(e)}")
+            del st.session_state['pending_task_revive']
 
     # Kanban columns
     col1, col2, col3, col4 = st.columns(4)
@@ -621,57 +794,107 @@ async def render_kanban_board(dashboard_manager):
                 description_preview = (task.description[:50] + "...") if task.description and len(
                     task.description) > 50 else (task.description or "No description")
 
-                st.markdown(f"""
-                <div class="task-card {color_info['all_classes']}">
-                    <strong>{task.title}{notes_indicator}</strong><br>
-                    <small>{description_preview}</small><br>
-                    <div class="date-display created-date">📅 Created: {created_date_str}</div>
-                    <div class="date-display {due_date_class}">{due_date_display}</div>
-                    <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
-                </div>
-                """, unsafe_allow_html=True)
+                # Different styling for archived vs active tasks
+                if task_view_mode == "Archived Tasks":
+                    # Archived task card with muted styling and archive info
+                    archived_date_str = format_date_display(
+                        task.archived_at) if task.archived_at else "Unknown"
+                    st.markdown(f"""
+                    <div class="task-card archived-task {color_info['all_classes']}">
+                        <div class="archive-indicator">📦 ARCHIVED</div>
+                        <strong>{task.title}{notes_indicator}</strong><br>
+                        <small>{description_preview}</small><br>
+                        <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                        <div class="date-display archive-date">📦 Archived: {archived_date_str}</div>
+                        <div class="date-display {due_date_class}">{due_date_display}</div>
+                        <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    # Active task card with normal styling
+                    st.markdown(f"""
+                    <div class="task-card {color_info['all_classes']}">
+                        <strong>{task.title}{notes_indicator}</strong><br>
+                        <small>{description_preview}</small><br>
+                        <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                        <div class="date-display {due_date_class}">{due_date_display}</div>
+                        <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                # Task actions - All in one responsive row
-                col_edit, col_notes, col_move, col_delete = st.columns([1, 1, 2, 1])
-                with col_edit:
-                    if st.button("✏️", key=f"edit_{task.id}", help="Edit task", use_container_width=True):
-                        st.session_state[f"edit_modal_{task.id}"] = True
-                with col_notes:
-                    if st.button("📝", key=f"notes_{task.id}", help="Manage daily progress notes", use_container_width=True):
-                        st.session_state[f"show_notes_{task.id}"] = True
-                with col_move:
-                    new_status = st.selectbox(
-                        "Status:",
-                        ["todo", "inprogress", "pending", "completed"],
-                        index=["todo", "inprogress", "pending",
-                               "completed"].index(task.status),
-                        key=f"status_{task.id}",
-                        label_visibility="collapsed"
-                    )
-                    if new_status != task.status:
-                        with LoaderContext("Updating task...", "inline"):
-                            try:
-                                user = RouteProtection.get_current_user()
-                                old_status = task.status
-                                old_category = task.category
-
-                                # Update the task
-                                updated_task = await update_task(task.id, status=new_status, updated_by=user.get('id') if user else None)
-
-                                # Check if category was automatically changed
-                                if updated_task and updated_task.category != old_category:
-                                    st.success(
-                                        f"✅ Task status updated to '{new_status}' and category automatically changed from '{old_category}' to '{updated_task.category}'!")
-                                else:
-                                    st.success(
-                                        f"✅ Task status updated to '{new_status}'!")
-
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error updating task: {str(e)}")
-                with col_delete:
-                    if st.button("🗑️", key=f"delete_current_{task.id}", help="Delete this task permanently", type="secondary", use_container_width=True):
-                        st.session_state[f"pending_delete_current_{task.id}"] = True
+                # Task actions - different layouts for active vs archived tasks
+                if task_view_mode == "Active Tasks":
+                    # Active tasks: Edit, Notes, Status, Archive, Delete
+                    col_edit, col_notes, col_move, col_archive, col_delete = st.columns(
+                        5)
+                    with col_edit:
+                        if st.button("✏️", key=f"edit_{task.id}", help="Edit task"):
+                            st.session_state[f"edit_modal_{task.id}"] = True
+                    with col_notes:
+                        if st.button("📝", key=f"notes_{task.id}", help="Manage daily progress notes"):
+                            st.session_state[f"show_notes_{task.id}"] = True
+                    with col_move:
+                        new_status = st.selectbox(
+                            "Move to:",
+                            ["todo", "inprogress", "pending", "completed"],
+                            index=["todo", "inprogress", "pending",
+                                   "completed"].index(task.status),
+                            key=f"status_{task.id}",
+                            label_visibility="collapsed"
+                        )
+                        if new_status != task.status:
+                            with LoaderContext("Updating task...", "inline"):
+                                try:
+                                    user = RouteProtection.get_current_user()
+                                    await update_task(task.id, status=new_status, updated_by=user.get('id') if user else None)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error updating task: {str(e)}")
+                    with col_archive:
+                        if st.button("📦", key=f"archive_{task.id}", help="Archive task"):
+                            # Store archive data for the parent async context to handle
+                            user = RouteProtection.get_current_user()
+                            st.session_state['pending_task_archive'] = {
+                                'task_id': task.id,
+                                'archived_by': user.get('id') if user else None
+                            }
+                            # Debug message
+                            st.success(
+                                f"Archive button clicked for task {task.id}")
+                            st.rerun()
+                    with col_delete:
+                        if st.button("🗑️", key=f"delete_{task.id}", help="Delete task permanently"):
+                            st.session_state.show_delete_confirmation = True
+                            st.session_state.task_to_delete = task
+                            # Debug message
+                            st.success(
+                                f"Delete button clicked for task {task.id}")
+                            st.rerun()
+                else:
+                    # Archived tasks: Edit, Notes, Revive, Delete (no status change)
+                    col_edit, col_notes, col_revive, col_delete = st.columns(4)
+                    with col_edit:
+                        if st.button("✏️", key=f"edit_{task.id}", help="Edit task"):
+                            st.session_state[f"edit_modal_{task.id}"] = True
+                    with col_notes:
+                        if st.button("📝", key=f"notes_{task.id}", help="View progress notes"):
+                            st.session_state[f"show_notes_{task.id}"] = True
+                    with col_revive:
+                        if st.button("🔄", key=f"revive_{task.id}", help="Revive task (move back to active)"):
+                            # Store revive data for the parent async context to handle
+                            st.session_state['pending_task_revive'] = task.id
+                            # Debug message
+                            st.success(
+                                f"Revive button clicked for task {task.id}")
+                            st.rerun()
+                    with col_delete:
+                        if st.button("🗑️", key=f"delete_{task.id}", help="Delete task permanently"):
+                            st.session_state.show_delete_confirmation = True
+                            st.session_state.task_to_delete = task
+                            # Debug message
+                            st.success(
+                                f"Delete button clicked for task {task.id}")
+                            st.rerun()
 
     # Handle pending task updates
     for task in tasks:
@@ -694,20 +917,6 @@ async def render_kanban_board(dashboard_manager):
             except Exception as e:
                 st.error(f"❌ Error updating task: {str(e)}")
                 del st.session_state[f'pending_task_update_{task.id}']
-
-    # Handle delete confirmations and deletions
-    for task in tasks:
-        # Handle actual deletion
-        if st.session_state.get(f"pending_delete_current_{task.id}", False):
-            try:
-                with LoaderContext("Deleting task...", "inline"):
-                    await delete_task(task.id)
-                    st.success(f"✅ Task '{task.title}' deleted successfully!")
-                    del st.session_state[f"pending_delete_current_{task.id}"]
-                    st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error deleting task: {str(e)}")
-                del st.session_state[f"pending_delete_current_{task.id}"]
 
     # Show task modals for any tasks that have been clicked
     for task in tasks:
@@ -735,8 +944,660 @@ async def render_kanban_board(dashboard_manager):
             st.session_state[f"show_notes_{task.id}"] = False
 
 
+async def render_productivity_analytics(dashboard_manager):
+    """Render productivity analytics dashboard"""
+    st.markdown("### 📊 Productivity Analytics")
+
+    with LoaderContext("Loading analytics data...", "inline"):
+        tasks = await dashboard_manager.get_user_tasks()
+        user = RouteProtection.get_current_user()
+        stats = await get_task_statistics(user_id=user.get('id') if user else None)
+
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #667eea; margin: 0;">📋 {stats['total']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Total Tasks</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #6bcf7f; margin: 0;">✅ {stats['completed']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Completed</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #4fc3f7; margin: 0;">🔄 {stats['inprogress']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">In Progress</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #ff9800; margin: 0;">⏳ {stats['pending']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Pending</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Charts
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Task status distribution
+        status_counts = {
+            'todo': stats['todo'],
+            'inprogress': stats['inprogress'],
+            'pending': stats['pending'],
+            'completed': stats['completed']
+        }
+        status_counts = {k: v for k, v in status_counts.items() if v > 0}
+
+        if status_counts:
+            fig = px.pie(
+                values=list(status_counts.values()),
+                names=list(status_counts.keys()),
+                title="Task Status Distribution",
+                color_discrete_map={
+                    'todo': '#ffd93d',
+                    'inprogress': '#4fc3f7',
+                    'pending': '#ff9800',
+                    'completed': '#6bcf7f'
+                }
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        # Priority distribution
+        priority_counts = {
+            'low': len([t for t in tasks if t.priority == 'low']),
+            'medium': len([t for t in tasks if t.priority == 'medium']),
+            'high': len([t for t in tasks if t.priority == 'high']),
+            'urgent': len([t for t in tasks if t.priority == 'urgent'])
+        }
+        priority_counts = {k: v for k, v in priority_counts.items() if v > 0}
+
+        if priority_counts:
+            fig = px.bar(
+                x=list(priority_counts.keys()),
+                y=list(priority_counts.values()),
+                title="Task Priority Distribution",
+                color=list(priority_counts.keys()),
+                color_discrete_map={
+                    'low': '#6bcf7f',
+                    'medium': '#ffd93d',
+                    'high': '#ff6b6b',
+                    'urgent': '#d32f2f'
+                }
+            )
+            fig.update_layout(height=400, showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+
+    # Completion trend
+    st.markdown("#### 📈 Task Completion Trend")
+
+    # Generate completion data for the last 7 days
+    dates = [datetime.now() - timedelta(days=i) for i in range(6, -1, -1)]
+    completed_per_day = []
+
+    for date in dates:
+        completed_count = len([
+            task for task in tasks
+            if task.status == 'completed' and task.updated_at and task.updated_at.date() == date.date()
+        ])
+        completed_per_day.append(completed_count)
+
+    fig = px.line(
+        x=[d.strftime('%Y-%m-%d') for d in dates],
+        y=completed_per_day,
+        title="Tasks Completed (Last 7 Days)",
+        markers=True
+    )
+    fig.update_traces(line_color='#667eea', marker_color='#667eea')
+    fig.update_layout(height=300)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # User productivity summary
+    st.markdown("#### 👤 Your Productivity Summary")
+
+    if tasks:
+        user_data = {
+            'Category': ['Total Tasks', 'Completed', 'In Progress', 'Pending', 'Todo'],
+            'Count': [stats['total'], stats['completed'], stats['inprogress'], stats['pending'], stats['todo']]
+        }
+
+        fig = px.bar(
+            x=user_data['Category'],
+            y=user_data['Count'],
+            title="Your Task Overview",
+            color=user_data['Category'],
+            color_discrete_map={
+                'Total Tasks': '#667eea',
+                'Completed': '#6bcf7f',
+                'In Progress': '#4fc3f7',
+                'Pending': '#ff9800',
+                'Todo': '#ffd93d'
+            }
+        )
+        fig.update_layout(height=400, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No tasks found. Create your first task to see productivity analytics!")
+
+    # Add productivity insights section
+    st.markdown("#### 💡 Productivity Insights")
+    with LoaderContext("Analyzing productivity patterns...", "inline"):
+        insights = await get_productivity_insights(user_id=user.get('id') if user else None)
+
+    if insights['insights']:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**📈 Key Insights**")
+            for insight in insights['insights']:
+                st.info(f"• {insight}")
+
+        with col2:
+            st.markdown("**💡 Recommendations**")
+            for recommendation in insights['recommendations']:
+                st.success(f"• {recommendation}")
+
+    # Task completion trends
+    st.markdown("#### 📈 Completion Trends (Last 30 Days)")
+    with LoaderContext("Generating trend analysis...", "inline"):
+        trends = await get_task_completion_trends(user_id=user.get('id') if user else None, days=30)
+
+    if trends['daily_trends']:
+        df_trends = pd.DataFrame(trends['daily_trends'])
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=df_trends['date'],
+            y=df_trends['created'],
+            mode='lines+markers',
+            name='Tasks Created',
+            line=dict(color='#667eea')
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_trends['date'],
+            y=df_trends['completed'],
+            mode='lines+markers',
+            name='Tasks Completed',
+            line=dict(color='#6bcf7f')
+        ))
+
+        fig.update_layout(
+            title="Task Creation vs Completion Trends",
+            xaxis_title="Date",
+            yaxis_title="Number of Tasks",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
+async def render_system_monitoring(dashboard_manager):
+    """Render system monitoring dashboard"""
+    st.markdown("### 🖥️ System Monitoring")
+
+    # Get current system status with loader
+    with LoaderContext("Collecting system metrics...", "inline"):
+        system_status = await get_current_system_status()
+        system_info = await get_system_info()
+
+    # System health overview
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">💻 {system_status['cpu_usage']:.1f}%</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">CPU Usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">🧠 {system_status['memory_usage']:.1f}%</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Memory Usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">💾 {system_status['disk_usage']:.1f}%</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Disk Usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: {system_status['status_color']}; margin: 0;">❤️ {system_status['health_score']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Health Score</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # System alerts
+    st.markdown("#### 🚨 System Alerts")
+    for alert in system_status['alerts']:
+        if "Critical" in alert:
+            st.error(alert)
+        elif "Warning" in alert:
+            st.warning(alert)
+        else:
+            st.success(alert)
+
+    # Historical metrics chart
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### 📊 Resource Usage Trends")
+        with LoaderContext("Loading historical data...", "inline"):
+            historical_data = await get_historical_metrics(hours=12)
+
+        if historical_data['data']:
+            df_metrics = pd.DataFrame(historical_data['data'])
+            df_metrics['timestamp'] = pd.to_datetime(df_metrics['timestamp'])
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df_metrics['timestamp'],
+                y=df_metrics['cpu_usage'],
+                mode='lines+markers',
+                name='CPU Usage (%)',
+                line=dict(color='#667eea')
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_metrics['timestamp'],
+                y=df_metrics['memory_usage'],
+                mode='lines+markers',
+                name='Memory Usage (%)',
+                line=dict(color='#764ba2')
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_metrics['timestamp'],
+                y=df_metrics['disk_usage'],
+                mode='lines+markers',
+                name='Disk Usage (%)',
+                line=dict(color='#ff9800')
+            ))
+
+            fig.update_layout(
+                title="System Resource Usage (Last 12 Hours)",
+                xaxis_title="Time",
+                yaxis_title="Usage (%)",
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("#### ℹ️ System Information")
+        st.markdown(f"""
+        <div class="task-card">
+            <strong>System Details</strong><br>
+            <small>🔧 CPU Cores: {system_info['cpu_cores']}</small><br>
+            <small>⚡ CPU Frequency: {system_info['cpu_frequency']}</small><br>
+            <small>🧠 Total Memory: {system_info['total_memory']}</small><br>
+            <small>💾 Total Disk: {system_info['total_disk']}</small><br>
+            <small>⏱️ Uptime: {system_info['system_uptime']}</small><br>
+            <small>🐍 Platform: {system_info['platform']}</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+async def render_archived_tasks(dashboard_manager):
+    """Render archived tasks (older than current month)"""
+    st.markdown("### 📦 Archived Tasks")
+    st.markdown("*Tasks created before the current month*")
+
+    # Get archived tasks with loader
+    with LoaderContext("Loading archived tasks...", "inline"):
+        archived_tasks = await dashboard_manager.get_archived_user_tasks()
+
+        # Get notes counts for all archived tasks
+        archived_notes_counts = await dashboard_manager.get_task_notes_counts(archived_tasks)
+
+    if not archived_tasks:
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem 2rem;
+                   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                   border-radius: 20px; margin: 2rem 0; border: 2px dashed #dee2e6;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📦</div>
+            <h3 style="color: #666; margin-bottom: 1rem;">No Archived Tasks</h3>
+            <p style="color: #888; margin-bottom: 2rem; font-size: 1.1rem;">
+                Tasks created before this month will appear here.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # Show archived task statistics
+    col1, col2, col3, col4 = st.columns(4)
+
+    archived_stats = {
+        'total': len(archived_tasks),
+        'completed': len([t for t in archived_tasks if t.status == 'completed']),
+        'inprogress': len([t for t in archived_tasks if t.status == 'inprogress']),
+        'pending': len([t for t in archived_tasks if t.status == 'pending'])
+    }
+
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #667eea; margin: 0;">📋 {archived_stats['total']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Total Archived</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #6bcf7f; margin: 0;">✅ {archived_stats['completed']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Completed</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #4fc3f7; margin: 0;">🔄 {archived_stats['inprogress']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">In Progress</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <h3 style="color: #ff9800; margin: 0;">⏳ {archived_stats['pending']}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: #666;">Pending</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Archived Kanban columns
+    st.markdown("#### 📋 Archived Kanban Board")
+    col1, col2, col3, col4 = st.columns(4)
+
+    columns = {
+        "todo": ("📝 To Do", col1),
+        "inprogress": ("🔄 In Progress", col2),
+        "pending": ("⏳ Pending", col3),
+        "completed": ("✅ Completed", col4)
+    }
+
+    for status, (title, column) in columns.items():
+        with column:
+            st.markdown(f"**{title}**")
+            status_tasks = [
+                task for task in archived_tasks if task.status == status]
+
+            for task in status_tasks:
+                # Get color information based on due date, status, and priority
+                color_info = get_combined_task_color(
+                    task.due_date, task.status, task.priority)
+
+                # Check if task has notes
+                notes_count = archived_notes_counts.get(task.id, 0)
+                notes_indicator = f" 📝({notes_count})" if notes_count > 0 else ""
+
+                # Format dates for display
+                created_date_str = format_date_display(task.created_at)
+
+                # For completed tasks, show completion date instead of due date
+                if task.status == "completed":
+                    completion_date_str = get_completion_date_display(
+                        task.status, task.updated_at)
+                    due_date_display = completion_date_str
+                    due_date_class = "completion-date"
+                else:
+                    # For non-completed tasks, show due date with context
+                    due_date_str = format_date_display(
+                        task.due_date) if task.due_date else "No due date"
+
+                    # Get days until due for additional context
+                    days_until_due = get_days_until_due(task.due_date)
+                    due_context = ""
+                    if days_until_due is not None:
+                        if days_until_due < 0:
+                            due_context = f" (Overdue by {abs(days_until_due)} day(s))"
+                        elif days_until_due == 0:
+                            due_context = " (Due today!)"
+                        elif days_until_due == 1:
+                            due_context = " (Due tomorrow)"
+                        elif days_until_due <= 7:
+                            due_context = f" (Due in {days_until_due} day(s))"
+
+                    due_date_display = f"⏰ Due: {due_date_str}{due_context}"
+
+                    # Determine due date text color
+                    due_date_class = ""
+                    if days_until_due is not None:
+                        if days_until_due <= 0:
+                            due_date_class = "due-date-urgent"
+                        elif days_until_due <= 1:
+                            due_date_class = "due-date-warning"
+
+                description_preview = (task.description[:50] + "...") if task.description and len(
+                    task.description) > 50 else (task.description or "No description")
+
+                st.markdown(f"""
+                <div class="task-card {color_info['all_classes']}" style="opacity: 0.8;">
+                    <strong>{task.title}{notes_indicator}</strong><br>
+                    <small>{description_preview}</small><br>
+                    <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                    <div class="date-display {due_date_class}">{due_date_display}</div>
+                    <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Actions for archived tasks
+                col_edit, col_notes = st.columns(2)
+                with col_edit:
+                    if st.button("✏️ Edit", key=f"edit_archived_{task.id}", help="Edit archived task"):
+                        st.session_state[f"edit_modal_{task.id}"] = True
+                with col_notes:
+                    if st.button("📝 Notes", key=f"notes_archived_{task.id}", help="View progress notes"):
+                        st.session_state[f"show_notes_{task.id}"] = True
+
+    # Handle pending task updates for archived tasks
+    for task in archived_tasks:
+        if f'pending_task_update_{task.id}' in st.session_state:
+            update_data = st.session_state[f'pending_task_update_{task.id}']
+            try:
+                with LoaderContext("Updating task...", "inline"):
+                    await update_task(
+                        update_data['task_id'],
+                        title=update_data['title'],
+                        description=update_data['description'],
+                        status=update_data['status'],
+                        priority=update_data['priority'],
+                        category=update_data['category'],
+                        due_date=update_data['due_date']
+                    )
+                    st.success("✅ Task updated successfully!")
+                    del st.session_state[f'pending_task_update_{task.id}']
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error updating task: {str(e)}")
+                del st.session_state[f'pending_task_update_{task.id}']
+
+    # Show task modals for any archived tasks that have been clicked
+    for task in archived_tasks:
+        if st.session_state.get(f"edit_modal_{task.id}", False):
+            show_edit_task_modal(task)
+
+        # Handle notes modal for archived tasks
+        if st.session_state.get(f"show_notes_{task.id}", False):
+            # Load notes, issue, and resolution for this task
+            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
+
+            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
+            task_issue = await get_task_issue(task.id)
+            task_resolution = await get_task_resolution(task.id)
+
+            st.session_state[f'task_notes_{task.id}'] = task_notes
+            st.session_state[f'task_issue_{task.id}'] = task_issue
+            st.session_state[f'task_resolution_{task.id}'] = task_resolution
+
+            # Handle pending operations
+            await dashboard_manager.handle_notes_operations(task.id)
+
+            from app.ui.components.task_notes_modal import show_task_notes_modal
+            show_task_notes_modal(task)
+            st.session_state[f"show_notes_{task.id}"] = False
+
+
+async def render_archived_tasks(dashboard_manager):
+    """Render the archived tasks interface"""
+    st.markdown("### 📦 Archived Tasks")
+    st.markdown(
+        "View and manage tasks that have been archived. You can revive them back to active status or permanently delete them.")
+
+    # Get archived tasks
+    with LoaderContext("Loading archived tasks...", "inline"):
+        archived_tasks = await dashboard_manager.get_archived_user_tasks()
+        # Get notes counts for all archived tasks
+        notes_counts = await dashboard_manager.get_task_notes_counts(archived_tasks)
+
+    if not archived_tasks:
+        st.info("📭 No archived tasks found. Tasks that are archived will appear here.")
+        return
+
+    st.markdown(f"**Found {len(archived_tasks)} archived tasks**")
+
+    # Display archived tasks in a grid layout
+    for i, task in enumerate(archived_tasks):
+        # Create a container for each task
+        with st.container():
+            # Get color information (archived tasks will have muted colors)
+            color_info = get_combined_task_color(
+                task.due_date, task.status, task.priority)
+
+            # Check if task has notes
+            notes_count = notes_counts.get(task.id, 0)
+            notes_indicator = f" 📝({notes_count})" if notes_count > 0 else ""
+
+            # Format dates for display
+            created_date_str = format_date_display(task.created_at)
+            archived_date_str = format_date_display(
+                task.archived_at) if task.archived_at else "Unknown"
+
+            # Due date display
+            if task.status == "completed":
+                completion_date_str = get_completion_date_display(
+                    task.status, task.updated_at)
+                due_date_display = completion_date_str
+                due_date_class = "completion-date"
+            else:
+                due_date_str = format_date_display(
+                    task.due_date) if task.due_date else "No due date"
+                days_until_due = get_days_until_due(task.due_date)
+                due_context = ""
+                if days_until_due is not None:
+                    if days_until_due < 0:
+                        due_context = f" (Was overdue by {abs(days_until_due)} day(s))"
+                    elif days_until_due == 0:
+                        due_context = " (Was due today)"
+                    elif days_until_due == 1:
+                        due_context = " (Was due tomorrow)"
+                    elif days_until_due <= 7:
+                        due_context = f" (Was due in {days_until_due} day(s))"
+
+                due_date_display = f"⏰ Due: {due_date_str}{due_context}"
+                due_date_class = ""
+
+            description_preview = (task.description[:100] + "...") if task.description and len(
+                task.description) > 100 else (task.description or "No description")
+
+            # Archived task card with special styling
+            st.markdown(f"""
+            <div class="task-card archived-task {color_info['all_classes']}">
+                <div class="archive-indicator">📦 ARCHIVED</div>
+                <strong>{task.title}{notes_indicator}</strong><br>
+                <small>{description_preview}</small><br>
+                <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                <div class="date-display archive-date">📦 Archived: {archived_date_str}</div>
+                <div class="date-display {due_date_class}">{due_date_display}</div>
+                <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Action buttons for archived tasks
+            col1, col2, col3, col4, col5 = st.columns(5)
+
+            with col1:
+                if st.button("✏️", key=f"archived_edit_{task.id}", help="Edit task"):
+                    st.session_state[f"edit_modal_{task.id}"] = True
+
+            with col2:
+                if st.button("📝", key=f"archived_notes_{task.id}", help="View progress notes"):
+                    st.session_state[f"show_notes_{task.id}"] = True
+
+            with col3:
+                if st.button("🔄", key=f"archived_revive_{task.id}", help="Revive task (move back to active)"):
+                    st.session_state['pending_task_revive'] = task.id
+                    st.success(f"Revive button clicked for task {task.id}")
+                    st.rerun()
+
+            with col4:
+                if st.button("🗑️", key=f"archived_delete_{task.id}", help="Delete task permanently"):
+                    st.session_state.show_delete_confirmation = True
+                    st.session_state.task_to_delete = task
+                    st.success(f"Delete button clicked for task {task.id}")
+                    st.rerun()
+
+            with col5:
+                # Show task status for reference
+                status_colors = {
+                    "todo": "🔵",
+                    "inprogress": "🟣",
+                    "pending": "🟠",
+                    "completed": "🟢"
+                }
+                st.markdown(
+                    f"{status_colors.get(task.status, '⚪')} {task.status.title()}")
+
+            st.markdown("---")  # Separator between tasks
+
+    # Handle task modals for archived tasks
+    for task in archived_tasks:
+        if st.session_state.get(f"edit_modal_{task.id}", False):
+            show_edit_task_modal(task)
+
+        # Handle notes modal for archived tasks
+        if st.session_state.get(f"show_notes_{task.id}", False):
+            # Load notes, issue, and resolution for this task
+            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
+
+            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
+            task_issue = await get_task_issue(task.id)
+            task_resolution = await get_task_resolution(task.id)
+
+            st.session_state[f'task_notes_{task.id}'] = task_notes
+            st.session_state[f'task_issue_{task.id}'] = task_issue
+            st.session_state[f'task_resolution_{task.id}'] = task_resolution
+
+            # Handle pending operations
+            await dashboard_manager.handle_notes_operations(task.id)
+
+            from app.ui.components.task_notes_modal import show_task_notes_modal
+            show_task_notes_modal(task)
+            st.session_state[f"show_notes_{task.id}"] = False
+
+
 def dashboard(go_to_page):
-    """Main dashboard function with responsive design"""
+    """Main dashboard function"""
     apply_custom_css()
 
     navbar(go_to_page, "dashboard")
@@ -761,8 +1622,61 @@ def dashboard(go_to_page):
     with tab1:
         asyncio.run(render_kanban_board(dashboard_manager))
 
-    # Note: Other tabs would be implemented similarly with responsive design
-    # For now, focusing on the Kanban board as requested
+    with tab2:
+        asyncio.run(render_productivity_analytics(dashboard_manager))
+
+    with tab3:
+        asyncio.run(render_system_monitoring(dashboard_manager))
+
+    with tab4:
+        asyncio.run(render_task_analysis(dashboard_manager))
+
+    with tab5:
+        asyncio.run(render_archived_tasks(dashboard_manager))
+
+
+if __name__ == "__main__":
+    # For standalone testing
+    dashboard()
+
+
+def dashboard(go_to_page):
+    """Main dashboard function"""
+    apply_custom_css()
+
+    navbar(go_to_page, "dashboard")
+
+    # Header
+    st.markdown("""
+    <div class="main-header">
+        <h1 style="margin: 0; font-size: 2.5rem;">📊 AutoReportSystem Dashboard</h1>
+        <p style="margin: 0.5rem 0 0 0; font-size: 1.1rem; opacity: 0.9;">
+            Comprehensive project management and system monitoring
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Initialize dashboard manager
+    dashboard_manager = DashboardManager()
+
+    # Tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor", "📈 Task Analysis", "📦 Archive"])
+
+    with tab1:
+        asyncio.run(render_kanban_board(dashboard_manager))
+
+    with tab2:
+        asyncio.run(render_productivity_analytics(dashboard_manager))
+
+    with tab3:
+        asyncio.run(render_system_monitoring(dashboard_manager))
+
+    with tab4:
+        asyncio.run(render_task_analysis(dashboard_manager))
+
+    with tab5:
+        asyncio.run(render_archived_tasks(dashboard_manager))
 
 
 if __name__ == "__main__":

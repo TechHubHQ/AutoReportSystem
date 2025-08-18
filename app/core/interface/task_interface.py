@@ -56,10 +56,10 @@ async def create_task(title: str, description: str = "", status: str = "todo",
 
 
 async def get_tasks(user_id: Optional[int] = None) -> List[Task]:
-    """Get all tasks, optionally filtered by user"""
+    """Get all active (non-archived) tasks, optionally filtered by user"""
     try:
         db = await get_db()
-        query = select(Task)
+        query = select(Task).where(Task.is_archived == False)
         if user_id:
             query = query.where(Task.created_by == user_id)
         query = query.order_by(Task.created_at.desc())
@@ -75,10 +75,11 @@ async def get_tasks(user_id: Optional[int] = None) -> List[Task]:
 
 
 async def get_tasks_by_status(status: str, user_id: Optional[int] = None) -> List[Task]:
-    """Get tasks filtered by status"""
+    """Get active (non-archived) tasks filtered by status"""
     try:
         db = await get_db()
-        query = select(Task).where(Task.status == status)
+        query = select(Task).where(
+            Task.status == status, Task.is_archived == False)
         if user_id:
             query = query.where(Task.created_by == user_id)
         query = query.order_by(Task.created_at.desc())
@@ -94,10 +95,11 @@ async def get_tasks_by_status(status: str, user_id: Optional[int] = None) -> Lis
 
 
 async def get_tasks_by_category(category: str, user_id: Optional[int] = None) -> List[Task]:
-    """Get tasks filtered by category"""
+    """Get active (non-archived) tasks filtered by category"""
     try:
         db = await get_db()
-        query = select(Task).where(Task.category == category)
+        query = select(Task).where(Task.category ==
+                                   category, Task.is_archived == False)
         if user_id:
             query = query.where(Task.created_by == user_id)
         query = query.order_by(Task.created_at.desc())
@@ -234,40 +236,138 @@ async def delete_task(task_id: int):
     """Delete a task and all its related records"""
     try:
         db = await get_db()
-        
+
         # First, get the task to ensure it exists
         task_result = await db.execute(select(Task).where(Task.id == task_id))
         task = task_result.scalar_one_or_none()
-        
+
         if not task:
             logger.warning(f"Task {task_id} not found for deletion")
             return False
-        
-        logger.info(f"Deleting task {task_id}: '{task.title}' and all related records")
-        
+
+        logger.info(
+            f"Deleting task {task_id}: '{task.title}' and all related records")
+
         # Delete related records first to avoid foreign key constraint violations
         # Delete task status history
         status_history_result = await db.execute(delete(TaskStatusHistory).where(TaskStatusHistory.task_id == task_id))
-        logger.info(f"Deleted {status_history_result.rowcount} status history records for task {task_id}")
-        
+        logger.info(
+            f"Deleted {status_history_result.rowcount} status history records for task {task_id}")
+
         # Delete task notes
         notes_result = await db.execute(delete(TaskNote).where(TaskNote.task_id == task_id))
-        logger.info(f"Deleted {notes_result.rowcount} note records for task {task_id}")
-        
+        logger.info(
+            f"Deleted {notes_result.rowcount} note records for task {task_id}")
+
         # Now delete the task itself
         task_delete_result = await db.execute(delete(Task).where(Task.id == task_id))
-        
+
         if task_delete_result.rowcount == 0:
             logger.warning(f"No task was deleted for task_id {task_id}")
             await db.rollback()
             return False
-        
+
         await db.commit()
-        logger.info(f"Successfully deleted task {task_id} and all related records")
+        logger.info(
+            f"Successfully deleted task {task_id} and all related records")
         return True
-        
+
     except Exception as e:
         logger.error(f"Error while deleting task {task_id}: {e}")
+        await db.rollback()
+        raise e
+    finally:
+        await db.close()
+
+
+async def archive_task(task_id: int, archived_by: int) -> bool:
+    """Archive a task by setting archive flags"""
+    try:
+        db = await get_db()
+
+        # First, get the task to ensure it exists
+        task_result = await db.execute(select(Task).where(Task.id == task_id))
+        task = task_result.scalar_one_or_none()
+
+        if not task:
+            logger.warning(f"Task {task_id} not found for archiving")
+            return False
+
+        if task.is_archived:
+            logger.warning(f"Task {task_id} is already archived")
+            return False
+
+        logger.info(f"Archiving task {task_id}: '{task.title}'")
+
+        # Update task with archive information
+        update_data = {
+            'is_archived': True,
+            'archived_at': get_current_utc_datetime(),
+            'archived_by': archived_by,
+            'updated_at': get_current_utc_datetime()
+        }
+
+        query = update(Task).where(Task.id == task_id).values(**update_data)
+        result = await db.execute(query)
+
+        if result.rowcount == 0:
+            logger.warning(f"No task was archived for task_id {task_id}")
+            await db.rollback()
+            return False
+
+        await db.commit()
+        logger.info(f"Successfully archived task {task_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error while archiving task {task_id}: {e}")
+        await db.rollback()
+        raise e
+    finally:
+        await db.close()
+
+
+async def revive_task(task_id: int) -> bool:
+    """Revive an archived task by clearing archive flags"""
+    try:
+        db = await get_db()
+
+        # First, get the task to ensure it exists
+        task_result = await db.execute(select(Task).where(Task.id == task_id))
+        task = task_result.scalar_one_or_none()
+
+        if not task:
+            logger.warning(f"Task {task_id} not found for revival")
+            return False
+
+        if not task.is_archived:
+            logger.warning(f"Task {task_id} is not archived, cannot revive")
+            return False
+
+        logger.info(f"Reviving task {task_id}: '{task.title}'")
+
+        # Update task to clear archive information
+        update_data = {
+            'is_archived': False,
+            'archived_at': None,
+            'archived_by': None,
+            'updated_at': get_current_utc_datetime()
+        }
+
+        query = update(Task).where(Task.id == task_id).values(**update_data)
+        result = await db.execute(query)
+
+        if result.rowcount == 0:
+            logger.warning(f"No task was revived for task_id {task_id}")
+            await db.rollback()
+            return False
+
+        await db.commit()
+        logger.info(f"Successfully revived task {task_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error while reviving task {task_id}: {e}")
         await db.rollback()
         raise e
     finally:
@@ -368,7 +468,7 @@ async def get_monthly_tasks(user_id: Optional[int] = None):
 
 
 async def get_current_month_tasks(user_id: Optional[int] = None) -> List[Task]:
-    """Get tasks for the current month only (for kanban board)"""
+    """Get active (non-archived) tasks for the current month only (for kanban board)"""
     try:
         db = await get_db()
         # Use UTC for database comparison
@@ -391,7 +491,8 @@ async def get_current_month_tasks(user_id: Optional[int] = None) -> List[Task]:
 
         query = select(Task).where(
             Task.created_at >= start_naive,
-            Task.created_at <= end_naive
+            Task.created_at <= end_naive,
+            Task.is_archived == False
         )
         if user_id:
             query = query.where(Task.created_by == user_id)
@@ -408,22 +509,14 @@ async def get_current_month_tasks(user_id: Optional[int] = None) -> List[Task]:
 
 
 async def get_archived_tasks(user_id: Optional[int] = None) -> List[Task]:
-    """Get tasks older than the current month (archived tasks)"""
+    """Get archived tasks"""
     try:
         db = await get_db()
-        # Use UTC for database comparison
-        today = datetime.now(timezone.utc)
-        # Get the first day of the current month
-        start_of_month = today.replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        # Convert to naive datetime for database comparison
-        start_naive = start_of_month.replace(tzinfo=None)
-
-        query = select(Task).where(Task.created_at < start_naive)
+        query = select(Task).where(Task.is_archived == True)
         if user_id:
             query = query.where(Task.created_by == user_id)
-        query = query.order_by(Task.created_at.desc())
+        query = query.order_by(Task.archived_at.desc())
 
         result = await db.execute(query)
         tasks = result.scalars().all()
@@ -436,16 +529,16 @@ async def get_archived_tasks(user_id: Optional[int] = None) -> List[Task]:
 
 
 async def get_task_statistics(user_id: Optional[int] = None):
-    """Get task statistics for dashboard"""
+    """Get task statistics for dashboard (active tasks only)"""
     try:
         db = await get_db()
 
-        # Base query
-        base_query = select(Task)
+        # Base query - only active (non-archived) tasks
+        base_query = select(Task).where(Task.is_archived == False)
         if user_id:
             base_query = base_query.where(Task.created_by == user_id)
 
-        # Get all tasks
+        # Get all active tasks
         result = await db.execute(base_query)
         all_tasks = result.scalars().all()
 

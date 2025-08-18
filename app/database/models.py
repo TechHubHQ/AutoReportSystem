@@ -59,10 +59,12 @@ class Task(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Many-to-one: Task → User
-    creator = relationship("User", foreign_keys=[created_by], back_populates="tasks")
-    
+    creator = relationship("User", foreign_keys=[
+                           created_by], back_populates="tasks")
+
     # Many-to-one: Task → User (who archived it)
-    archiver = relationship("User", foreign_keys=[archived_by], backref="archived_tasks")
+    archiver = relationship("User", foreign_keys=[
+                            archived_by], backref="archived_tasks")
 
     # One-to-many: Task → TaskStatusHistory
     status_history = relationship("TaskStatusHistory", back_populates="task",
