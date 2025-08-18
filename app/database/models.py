@@ -48,6 +48,10 @@ class Task(Base):
     # accomplishments, in progress
     category = Column(String, default="in progress", nullable=False)
     due_date = Column(DateTime(timezone=True), nullable=True)
+    # Archive functionality
+    is_archived = Column(Boolean, default=False, nullable=False)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    archived_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True),
@@ -56,6 +60,9 @@ class Task(Base):
 
     # Many-to-one: Task → User
     creator = relationship("User", back_populates="tasks")
+    
+    # Many-to-one: Task → User (who archived it)
+    archiver = relationship("User", foreign_keys=[archived_by], backref="archived_tasks")
 
     # One-to-many: Task → TaskStatusHistory
     status_history = relationship("TaskStatusHistory", back_populates="task",

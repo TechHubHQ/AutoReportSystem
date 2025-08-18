@@ -1,6 +1,6 @@
-"""Add job tracking tables (fixed)
+"""Add job tracking tables
 
-Revision ID: 20241224_add_job_tracking_fixed
+Revision ID: 20241224_add_job_tracking
 Revises: add_task_notes
 Create Date: 2024-12-24 14:00:00.000000
 
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '20241224_add_job_tracking_fixed'
+revision = '20241224_add_job_tracking'
 down_revision = 'add_task_notes'
 branch_labels = None
 depends_on = None
