@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from sqlalchemy import select, update, delete
 from app.database.db_connector import get_db
-from app.database.models import Task, TaskStatusHistory
+from app.database.models import Task, TaskStatusHistory, TaskNote
 from app.core.utils.datetime_utils import (
     ensure_timezone_aware, get_current_utc_datetime, safe_datetime_compare
 )
@@ -231,15 +231,43 @@ async def update_task(task_id: int, title: str = None, description: str = None,
 
 
 async def delete_task(task_id: int):
-    """Delete a task"""
+    """Delete a task and all its related records"""
     try:
         db = await get_db()
-        query = delete(Task).where(Task.id == task_id)
-        await db.execute(query)
+        
+        # First, get the task to ensure it exists
+        task_result = await db.execute(select(Task).where(Task.id == task_id))
+        task = task_result.scalar_one_or_none()
+        
+        if not task:
+            logger.warning(f"Task {task_id} not found for deletion")
+            return False
+        
+        logger.info(f"Deleting task {task_id}: '{task.title}' and all related records")
+        
+        # Delete related records first to avoid foreign key constraint violations
+        # Delete task status history
+        status_history_result = await db.execute(delete(TaskStatusHistory).where(TaskStatusHistory.task_id == task_id))
+        logger.info(f"Deleted {status_history_result.rowcount} status history records for task {task_id}")
+        
+        # Delete task notes
+        notes_result = await db.execute(delete(TaskNote).where(TaskNote.task_id == task_id))
+        logger.info(f"Deleted {notes_result.rowcount} note records for task {task_id}")
+        
+        # Now delete the task itself
+        task_delete_result = await db.execute(delete(Task).where(Task.id == task_id))
+        
+        if task_delete_result.rowcount == 0:
+            logger.warning(f"No task was deleted for task_id {task_id}")
+            await db.rollback()
+            return False
+        
         await db.commit()
+        logger.info(f"Successfully deleted task {task_id} and all related records")
         return True
+        
     except Exception as e:
-        logger.error(f"Error while deleting task: {e}")
+        logger.error(f"Error while deleting task {task_id}: {e}")
         await db.rollback()
         raise e
     finally:
