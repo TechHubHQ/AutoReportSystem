@@ -6,6 +6,10 @@ from app.database.models import Task, TaskStatusHistory
 from app.core.utils.datetime_utils import (
     ensure_timezone_aware, get_current_utc_datetime, safe_datetime_compare
 )
+from app.core.utils.task_automation_utils import (
+    should_auto_categorize_to_accomplishments, should_auto_categorize_to_in_progress,
+    log_automatic_category_change, TaskAutomationNotifier
+)
 from app.config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -29,7 +33,7 @@ async def create_task(title: str, description: str = "", status: str = "todo",
         db.add(new_task)
         await db.commit()
         await db.refresh(new_task)
-        
+
         # Log initial status in history
         status_history = TaskStatusHistory(
             task_id=new_task.id,
@@ -41,7 +45,7 @@ async def create_task(title: str, description: str = "", status: str = "todo",
         )
         db.add(status_history)
         await db.commit()
-        
+
         return new_task
     except Exception as e:
         logger.error(f"Error while creating new task: {e}")
@@ -128,7 +132,7 @@ async def update_task(task_id: int, title: str = None, description: str = None,
     """Update an existing task"""
     try:
         db = await get_db()
-        
+
         # Get current task to compare status/category changes
         current_task_result = await db.execute(select(Task).where(Task.id == task_id))
         current_task = current_task_result.scalar_one_or_none()
@@ -150,16 +154,38 @@ async def update_task(task_id: int, title: str = None, description: str = None,
         if due_date is not None:
             update_data['due_date'] = due_date
 
+        # AUTOMATIC CATEGORY CHANGES:
+        auto_category_changed = False
+
+        # 1. If status is being changed to "completed", automatically set category to "accomplishments"
+        if should_auto_categorize_to_accomplishments(current_task.status, status):
+            update_data['category'] = "accomplishments"
+            category = "accomplishments"  # Update the local variable for logging
+            auto_category_changed = True
+            log_automatic_category_change(
+                task_id, current_task.category, "accomplishments", "completed", updated_by
+            )
+
+        # 2. If status is being changed from "completed" to any other status,
+        # automatically set category back to "in progress"
+        elif should_auto_categorize_to_in_progress(current_task.status, status):
+            update_data['category'] = "in progress"
+            category = "in progress"  # Update the local variable for logging
+            auto_category_changed = True
+            log_automatic_category_change(
+                task_id, current_task.category, "in progress", status, updated_by
+            )
+
         update_data['updated_at'] = get_current_utc_datetime()
 
         # Check if status or category changed
         status_changed = status is not None and status != current_task.status
         category_changed = category is not None and category != current_task.category
-        
+
         # Update the task
         query = update(Task).where(Task.id == task_id).values(**update_data)
         await db.execute(query)
-        
+
         # Log status/category changes if they occurred
         if (status_changed or category_changed) and updated_by is not None:
             status_history = TaskStatusHistory(
@@ -171,8 +197,15 @@ async def update_task(task_id: int, title: str = None, description: str = None,
                 changed_by=updated_by
             )
             db.add(status_history)
-        
+
         await db.commit()
+
+        # Send notification for automatic category changes
+        if auto_category_changed:
+            TaskAutomationNotifier.notify_category_change(
+                task_id, current_task.title, current_task.category,
+                category, updated_by
+            )
 
         # Return updated task
         return await get_task(task_id)
@@ -342,7 +375,7 @@ async def get_archived_tasks(user_id: Optional[int] = None) -> List[Task]:
         # Get the first day of the current month
         start_of_month = today.replace(
             day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
         # Convert to naive datetime for database comparison
         start_naive = start_of_month.replace(tzinfo=None)
 
@@ -397,45 +430,46 @@ async def get_task_statistics(user_id: Optional[int] = None):
         await db.close()
 
 
-async def get_tasks_with_status_changes(user_id: Optional[int] = None, 
-                                       from_date: datetime = None, 
-                                       to_date: datetime = None,
-                                       old_status: str = None,
-                                       new_status: str = None,
-                                       old_category: str = None,
-                                       new_category: str = None) -> List[Task]:
+async def get_tasks_with_status_changes(user_id: Optional[int] = None,
+                                        from_date: datetime = None,
+                                        to_date: datetime = None,
+                                        old_status: str = None,
+                                        new_status: str = None,
+                                        old_category: str = None,
+                                        new_category: str = None) -> List[Task]:
     """Get tasks that had specific status/category changes within a date range"""
     try:
         db = await get_db()
-        
+
         # Build query to find tasks with status changes
-        query = select(Task).join(TaskStatusHistory, Task.id == TaskStatusHistory.task_id)
-        
+        query = select(Task).join(TaskStatusHistory,
+                                  Task.id == TaskStatusHistory.task_id)
+
         # Filter by user if provided
         if user_id:
             query = query.where(Task.created_by == user_id)
-        
+
         # Filter by date range if provided
         if from_date:
             query = query.where(TaskStatusHistory.changed_at >= from_date)
         if to_date:
             query = query.where(TaskStatusHistory.changed_at <= to_date)
-        
+
         # Filter by status changes if provided
         if old_status:
             query = query.where(TaskStatusHistory.old_status == old_status)
         if new_status:
             query = query.where(TaskStatusHistory.new_status == new_status)
-        
+
         # Filter by category changes if provided
         if old_category:
             query = query.where(TaskStatusHistory.old_category == old_category)
         if new_category:
             query = query.where(TaskStatusHistory.new_category == new_category)
-        
+
         # Distinct tasks (avoid duplicates if multiple status changes)
         query = query.distinct()
-        
+
         result = await db.execute(query)
         tasks = result.scalars().all()
         return tasks
@@ -451,18 +485,21 @@ async def get_tasks_for_weekly_report_enhanced(user_id: Optional[int] = None):
     try:
         # Get current week tasks (created this week)
         current_week_tasks = await get_weekly_tasks(user_id)
-        
+
         # Get date ranges for last week and this week
         today = datetime.now(timezone.utc)
         # Current week: Monday to Sunday
         start_of_week = today - timedelta(days=today.weekday())
-        start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_week = start_of_week + timedelta(days=6, hours=23, minutes=59, seconds=59, microseconds=999999)
-        
+        start_of_week = start_of_week.replace(
+            hour=0, minute=0, second=0, microsecond=0)
+        end_of_week = start_of_week + \
+            timedelta(days=6, hours=23, minutes=59,
+                      seconds=59, microseconds=999999)
+
         # Last week: Previous Monday to Sunday
         start_of_last_week = start_of_week - timedelta(days=7)
         end_of_last_week = start_of_week - timedelta(microseconds=1)
-        
+
         # Get tasks that changed from "in progress" to "accomplishments" between last week and this week
         status_changed_tasks = await get_tasks_with_status_changes(
             user_id=user_id,
@@ -471,17 +508,19 @@ async def get_tasks_for_weekly_report_enhanced(user_id: Optional[int] = None):
             old_category="in progress",
             new_category="accomplishments"
         )
-        
+
         # Categorize current week tasks
-        accomplishments = [task for task in current_week_tasks if task.category == "accomplishments"]
-        in_progress = [task for task in current_week_tasks if task.category == "in progress"]
-        
+        accomplishments = [
+            task for task in current_week_tasks if task.category == "accomplishments"]
+        in_progress = [
+            task for task in current_week_tasks if task.category == "in progress"]
+
         # Add tasks that changed from in progress to accomplishments
         # These should appear in accomplishments for this week's report
         for task in status_changed_tasks:
             if task.category == "accomplishments" and task not in accomplishments:
                 accomplishments.append(task)
-        
+
         return {
             'accomplishments': accomplishments,
             'in_progress': in_progress,

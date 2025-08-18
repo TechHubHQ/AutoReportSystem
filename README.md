@@ -28,6 +28,7 @@ A comprehensive task management and automated reporting platform built with mode
 
 - **Interactive Kanban Board** with drag-and-drop functionality
 - **Smart Color Coding** for status, priority, and due date urgency
+- **Automatic Task Categorization** - completed tasks automatically move to accomplishments
 - **Task Analytics** with productivity insights and trends
 - **Archive System** for historical task management
 - **Real-time Updates** with live dashboard metrics

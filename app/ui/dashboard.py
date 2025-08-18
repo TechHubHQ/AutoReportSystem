@@ -21,6 +21,7 @@ from app.core.utils.task_color_utils import (
     get_combined_task_color, format_date_display, get_days_until_due, get_completion_date_display
 )
 from app.ui.components.task_modal import show_edit_task_modal
+from app.ui.components.automation_notifications import show_automation_notifications, show_automation_summary_card
 from app.ui.dashboard_task_analysis import render_task_analysis
 
 
@@ -1253,6 +1254,10 @@ def dashboard(go_to_page):
 
     # Initialize dashboard manager
     dashboard_manager = DashboardManager()
+
+    # Show automation summary and notifications
+    show_automation_summary_card()
+    show_automation_notifications()
 
     # Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
