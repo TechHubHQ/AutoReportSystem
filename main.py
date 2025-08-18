@@ -21,7 +21,7 @@ setup_logging()
 logger = get_logger(__name__)
 
 st.set_page_config(
-    page_title="Automate Report System",
+    page_title="Auto Report System",
     page_icon="ars.ico",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -149,7 +149,7 @@ if st.session_state.page == "home":
     # Enhanced home page layout
     st.markdown("""
     <div class="home-container">
-        <h1 class="home-title">🏠 Automate Report System</h1>
+        <h1 class="home-title">🏠 Auto Report System</h1>
         <p class="home-subtitle">Streamline your reporting workflow with intelligent automation</p>
     </div>
     """, unsafe_allow_html=True)

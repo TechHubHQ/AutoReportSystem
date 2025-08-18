@@ -60,7 +60,7 @@ def navbar(go_to_page, current_page="dashboard"):
         st.markdown("""
         <div class="nav-header">
             <h3>📊 ARS</h3>
-            <p style="margin: 0; font-size: 0.9em;">Automate Report System</p>
+            <p style="margin: 0; font-size: 0.9em;">Auto Report System</p>
         </div>
         """, unsafe_allow_html=True)
 

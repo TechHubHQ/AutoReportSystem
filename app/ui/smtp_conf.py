@@ -286,7 +286,7 @@ def smtp_conf(go_to_page):
                     </li>
                     <li><strong>Create App Password:</strong>
                         <ul>
-                            <li>Enter "Automate Report System" in the app name field</li>
+                            <li>Enter "Auto Report System" in the app name field</li>
                             <li>Click "Create" to generate a 16-character password</li>
                         </ul>
                     </li>
@@ -330,7 +330,7 @@ def smtp_conf(go_to_page):
                         <ul>
                             <li>In Security settings, find "App passwords"</li>
                             <li>Click "Create a new app password"</li>
-                            <li>Enter "Automate Report System" as the name</li>
+                            <li>Enter "Auto Report System" as the name</li>
                             <li>Click "Next" to generate</li>
                         </ul>
                     </li>
