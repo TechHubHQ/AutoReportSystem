@@ -23,7 +23,7 @@ class User(Base):
     userrole = Column(String, default="Software Engineer", nullable=False)
 
     # One-to-many: User → Tasks
-    tasks = relationship("Task", back_populates="creator",
+    tasks = relationship("Task", foreign_keys="Task.created_by", back_populates="creator",
                          cascade="all, delete-orphan")
 
     # One-to-many: User → EmailTemplates
@@ -59,7 +59,7 @@ class Task(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Many-to-one: Task → User
-    creator = relationship("User", back_populates="tasks")
+    creator = relationship("User", foreign_keys=[created_by], back_populates="tasks")
     
     # Many-to-one: Task → User (who archived it)
     archiver = relationship("User", foreign_keys=[archived_by], backref="archived_tasks")
