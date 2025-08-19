@@ -375,7 +375,7 @@ async def revive_task(task_id: int) -> bool:
 
 
 async def get_weekly_tasks(user_id: Optional[int] = None):
-    """Get tasks for the current week (Monday to Sunday, inclusive)"""
+    """Get tasks for the current week (Monday to Sunday, inclusive), excluding archived tasks"""
     try:
         db = await get_db()
         # Use UTC for database comparison
@@ -393,10 +393,11 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
         start_naive = start_of_week.replace(tzinfo=None)
         end_naive = end_of_week.replace(tzinfo=None)
 
-        # Some databases store created_at as UTC, some as local/naive. Try both comparisons.
+        # Always exclude archived tasks
         query = select(Task).where(
             Task.created_at >= start_naive,
-            Task.created_at <= end_naive
+            Task.created_at <= end_naive,
+            Task.is_archived == False
         )
         if user_id:
             query = query.where(Task.created_by == user_id)
@@ -408,7 +409,8 @@ async def get_weekly_tasks(user_id: Optional[int] = None):
         if not tasks:
             query2 = select(Task).where(
                 Task.created_at >= start_of_week,
-                Task.created_at <= end_of_week
+                Task.created_at <= end_of_week,
+                Task.is_archived == False
             )
             if user_id:
                 query2 = query2.where(Task.created_by == user_id)
@@ -452,7 +454,8 @@ async def get_monthly_tasks(user_id: Optional[int] = None):
 
         query = select(Task).where(
             Task.created_at >= start_naive,
-            Task.created_at <= end_naive
+            Task.created_at <= end_naive,
+            Task.is_archived == False
         )
         if user_id:
             query = query.where(Task.created_by == user_id)
@@ -614,7 +617,7 @@ async def get_tasks_with_status_changes(user_id: Optional[int] = None,
         await db.close()
 
 
-async def get_tasks_for_weekly_report_enhanced(user_id: Optional[int] = None):
+async def get_tasks_for_weekly_report(user_id: Optional[int] = None):
     """Get tasks for weekly report including status change tracking"""
     try:
         # Get current week tasks (created this week)
