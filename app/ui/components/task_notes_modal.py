@@ -18,6 +18,29 @@ def show_task_notes_modal(task):
                 st.error("Please log in to manage task notes.")
                 return
 
+            # Handle pending operations BEFORE rendering tabs
+            # This ensures operations are processed regardless of which tab is active
+            
+            # Handle note creation if pending
+            if 'create_task_note' in st.session_state:
+                note_data = st.session_state['create_task_note']
+                try:
+                    # This will be handled by the parent async context
+                    st.session_state['pending_note_creation'] = note_data
+                    del st.session_state['create_task_note']
+                except Exception as e:
+                    st.error(f"Error creating note: {e}")
+
+            # Handle issue update if pending
+            if 'pending_issue_update' in st.session_state:
+                # This is already handled by the parent, just ensure it's processed
+                pass
+
+            # Handle resolution update if pending  
+            if 'pending_resolution_update' in st.session_state:
+                # This is already handled by the parent, just ensure it's processed
+                pass
+
             # Task information header
             st.markdown(f"""
             <div style="background: linear-gradient(90deg, #007bff, #0056b3); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
@@ -174,16 +197,6 @@ def show_task_notes_modal(task):
                 st.markdown("### 📚 Notes Timeline")
 
                 try:
-                    # Handle note creation if pending
-                    if 'create_task_note' in st.session_state:
-                        note_data = st.session_state['create_task_note']
-                        try:
-                            # This will be handled by the parent async context
-                            st.session_state['pending_note_creation'] = note_data
-                            del st.session_state['create_task_note']
-                        except Exception as e:
-                            st.error(f"Error creating note: {e}")
-
                     # Get progress notes from session state if available, otherwise show loading
                     if f'task_notes_{task.id}' in st.session_state:
                         all_notes = st.session_state[f'task_notes_{task.id}']

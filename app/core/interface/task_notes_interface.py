@@ -13,6 +13,7 @@ async def create_task_note(task_id: int, note_date: date, issue_description: str
                            analysis_content: str, resolution_notes: str = None,
                            created_by: int = None) -> TaskNote:
     """Create a new task note for a specific date"""
+    db = None
     try:
         db = await get_db()
 
@@ -35,13 +36,16 @@ async def create_task_note(task_id: int, note_date: date, issue_description: str
         await db.commit()
         await db.refresh(new_note)
 
+        logger.info(f"Successfully created task note for task {task_id} on {note_date}")
         return new_note
     except Exception as e:
         logger.error(f"Error while creating task note: {e}")
-        await db.rollback()
+        if db:
+            await db.rollback()
         raise e
     finally:
-        await db.close()
+        if db:
+            await db.close()
 
 
 async def get_task_notes(task_id: int) -> List[TaskNote]:

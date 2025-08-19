@@ -71,12 +71,14 @@ class DashboardManager:
         return []
 
     async def get_task_notes_counts(self, tasks):
-        """Get notes counts for a list of tasks"""
-        from app.core.interface.task_notes_interface import get_task_notes
+        """Get notes counts for a list of tasks (only progress notes, excluding issue and resolution)"""
+        from app.core.interface.task_notes_interface import get_task_progress_notes
         notes_counts = {}
         for task in tasks:
             try:
-                task_notes = await get_task_notes(task.id)
+                # Use get_task_progress_notes to exclude issue and resolution notes
+                # This matches what's displayed in the timeline
+                task_notes = await get_task_progress_notes(task.id)
                 notes_counts[task.id] = len(task_notes) if task_notes else 0
             except:
                 notes_counts[task.id] = 0
