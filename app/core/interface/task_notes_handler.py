@@ -74,9 +74,18 @@ async def update_progress_note_direct(note_id: int, analysis_content: str) -> di
         dict: {'success': bool, 'message': str, 'note': TaskNote or None}
     """
     try:
+        logger.info(f"Starting update of progress note {note_id}")
+        
+        if not analysis_content or not analysis_content.strip():
+            return {
+                'success': False,
+                'message': 'Analysis content cannot be empty',
+                'note': None
+            }
+        
         note = await update_task_note(
             note_id=note_id,
-            analysis_content=analysis_content
+            analysis_content=analysis_content.strip()
         )
 
         logger.info(f"Successfully updated progress note {note_id}")
@@ -88,7 +97,7 @@ async def update_progress_note_direct(note_id: int, analysis_content: str) -> di
 
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"Failed to update progress note {note_id}: {error_msg}")
+        logger.error(f"Failed to update progress note {note_id}: {error_msg}", exc_info=True)
         return {
             'success': False,
             'message': f'Error updating note: {error_msg}',
@@ -272,7 +281,7 @@ async def get_task_notes_data_direct(task_id: int) -> dict:
 
 def run_async_operation(coro):
     """
-    Helper function to run async operations from sync context.
+    Improved helper function to run async operations from sync context.
     This is useful for Streamlit components that need to call async functions.
 
     Args:
@@ -282,21 +291,33 @@ def run_async_operation(coro):
         Result of the coroutine
     """
     try:
-        # Try to get the current event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # If loop is running, we need to use a different approach
-            # This typically happens in Streamlit
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, use thread executor
             import concurrent.futures
+            import threading
+            
+            def run_in_thread():
+                # Create a new event loop for this thread
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
+            
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, coro)
-                return future.result()
-        else:
-            # If no loop is running, we can run directly
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        # No event loop exists, create a new one
-        return asyncio.run(coro)
+                future = executor.submit(run_in_thread)
+                return future.result(timeout=30)  # 30 second timeout
+                
+        except RuntimeError:
+            # No running loop, we can run directly
+            return asyncio.run(coro)
+            
+    except Exception as e:
+        logger.error(f"Error in run_async_operation: {e}", exc_info=True)
+        raise e
 
 
 # Convenience sync wrappers for Streamlit usage

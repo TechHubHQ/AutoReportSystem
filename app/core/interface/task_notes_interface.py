@@ -107,8 +107,11 @@ async def update_task_note(note_id: int, issue_description: str = None,
     try:
         db = await get_db()
 
-        # Get current note to verify it exists
-        current_note = await get_task_note_by_id(note_id)
+        # First, get the current note to verify it exists and get its data
+        query_select = select(TaskNote).where(TaskNote.id == note_id)
+        result = await db.execute(query_select)
+        current_note = result.scalar_one_or_none()
+        
         if not current_note:
             raise Exception(f"Task note {note_id} not found")
 
@@ -124,17 +127,29 @@ async def update_task_note(note_id: int, issue_description: str = None,
         update_data['updated_at'] = get_current_utc_datetime()
 
         # Update the note
-        query = update(TaskNote).where(
+        query_update = update(TaskNote).where(
             TaskNote.id == note_id).values(**update_data)
-        await db.execute(query)
+        await db.execute(query_update)
         await db.commit()
 
         logger.info(f"Successfully updated task note {note_id} - saved directly")
         
-        # Return updated note
-        return await get_task_note_by_id(note_id)
+        # Create updated note object to return (avoid additional DB call)
+        updated_note = TaskNote(
+            id=current_note.id,
+            task_id=current_note.task_id,
+            note_date=current_note.note_date,
+            issue_description=update_data.get('issue_description', current_note.issue_description),
+            analysis_content=update_data.get('analysis_content', current_note.analysis_content),
+            resolution_notes=update_data.get('resolution_notes', current_note.resolution_notes),
+            created_by=current_note.created_by,
+            created_at=current_note.created_at,
+            updated_at=update_data['updated_at']
+        )
+        
+        return updated_note
     except Exception as e:
-        logger.error(f"Error while updating task note: {e}")
+        logger.error(f"Error while updating task note {note_id}: {e}")
         if db:
             await db.rollback()
         raise e
