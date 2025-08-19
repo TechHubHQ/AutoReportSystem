@@ -41,8 +41,13 @@ async def generate_report(user_id):
         in_progress = [
             task for task in tasks if task.category == "in progress"]
 
+    # If both accomplishments and in_progress are empty, do not generate a report
+    if not accomplishments and not in_progress:
+        logger.info(
+            f"No accomplishments or in progress tasks for user {user_id}. Skipping report generation.")
+        return None
+
     # Week/year for header
-    now = get_date_in_timezone('Asia/Kolkata')
     week_num = datetime.now().isocalendar().week
     year_num = datetime.now().year
 
@@ -69,6 +74,12 @@ async def send_report(to_email, user_id):
             f"No active SMTP configuration found for user {user_id}")
 
     report_content = await generate_report(user_id)
+
+    # If report_content is None, do not send the email
+    if report_content is None:
+        logger.info(
+            f"Weekly report not sent to {to_email} for user {user_id} as there are no accomplishments or in progress tasks.")
+        return
 
     email_service = EmailService(
         from_email=smtp_config.sender_email,

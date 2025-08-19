@@ -30,6 +30,11 @@ async def generate_report(user_id):
     in_progress = [
         task for task in tasks if task.category == "in progress"]
 
+    if not accomplishments and not in_progress:
+        logger.info(
+            f"No accomplishments or in progress tasks for user {user_id}. Skipping report generation.")
+        return None
+
     # Month/year for header
     now = get_date_in_timezone('Asia/Kolkata')
     month_name = now.strftime('%B')
@@ -64,6 +69,11 @@ async def send_report(to_email, user_id):
     # Generate report content
     report_content = await generate_report(user_id)
 
+    if report_content is None:
+        logger.info(
+            f"Weekly report not sent to {to_email} for user {user_id} as there are no accomplishments or in progress tasks.")
+        return
+
     # Create email service
     email_service = EmailService(
         from_email=smtp_config.sender_email,
@@ -86,15 +96,15 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
     """Send monthly reports only on the last Friday of the month (IST)."""
     # Use provided job_id or default to 'monthly_reporter'
     actual_job_id = job_id if job_id else 'monthly_reporter'
-    
+
     # Use the new job tracking system
     async with JobExecutionTracker(
         job_name=actual_job_id,
         trigger_type="scheduled" if not force else "manual"
     ) as tracker:
-        
+
         await tracker.log("INFO", "Starting monthly report execution")
-        
+
         execution_result = {
             'job_id': actual_job_id,
             'status': 'success',
@@ -106,16 +116,16 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
             'execution_time': datetime.now(),
             'forced': force
         }
-        
+
         db = None
         try:
             # Determine today's date in IST
             today_ist = get_date_in_timezone('Asia/Kolkata')
             execution_result['details'].append(
                 f"Execution started at {today_ist.strftime('%Y-%m-%d %H:%M:%S')} IST")
-            
+
             await tracker.log("INFO", f"Execution started at {today_ist.strftime('%Y-%m-%d %H:%M:%S')} IST")
-            
+
             # Only proceed if last Friday
             if not force and (today_ist.weekday() != 4 or not is_last_friday(today_ist)):
                 execution_result['status'] = 'skipped'
@@ -129,12 +139,12 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
                 logger.info(execution_result['message'])
                 await tracker.set_result_data(execution_result)
                 return execution_result
-            
+
             if force:
                 execution_result['details'].append(
                     "⚡ FORCED EXECUTION - Schedule checks bypassed")
                 await tracker.log("WARNING", "FORCED EXECUTION - Schedule checks bypassed")
-            
+
             db = await get_db()
             result = await db.execute(
                 select(User).join(SMTPConf, User.email == SMTPConf.sender_email)
@@ -144,9 +154,9 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
             execution_result['users_processed'] = len(users)
             execution_result['details'].append(
                 f"Found {len(users)} users with active SMTP configurations")
-            
+
             await tracker.log("INFO", f"Found {len(users)} users with active SMTP configurations")
-            
+
             for user in users:
                 try:
                     await tracker.log("INFO", f"Sending monthly report for user: {user.username}")
@@ -155,23 +165,24 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
                     execution_result['details'].append(
                         f"✅ Report sent for user: {user.username}")
                     await tracker.log("INFO", f"✅ Monthly report sent for user: {user.username}")
-                    logger.info(f"Monthly report sent for user: {user.username}")
+                    logger.info(
+                        f"Monthly report sent for user: {user.username}")
                 except Exception as e:
                     error_msg = f"Failed to send report for user {user.username}: {str(e)}"
                     execution_result['errors'].append(error_msg)
                     execution_result['details'].append(f"❌ {error_msg}")
                     await tracker.log("ERROR", error_msg)
                     logger.error(error_msg)
-            
+
             if execution_result['errors']:
                 execution_result['status'] = 'partial_success'
                 execution_result['message'] = f"Monthly reports completed with {len(execution_result['errors'])} errors. {execution_result['emails_sent']} emails sent successfully."
             else:
                 execution_result[
                     'message'] = f"Monthly reports sent successfully to {execution_result['emails_sent']} recipients."
-            
+
             await tracker.log("INFO", execution_result['message'])
-            
+
         except Exception as e:
             execution_result['status'] = 'error'
             execution_result['message'] = f"Error sending monthly reports: {str(e)}"
@@ -183,21 +194,21 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
         finally:
             if db is not None:
                 await db.close()
-            
+
             execution_result['details'].append(
                 f"Execution completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            
+
             # Store result data in the tracker
             await tracker.set_result_data(execution_result)
-            
+
             # Store result in global storage for UI display (backward compatibility)
             from app.core.jobs.job_results_store import store_job_result
             store_job_result(actual_job_id, execution_result)
-            
+
             # Also store under the base job ID for UI consistency
             if actual_job_id != 'monthly_reporter':
                 store_job_result('monthly_reporter', execution_result)
-            
+
             await tracker.log("INFO", "Monthly report execution completed")
-            
+
             return execution_result
