@@ -85,10 +85,11 @@ def get_combined_task_color(due_date: Optional[datetime], status: str, priority:
     """
     Get combined color information for a task based on due date, status, and priority
 
-    Special rules:
-    - Completed tasks always use status-based coloring (no red for overdue completed tasks)
-    - Pending tasks are treated as "on-hold" with distinct styling
-    - Due date urgency only applies to non-completed tasks
+    New Color Scheme Rules:
+    - TODO tasks: Green+Blue (far away), Orange+Blue (2 days), Red+Blue (overdue)
+    - IN PROGRESS tasks: Green+Purple (far away), Orange+Purple (2 days), Red+Purple (overdue)
+    - PENDING tasks: Always Orange double border
+    - COMPLETED tasks: Always green (no change)
 
     Returns:
         Dictionary with color classes and descriptions
@@ -97,22 +98,39 @@ def get_combined_task_color(due_date: Optional[datetime], status: str, priority:
     status_color, status_desc = get_status_color(status)
     priority_color, priority_desc = get_priority_color(priority)
 
-    # Determine primary color based on urgency hierarchy
-    # Special rule: Completed tasks always use status color (green)
+    # Determine combined color based on new scheme
     if status == "completed":
-        primary_color = status_color
-        # Override due color for completed tasks - no due date info shown
+        # Completed tasks are always green
+        primary_color = "status-completed"
+        combined_class = "status-completed"
         due_color = "due-completed"
-        due_desc = "Completed"  # Don't show original due date info for completed tasks
+        due_desc = "Completed"
     elif status == "pending":
-        # Pending is treated as "on-hold" - use status color with special styling
-        primary_color = status_color
-    elif due_color in ["due-overdue", "due-today", "due-tomorrow"]:
-        # Only apply urgent due date colors to non-completed tasks
-        primary_color = due_color
+        # Pending tasks always have orange double border
+        primary_color = "status-pending"
+        combined_class = "status-pending"
     else:
-        # Use status-based coloring for other cases
-        primary_color = status_color
+        # For TODO and IN PROGRESS, combine due date urgency with status
+        if due_color == "due-overdue":
+            # Red + Blue (TODO) or Red + Purple (IN PROGRESS)
+            if status == "todo":
+                combined_class = "due-overdue status-todo"
+            else:  # inprogress
+                combined_class = "due-overdue status-inprogress"
+        elif due_color in ["due-today", "due-tomorrow"]:
+            # Orange + Blue (TODO) or Orange + Purple (IN PROGRESS)
+            if status == "todo":
+                combined_class = "due-urgent status-todo"
+            else:  # inprogress
+                combined_class = "due-urgent status-inprogress"
+        else:
+            # Green + Blue (TODO) or Green + Purple (IN PROGRESS) for far away dates
+            if status == "todo":
+                combined_class = "due-safe status-todo"
+            else:  # inprogress
+                combined_class = "due-safe status-inprogress"
+
+        primary_color = combined_class
 
     return {
         "due_color": due_color,
@@ -122,7 +140,7 @@ def get_combined_task_color(due_date: Optional[datetime], status: str, priority:
         "priority_color": priority_color,
         "priority_description": priority_desc,
         "primary_color": primary_color,
-        "all_classes": f"{due_color} {status_color} {priority_color}"
+        "all_classes": combined_class if 'combined_class' in locals() else f"{due_color} {status_color} {priority_color}"
     }
 
 

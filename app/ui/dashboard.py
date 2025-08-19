@@ -224,78 +224,74 @@ def apply_custom_css():
     .priority-medium { border-left-color: #ff9800 !important; }
     .priority-low { border-left-color: #4caf50 !important; }
 
-    /* Status-based background colors - will be combined with due date colors diagonally */
-    .status-todo {
-        border-left-color: #2196F3 !important;
-    }
-    .status-inprogress {
-        border-left-color: #9C27B0 !important;
-    }
-    .status-pending {
-        border-left-color: #FF9800 !important;
-        border-left-style: double !important;
-        border-left-width: 8px !important;
-    }
+    /* New Color Scheme Implementation */
+    
+    /* COMPLETED TASKS - Always green (no change) */
     .status-completed {
         background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
         border-left-color: #4CAF50 !important;
         box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
     }
 
-    /* Due date-based colors (override status when urgent) - Enhanced with brighter colors */
-    /* Overdue + Status combinations */
+    /* PENDING TASKS - Always orange double border */
+    .status-pending {
+        background: linear-gradient(135deg, #FFF3E0 0%, #FFCC80 100%) !important;
+        border-left-color: #FF9800 !important;
+        border-left-style: double !important;
+        border-left-width: 8px !important;
+        box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.3) !important;
+    }
+
+    /* TODO TASKS - Combinations with Blue */
+    /* Overdue TODO: Red + Blue */
     .due-overdue.status-todo {
         background: linear-gradient(135deg, #FFCDD2 50%, #E3F2FD 50%) !important;
         border-left-color: #F44336 !important;
         box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
     }
+    
+    /* Urgent TODO (today/tomorrow): Orange + Blue */
+    .due-urgent.status-todo {
+        background: linear-gradient(135deg, #FFCC80 50%, #E3F2FD 50%) !important;
+        border-left-color: #FF9800 !important;
+        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+    }
+    
+    /* Safe TODO (far away): Green + Blue */
+    .due-safe.status-todo {
+        background: linear-gradient(135deg, #C8E6C9 50%, #E3F2FD 50%) !important;
+        border-left-color: #4CAF50 !important;
+        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+    }
+
+    /* IN PROGRESS TASKS - Combinations with Purple */
+    /* Overdue IN PROGRESS: Red + Purple */
     .due-overdue.status-inprogress {
         background: linear-gradient(135deg, #FFCDD2 50%, #F3E5F5 50%) !important;
         border-left-color: #F44336 !important;
         box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
     }
-    .due-overdue.status-pending {
-        background: linear-gradient(135deg, #FFCDD2 50%, #FFF3E0 50%) !important;
-        border-left-color: #F44336 !important;
-        box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
-    }
-    /* Due today + Status combinations */
-    .due-today.status-todo {
-        background: linear-gradient(135deg, #FFAB91 50%, #E3F2FD 50%) !important;
-        border-left-color: #FF5722 !important;
-        box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
-    }
-    .due-today.status-inprogress {
-        background: linear-gradient(135deg, #FFAB91 50%, #F3E5F5 50%) !important;
-        border-left-color: #FF5722 !important;
-        box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
-    }
-    .due-today.status-pending {
-        background: linear-gradient(135deg, #FFAB91 50%, #FFF3E0 50%) !important;
-        border-left-color: #FF5722 !important;
-        box-shadow: -8px 8px 25px rgba(255, 87, 34, 0.35) !important;
-    }
-    /* Due tomorrow + Status combinations */
-    .due-tomorrow.status-todo {
-        background: linear-gradient(135deg, #FFCC80 50%, #E3F2FD 50%) !important;
-        border-left-color: #FF9800 !important;
-        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
-    }
-    .due-tomorrow.status-inprogress {
+    
+    /* Urgent IN PROGRESS (today/tomorrow): Orange + Purple */
+    .due-urgent.status-inprogress {
         background: linear-gradient(135deg, #FFCC80 50%, #F3E5F5 50%) !important;
         border-left-color: #FF9800 !important;
         box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
     }
-    .due-tomorrow.status-pending {
-        background: linear-gradient(135deg, #FFCC80 50%, #FFF3E0 50%) !important;
-        border-left-color: #FF9800 !important;
-        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
-    }
-    /* Due soon/later + Status combinations */
-    .due-soon.status-todo, .due-later.status-todo {
-        background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
+    
+    /* Safe IN PROGRESS (far away): Green + Purple */
+    .due-safe.status-inprogress {
+        background: linear-gradient(135deg, #C8E6C9 50%, #F3E5F5 50%) !important;
         border-left-color: #4CAF50 !important;
         box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+    }
+
+    /* Legacy support for old classes - fallback */
+    .status-todo {
+        border-left-color: #2196F3 !important;
+    }
+    .status-inprogress {
+        border-left-color: #9C27B0 !important;
     }
 
     /* Date display styling */
@@ -522,64 +518,65 @@ async def render_kanban_board(dashboard_manager):
         @st.dialog("🎨 Task Color System Guide", width="large")
         def color_guide_dialog():
             st.markdown("""
-            ### Diagonal Split Color System
-            Each task card uses a **diagonal split** showing two types of information:
+            ### New Enhanced Color System
+            Each task card uses **gradient combinations** based on due date urgency and task status:
 
-            **Left Side = Due Date Urgency:**
-            - 🔴 **Light Red**: Overdue tasks (need immediate attention)
-            - 🟠 **Light Orange**: Due today (urgent)
-            - 🟡 **Light Amber**: Due tomorrow (prepare for action)
-            - 🟢 **Light Green**: Due in future (on track)
+            **TODO Tasks (Blue combinations):**
+            - 🔴+🔵 **Red + Blue**: Overdue TODO tasks
+            - 🟠+🔵 **Orange + Blue**: TODO tasks due today/tomorrow
+            - 🟢+🔵 **Green + Blue**: TODO tasks due later (safe)
 
-            **Right Side = Task Status:**
-            - 🔵 **Light Blue**: To Do (ready to start)
-            - 🟣 **Light Purple**: In Progress (actively working)
-            - 🟠 **Light Orange**: On Hold (blocked/waiting) - *dashed border*
-            - 🟢 **Light Green**: Completed (finished) - *always full green*
+            **IN PROGRESS Tasks (Purple combinations):**
+            - 🔴+🟣 **Red + Purple**: Overdue IN PROGRESS tasks
+            - 🟠+🟣 **Orange + Purple**: IN PROGRESS tasks due today/tomorrow
+            - 🟢+🟣 **Green + Purple**: IN PROGRESS tasks due later (safe)
 
-            **Special Cases:**
-            - **No Due Date**: Shows only status color (full background)
-            - **Completed Tasks**: Always light green regardless of due date
-            - **Enhanced Shadows**: Urgent tasks have stronger shadows
+            **Special Status Rules:**
+            - 🟠 **PENDING**: Always orange with double border (regardless of due date)
+            - 🟢 **COMPLETED**: Always green (no due date consideration)
 
-            **Example:** A task due tomorrow that's in progress shows amber→purple diagonal split.
+            **Visual Enhancements:**
+            - Stronger shadows for urgent tasks (overdue/due soon)
+            - Diagonal gradient split shows both urgency and status
+            - Double border styling for pending tasks
             """)
 
             # Color examples
+            st.markdown("#### Examples:")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #ffcdd2 50%, #e3f2fd 50%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #e57373; 
-                           box-shadow: 0 4px 8px rgba(244, 67, 54, 0.2); margin: 0.5rem 0;">
-                    <small><strong>Overdue + To Do</strong><br>Red → Blue</small>
+                <div style="background: linear-gradient(135deg, #FFCDD2 50%, #E3F2FD 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #F44336; 
+                           box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4); margin: 0.5rem 0;">
+                    <small><strong>Overdue TODO</strong><br>Red + Blue</small>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col2:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #ffcc80 50%, #f3e5f5 50%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #ffb74d; 
-                           box-shadow: 0 4px 8px rgba(255, 152, 0, 0.15); margin: 0.5rem 0;">
-                    <small><strong>Due Tomorrow + In Progress</strong><br>Amber → Purple</small>
+                <div style="background: linear-gradient(135deg, #FFCC80 50%, #F3E5F5 50%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #FF9800; 
+                           box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3); margin: 0.5rem 0;">
+                    <small><strong>Urgent IN PROGRESS</strong><br>Orange + Purple</small>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col3:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #c8e6c9 50%, #fff3e0 50%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px dashed #ffa726; 
-                           box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 0.5rem 0;">
-                    <small><strong>Future + On Hold</strong><br>Green → Orange (dashed)</small>
+                <div style="background: linear-gradient(135deg, #FFF3E0 0%, #FFCC80 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 8px double #FF9800; 
+                           box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.3); margin: 0.5rem 0;">
+                    <small><strong>PENDING</strong><br>Orange Double Border</small>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col4:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #66bb6a; 
-                           box-shadow: 0 4px 8px rgba(76, 175, 80, 0.15); margin: 0.5rem 0;">
-                    <small><strong>Completed</strong><br>Always Light Green</small>
+                <div style="background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #4CAF50; 
+                           box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3); margin: 0.5rem 0;">
+                    <small><strong>COMPLETED</strong><br>Always Green</small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -1258,207 +1255,6 @@ async def render_system_monitoring(dashboard_manager):
 
 
 async def render_archived_tasks(dashboard_manager):
-    """Render archived tasks (older than current month)"""
-    st.markdown("### 📦 Archived Tasks")
-    st.markdown("*Tasks created before the current month*")
-
-    # Get archived tasks with loader
-    with LoaderContext("Loading archived tasks...", "inline"):
-        archived_tasks = await dashboard_manager.get_archived_user_tasks()
-
-        # Get notes counts for all archived tasks
-        archived_notes_counts = await dashboard_manager.get_task_notes_counts(archived_tasks)
-
-    if not archived_tasks:
-        st.markdown("""
-        <div style="text-align: center; padding: 3rem 2rem;
-                   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                   border-radius: 20px; margin: 2rem 0; border: 2px dashed #dee2e6;">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">📦</div>
-            <h3 style="color: #666; margin-bottom: 1rem;">No Archived Tasks</h3>
-            <p style="color: #888; margin-bottom: 2rem; font-size: 1.1rem;">
-                Tasks created before this month will appear here.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-
-    # Show archived task statistics
-    col1, col2, col3, col4 = st.columns(4)
-
-    archived_stats = {
-        'total': len(archived_tasks),
-        'completed': len([t for t in archived_tasks if t.status == 'completed']),
-        'inprogress': len([t for t in archived_tasks if t.status == 'inprogress']),
-        'pending': len([t for t in archived_tasks if t.status == 'pending'])
-    }
-
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #667eea; margin: 0;">📋 {archived_stats['total']}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">Total Archived</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #6bcf7f; margin: 0;">✅ {archived_stats['completed']}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">Completed</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #4fc3f7; margin: 0;">🔄 {archived_stats['inprogress']}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">In Progress</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #ff9800; margin: 0;">⏳ {archived_stats['pending']}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">Pending</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Archived Kanban columns
-    st.markdown("#### 📋 Archived Kanban Board")
-    col1, col2, col3, col4 = st.columns(4)
-
-    columns = {
-        "todo": ("📝 To Do", col1),
-        "inprogress": ("🔄 In Progress", col2),
-        "pending": ("⏳ Pending", col3),
-        "completed": ("✅ Completed", col4)
-    }
-
-    for status, (title, column) in columns.items():
-        with column:
-            st.markdown(f"**{title}**")
-            status_tasks = [
-                task for task in archived_tasks if task.status == status]
-
-            for task in status_tasks:
-                # Get color information based on due date, status, and priority
-                color_info = get_combined_task_color(
-                    task.due_date, task.status, task.priority)
-
-                # Check if task has notes
-                notes_count = archived_notes_counts.get(task.id, 0)
-                notes_indicator = f" 📝({notes_count})" if notes_count > 0 else ""
-
-                # Format dates for display
-                created_date_str = format_date_display(task.created_at)
-
-                # For completed tasks, show completion date instead of due date
-                if task.status == "completed":
-                    completion_date_str = get_completion_date_display(
-                        task.status, task.updated_at)
-                    due_date_display = completion_date_str
-                    due_date_class = "completion-date"
-                else:
-                    # For non-completed tasks, show due date with context
-                    due_date_str = format_date_display(
-                        task.due_date) if task.due_date else "No due date"
-
-                    # Get days until due for additional context
-                    days_until_due = get_days_until_due(task.due_date)
-                    due_context = ""
-                    if days_until_due is not None:
-                        if days_until_due < 0:
-                            due_context = f" (Overdue by {abs(days_until_due)} day(s))"
-                        elif days_until_due == 0:
-                            due_context = " (Due today!)"
-                        elif days_until_due == 1:
-                            due_context = " (Due tomorrow)"
-                        elif days_until_due <= 7:
-                            due_context = f" (Due in {days_until_due} day(s))"
-
-                    due_date_display = f"⏰ Due: {due_date_str}{due_context}"
-
-                    # Determine due date text color
-                    due_date_class = ""
-                    if days_until_due is not None:
-                        if days_until_due <= 0:
-                            due_date_class = "due-date-urgent"
-                        elif days_until_due <= 1:
-                            due_date_class = "due-date-warning"
-
-                description_preview = (task.description[:50] + "...") if task.description and len(
-                    task.description) > 50 else (task.description or "No description")
-
-                st.markdown(f"""
-                <div class="task-card {color_info['all_classes']}" style="opacity: 0.8;">
-                    <strong>{task.title}{notes_indicator}</strong><br>
-                    <small>{description_preview}</small><br>
-                    <div class="date-display created-date">📅 Created: {created_date_str}</div>
-                    <div class="date-display {due_date_class}">{due_date_display}</div>
-                    <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Actions for archived tasks
-                col_edit, col_notes = st.columns(2)
-                with col_edit:
-                    if st.button("✏️ Edit", key=f"edit_archived_{task.id}", help="Edit archived task"):
-                        st.session_state[f"edit_modal_{task.id}"] = True
-                with col_notes:
-                    if st.button("📝 Notes", key=f"notes_archived_{task.id}", help="View progress notes"):
-                        st.session_state[f"show_notes_{task.id}"] = True
-
-    # Handle pending task updates for archived tasks
-    for task in archived_tasks:
-        if f'pending_task_update_{task.id}' in st.session_state:
-            update_data = st.session_state[f'pending_task_update_{task.id}']
-            try:
-                with LoaderContext("Updating task...", "inline"):
-                    await update_task(
-                        update_data['task_id'],
-                        title=update_data['title'],
-                        description=update_data['description'],
-                        status=update_data['status'],
-                        priority=update_data['priority'],
-                        category=update_data['category'],
-                        due_date=update_data['due_date']
-                    )
-                    st.success("✅ Task updated successfully!")
-                    del st.session_state[f'pending_task_update_{task.id}']
-                    st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error updating task: {str(e)}")
-                del st.session_state[f'pending_task_update_{task.id}']
-
-    # Show task modals for any archived tasks that have been clicked
-    for task in archived_tasks:
-        if st.session_state.get(f"edit_modal_{task.id}", False):
-            show_edit_task_modal(task)
-
-        # Handle notes modal for archived tasks
-        if st.session_state.get(f"show_notes_{task.id}", False):
-            # Load notes, issue, and resolution for this task
-            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
-
-            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
-            task_issue = await get_task_issue(task.id)
-            task_resolution = await get_task_resolution(task.id)
-
-            st.session_state[f'task_notes_{task.id}'] = task_notes
-            st.session_state[f'task_issue_{task.id}'] = task_issue
-            st.session_state[f'task_resolution_{task.id}'] = task_resolution
-
-            # Handle pending operations
-            await dashboard_manager.handle_notes_operations(task.id)
-
-            from app.ui.components.task_notes_modal import show_task_notes_modal
-            show_task_notes_modal(task)
-            st.session_state[f"show_notes_{task.id}"] = False
-
-
-async def render_archived_tasks(dashboard_manager):
     """Render the archived tasks interface"""
     st.markdown("### 📦 Archived Tasks")
     st.markdown(
@@ -1594,50 +1390,6 @@ async def render_archived_tasks(dashboard_manager):
             from app.ui.components.task_notes_modal import show_task_notes_modal
             show_task_notes_modal(task)
             st.session_state[f"show_notes_{task.id}"] = False
-
-
-def dashboard(go_to_page):
-    """Main dashboard function"""
-    apply_custom_css()
-
-    navbar(go_to_page, "dashboard")
-
-    # Header
-    st.markdown("""
-    <div class="main-header">
-        <h1 style="margin: 0; font-size: 2.5rem;">📊 AutoReportSystem Dashboard</h1>
-        <p style="margin: 0.5rem 0 0 0; font-size: 1.1rem; opacity: 0.9;">
-            Comprehensive project management and system monitoring
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Initialize dashboard manager
-    dashboard_manager = DashboardManager()
-
-    # Tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor", "📈 Task Analysis", "📦 Archive"])
-
-    with tab1:
-        asyncio.run(render_kanban_board(dashboard_manager))
-
-    with tab2:
-        asyncio.run(render_productivity_analytics(dashboard_manager))
-
-    with tab3:
-        asyncio.run(render_system_monitoring(dashboard_manager))
-
-    with tab4:
-        asyncio.run(render_task_analysis(dashboard_manager))
-
-    with tab5:
-        asyncio.run(render_archived_tasks(dashboard_manager))
-
-
-if __name__ == "__main__":
-    # For standalone testing
-    dashboard()
 
 
 def dashboard(go_to_page):
