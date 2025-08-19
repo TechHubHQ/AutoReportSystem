@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 async def create_task_note(task_id: int, note_date: date, issue_description: str,
                            analysis_content: str, resolution_notes: str = None,
                            created_by: int = None) -> TaskNote:
-    """Create a new task note for a specific date"""
+    """Create a new task note for a specific date - saves directly to database"""
     db = None
     try:
         db = await get_db()
@@ -36,7 +36,7 @@ async def create_task_note(task_id: int, note_date: date, issue_description: str
         await db.commit()
         await db.refresh(new_note)
 
-        logger.info(f"Successfully created task note for task {task_id} on {note_date}")
+        logger.info(f"Successfully created task note for task {task_id} on {note_date} - saved directly")
         return new_note
     except Exception as e:
         logger.error(f"Error while creating task note: {e}")
@@ -102,7 +102,8 @@ async def get_task_note_by_id(note_id: int) -> Optional[TaskNote]:
 
 async def update_task_note(note_id: int, issue_description: str = None,
                            analysis_content: str = None, resolution_notes: str = None) -> TaskNote:
-    """Update an existing task note"""
+    """Update an existing task note - saves directly to database"""
+    db = None
     try:
         db = await get_db()
 
@@ -128,31 +129,39 @@ async def update_task_note(note_id: int, issue_description: str = None,
         await db.execute(query)
         await db.commit()
 
+        logger.info(f"Successfully updated task note {note_id} - saved directly")
+        
         # Return updated note
         return await get_task_note_by_id(note_id)
     except Exception as e:
         logger.error(f"Error while updating task note: {e}")
-        await db.rollback()
+        if db:
+            await db.rollback()
         raise e
     finally:
-        await db.close()
+        if db:
+            await db.close()
 
 
 async def delete_task_note(note_id: int) -> bool:
-    """Delete a task note"""
+    """Delete a task note - saves directly to database"""
+    db = None
     try:
         db = await get_db()
         query = delete(TaskNote).where(TaskNote.id == note_id)
         result = await db.execute(query)
         await db.commit()
 
+        logger.info(f"Successfully deleted task note {note_id} - saved directly")
         return result.rowcount > 0
     except Exception as e:
         logger.error(f"Error while deleting task note: {e}")
-        await db.rollback()
+        if db:
+            await db.rollback()
         raise e
     finally:
-        await db.close()
+        if db:
+            await db.close()
 
 
 async def get_notes_by_date_range(task_id: int, start_date: date, end_date: date) -> List[TaskNote]:
@@ -214,7 +223,8 @@ async def get_notes_with_resolution(task_id: int) -> List[TaskNote]:
 
 
 async def create_task_issue(task_id: int, issue_description: str, created_by: int = None) -> TaskNote:
-    """Create or update the main issue description for a task"""
+    """Create or update the main issue description for a task - saves directly to database"""
+    db = None
     try:
         db = await get_db()
 
@@ -224,6 +234,7 @@ async def create_task_issue(task_id: int, issue_description: str, created_by: in
 
         if existing_issue:
             # Update existing issue
+            logger.info(f"Updating existing task issue for task {task_id} - saved directly")
             return await update_task_note(
                 existing_issue.id,
                 issue_description=issue_description
@@ -242,18 +253,22 @@ async def create_task_issue(task_id: int, issue_description: str, created_by: in
             db.add(new_issue)
             await db.commit()
             await db.refresh(new_issue)
+            logger.info(f"Created new task issue for task {task_id} - saved directly")
             return new_issue
 
     except Exception as e:
         logger.error(f"Error while creating/updating task issue: {e}")
-        await db.rollback()
+        if db:
+            await db.rollback()
         raise e
     finally:
-        await db.close()
+        if db:
+            await db.close()
 
 
 async def create_task_resolution(task_id: int, resolution_notes: str, created_by: int = None) -> TaskNote:
-    """Create or update the resolution notes for a task"""
+    """Create or update the resolution notes for a task - saves directly to database"""
+    db = None
     try:
         db = await get_db()
 
@@ -264,6 +279,7 @@ async def create_task_resolution(task_id: int, resolution_notes: str, created_by
 
         if existing_resolution:
             # Update existing resolution
+            logger.info(f"Updating existing task resolution for task {task_id} - saved directly")
             return await update_task_note(
                 existing_resolution.id,
                 resolution_notes=resolution_notes
@@ -282,14 +298,17 @@ async def create_task_resolution(task_id: int, resolution_notes: str, created_by
             db.add(new_resolution)
             await db.commit()
             await db.refresh(new_resolution)
+            logger.info(f"Created new task resolution for task {task_id} - saved directly")
             return new_resolution
 
     except Exception as e:
         logger.error(f"Error while creating/updating task resolution: {e}")
-        await db.rollback()
+        if db:
+            await db.rollback()
         raise e
     finally:
-        await db.close()
+        if db:
+            await db.close()
 
 
 async def get_task_issue(task_id: int) -> Optional[TaskNote]:

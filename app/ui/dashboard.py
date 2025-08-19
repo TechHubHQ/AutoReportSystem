@@ -92,86 +92,6 @@ class DashboardManager:
         except:
             return []
 
-    async def handle_notes_operations(self, task_id):
-        """Handle pending notes operations (create, update, delete)"""
-        from app.core.interface.task_notes_interface import (
-            create_task_note, update_task_note, delete_task_note,
-            create_task_issue, create_task_resolution, get_task_issue, get_task_resolution
-        )
-
-        # Handle note creation
-        if 'pending_note_creation' in st.session_state:
-            note_data = st.session_state['pending_note_creation']
-            try:
-                await create_task_note(**note_data)
-                # Refresh notes
-                task_notes = await self.get_task_notes_for_modal(task_id)
-                st.session_state[f'task_notes_{task_id}'] = task_notes
-                del st.session_state['pending_note_creation']
-            except Exception as e:
-                st.error(f"Error creating note: {e}")
-
-        # Handle note update
-        if 'pending_note_update' in st.session_state:
-            update_data = st.session_state['pending_note_update']
-            try:
-                await update_task_note(
-                    note_id=update_data['note_id'],
-                    analysis_content=update_data['analysis_content']
-                )
-                # Refresh notes
-                task_notes = await self.get_task_notes_for_modal(task_id)
-                st.session_state[f'task_notes_{task_id}'] = task_notes
-                del st.session_state['pending_note_update']
-            except Exception as e:
-                st.error(f"Error updating note: {e}")
-
-        # Handle note deletion
-        if 'pending_note_deletion' in st.session_state:
-            note_id = st.session_state['pending_note_deletion']
-            try:
-                await delete_task_note(note_id)
-                # Refresh notes
-                task_notes = await self.get_task_notes_for_modal(task_id)
-                st.session_state[f'task_notes_{task_id}'] = task_notes
-                del st.session_state['pending_note_deletion']
-            except Exception as e:
-                st.error(f"Error deleting note: {e}")
-
-        # Handle issue update
-        if 'pending_issue_update' in st.session_state:
-            issue_data = st.session_state['pending_issue_update']
-            try:
-                await create_task_issue(
-                    task_id=issue_data['task_id'],
-                    issue_description=issue_data['issue_description'],
-                    created_by=issue_data['created_by']
-                )
-                # Refresh issue data
-                task_issue = await get_task_issue(task_id)
-                st.session_state[f'task_issue_{task_id}'] = task_issue
-                del st.session_state['pending_issue_update']
-                st.success("✅ Issue description updated successfully!")
-            except Exception as e:
-                st.error(f"Error updating issue: {e}")
-
-        # Handle resolution update
-        if 'pending_resolution_update' in st.session_state:
-            resolution_data = st.session_state['pending_resolution_update']
-            try:
-                await create_task_resolution(
-                    task_id=resolution_data['task_id'],
-                    resolution_notes=resolution_data['resolution_notes'],
-                    created_by=resolution_data['created_by']
-                )
-                # Refresh resolution data
-                task_resolution = await get_task_resolution(task_id)
-                st.session_state[f'task_resolution_{task_id}'] = task_resolution
-                del st.session_state['pending_resolution_update']
-                st.success("✅ Resolution notes updated successfully!")
-            except Exception as e:
-                st.error(f"Error updating resolution: {e}")
-
 
 def apply_custom_css():
     """Apply custom CSS for modern UI styling"""
@@ -924,20 +844,6 @@ async def render_kanban_board(dashboard_manager):
 
         # Handle notes modal
         if st.session_state.get(f"show_notes_{task.id}", False):
-            # Load notes, issue, and resolution for this task
-            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
-
-            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
-            task_issue = await get_task_issue(task.id)
-            task_resolution = await get_task_resolution(task.id)
-
-            st.session_state[f'task_notes_{task.id}'] = task_notes
-            st.session_state[f'task_issue_{task.id}'] = task_issue
-            st.session_state[f'task_resolution_{task.id}'] = task_resolution
-
-            # Handle pending operations
-            await dashboard_manager.handle_notes_operations(task.id)
-
             from app.ui.components.task_notes_modal import show_task_notes_modal
             show_task_notes_modal(task)
             st.session_state[f"show_notes_{task.id}"] = False
@@ -1375,20 +1281,6 @@ async def render_archived_tasks(dashboard_manager):
 
         # Handle notes modal for archived tasks
         if st.session_state.get(f"show_notes_{task.id}", False):
-            # Load notes, issue, and resolution for this task
-            from app.core.interface.task_notes_interface import get_task_issue, get_task_resolution
-
-            task_notes = await dashboard_manager.get_task_notes_for_modal(task.id)
-            task_issue = await get_task_issue(task.id)
-            task_resolution = await get_task_resolution(task.id)
-
-            st.session_state[f'task_notes_{task.id}'] = task_notes
-            st.session_state[f'task_issue_{task.id}'] = task_issue
-            st.session_state[f'task_resolution_{task.id}'] = task_resolution
-
-            # Handle pending operations
-            await dashboard_manager.handle_notes_operations(task.id)
-
             from app.ui.components.task_notes_modal import show_task_notes_modal
             show_task_notes_modal(task)
             st.session_state[f"show_notes_{task.id}"] = False

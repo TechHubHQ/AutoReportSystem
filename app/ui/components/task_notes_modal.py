@@ -2,6 +2,10 @@ import asyncio
 import streamlit as st
 from datetime import date
 from app.security.route_protection import RouteProtection
+from app.core.interface.task_notes_handler import (
+    create_progress_note_sync, update_progress_note_sync, delete_progress_note_sync,
+    create_or_update_issue_sync, create_or_update_resolution_sync, get_task_notes_data_sync
+)
 
 
 def show_task_notes_modal(task):
@@ -18,28 +22,16 @@ def show_task_notes_modal(task):
                 st.error("Please log in to manage task notes.")
                 return
 
-            # Handle pending operations BEFORE rendering tabs
-            # This ensures operations are processed regardless of which tab is active
+            # Load task notes data directly (no session state dependency)
+            notes_data = get_task_notes_data_sync(task.id)
             
-            # Handle note creation if pending
-            if 'create_task_note' in st.session_state:
-                note_data = st.session_state['create_task_note']
-                try:
-                    # This will be handled by the parent async context
-                    st.session_state['pending_note_creation'] = note_data
-                    del st.session_state['create_task_note']
-                except Exception as e:
-                    st.error(f"Error creating note: {e}")
-
-            # Handle issue update if pending
-            if 'pending_issue_update' in st.session_state:
-                # This is already handled by the parent, just ensure it's processed
-                pass
-
-            # Handle resolution update if pending  
-            if 'pending_resolution_update' in st.session_state:
-                # This is already handled by the parent, just ensure it's processed
-                pass
+            if not notes_data['success']:
+                st.error(f"Error loading task notes: {notes_data['message']}")
+                return
+                
+            progress_notes = notes_data['progress_notes']
+            task_issue = notes_data['issue']
+            task_resolution = notes_data['resolution']
 
             # Task information header
             st.markdown(f"""
@@ -58,10 +50,8 @@ def show_task_notes_modal(task):
                 st.markdown(
                     "*Document the main issue or problem this task is meant to address*")
 
-                # Get existing issue if any
-                existing_issue = None
-                if f'task_issue_{task.id}' in st.session_state:
-                    existing_issue = st.session_state[f'task_issue_{task.id}']
+                # Use the loaded issue data
+                existing_issue = task_issue
 
                 with st.form(f"issue_form_{task.id}"):
                     issue_content = st.text_area(
@@ -78,14 +68,19 @@ def show_task_notes_modal(task):
                             if not issue_content.strip():
                                 st.error("❌ Issue description is required!")
                             else:
-                                # Store issue creation/update request
-                                st.session_state['pending_issue_update'] = {
-                                    'task_id': task.id,
-                                    'issue_description': issue_content.strip(),
-                                    'created_by': user.get('id')
-                                }
-                                st.success("✅ Issue description saved!")
-                                st.rerun()
+                                # Save issue directly to database
+                                with st.spinner("Saving issue..."):
+                                    result = create_or_update_issue_sync(
+                                        task_id=task.id,
+                                        issue_description=issue_content.strip(),
+                                        created_by=user.get('id')
+                                    )
+                                
+                                if result['success']:
+                                    st.success(result['message'])
+                                    st.rerun()  # Refresh to show updated data
+                                else:
+                                    st.error(result['message'])
 
                     with col2:
                         if st.form_submit_button("🗑️ Clear"):
@@ -125,35 +120,28 @@ def show_task_notes_modal(task):
                         if not analysis_content.strip():
                             st.error("❌ Progress content is required!")
                         else:
-                            try:
-                                # Create note with simplified structure
-                                if 'create_task_note' in st.session_state:
-                                    del st.session_state['create_task_note']
-
-                                # Store the note creation request
-                                st.session_state['create_task_note'] = {
-                                    'task_id': task.id,
-                                    'note_date': note_date_input,
-                                    'issue_description': f"Daily progress for {note_date_input.strftime('%B %d, %Y')}",
-                                    'analysis_content': analysis_content.strip(),
-                                    'resolution_notes': None,
-                                    'created_by': user.get('id')
-                                }
-                                st.success(
-                                    "✅ Progress note saved successfully!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Error saving note: {e}")
+                            # Save progress note directly to database
+                            with st.spinner("Saving progress note..."):
+                                result = create_progress_note_sync(
+                                    task_id=task.id,
+                                    note_date=note_date_input,
+                                    analysis_content=analysis_content.strip(),
+                                    created_by=user.get('id')
+                                )
+                            
+                            if result['success']:
+                                st.success(result['message'])
+                                st.rerun()  # Refresh to show updated data
+                            else:
+                                st.error(result['message'])
 
             with tab3:
                 st.markdown("### ✅ Task Resolution Notes")
                 st.markdown(
                     "*Document the final resolution when the task is completed*")
 
-                # Get existing resolution if any
-                existing_resolution = None
-                if f'task_resolution_{task.id}' in st.session_state:
-                    existing_resolution = st.session_state[f'task_resolution_{task.id}']
+                # Use the loaded resolution data
+                existing_resolution = task_resolution
 
                 with st.form(f"resolution_form_{task.id}"):
                     resolution_content = st.text_area(
@@ -171,14 +159,19 @@ def show_task_notes_modal(task):
                                 st.error(
                                     "❌ Resolution description is required!")
                             else:
-                                # Store resolution creation/update request
-                                st.session_state['pending_resolution_update'] = {
-                                    'task_id': task.id,
-                                    'resolution_notes': resolution_content.strip(),
-                                    'created_by': user.get('id')
-                                }
-                                st.success("✅ Resolution notes saved!")
-                                st.rerun()
+                                # Save resolution directly to database
+                                with st.spinner("Saving resolution..."):
+                                    result = create_or_update_resolution_sync(
+                                        task_id=task.id,
+                                        resolution_notes=resolution_content.strip(),
+                                        created_by=user.get('id')
+                                    )
+                                
+                                if result['success']:
+                                    st.success(result['message'])
+                                    st.rerun()  # Refresh to show updated data
+                                else:
+                                    st.error(result['message'])
 
                     with col2:
                         if st.form_submit_button("🗑️ Clear"):
@@ -197,17 +190,8 @@ def show_task_notes_modal(task):
                 st.markdown("### 📚 Notes Timeline")
 
                 try:
-                    # Get progress notes from session state if available, otherwise show loading
-                    if f'task_notes_{task.id}' in st.session_state:
-                        all_notes = st.session_state[f'task_notes_{task.id}']
-                        # Filter out issue and resolution notes (special dates)
-                        issue_date = date(1900, 1, 1)
-                        resolution_date = date(2100, 12, 31)
-                        notes = [note for note in all_notes if note.note_date !=
-                                 issue_date and note.note_date != resolution_date]
-                    else:
-                        st.info("Loading notes...")
-                        notes = []
+                    # Use the loaded progress notes data
+                    notes = progress_notes
 
                     if not notes:
                         st.info(
@@ -234,10 +218,15 @@ def show_task_notes_modal(task):
 
                                 with col2:
                                     if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}"):
-                                        # Store delete request for parent to handle
-                                        st.session_state['pending_note_deletion'] = note.id
-                                        st.success("Note deletion requested!")
-                                        st.rerun()
+                                        # Delete note directly from database
+                                        with st.spinner("Deleting note..."):
+                                            result = delete_progress_note_sync(note.id)
+                                        
+                                        if result['success']:
+                                            st.success(result['message'])
+                                            st.rerun()  # Refresh to show updated data
+                                        else:
+                                            st.error(result['message'])
 
                                 # Edit form (if editing)
                                 if st.session_state.get(f"editing_note_{note.id}", False):
@@ -256,15 +245,19 @@ def show_task_notes_modal(task):
                                                     "❌ Cancel")
 
                                             if save_edit:
-                                                # Store update request for parent to handle
-                                                st.session_state['pending_note_update'] = {
-                                                    'note_id': note.id,
-                                                    'analysis_content': edit_analysis.strip()
-                                                }
-                                                st.success(
-                                                    "Note update requested!")
-                                                del st.session_state[f"editing_note_{note.id}"]
-                                                st.rerun()
+                                                # Update note directly in database
+                                                with st.spinner("Updating note..."):
+                                                    result = update_progress_note_sync(
+                                                        note_id=note.id,
+                                                        analysis_content=edit_analysis.strip()
+                                                    )
+                                                
+                                                if result['success']:
+                                                    st.success(result['message'])
+                                                    del st.session_state[f"editing_note_{note.id}"]
+                                                    st.rerun()  # Refresh to show updated data
+                                                else:
+                                                    st.error(result['message'])
 
                                             if cancel_edit:
                                                 del st.session_state[f"editing_note_{note.id}"]
