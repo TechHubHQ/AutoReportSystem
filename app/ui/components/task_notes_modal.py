@@ -6,6 +6,7 @@ from app.core.interface.task_notes_handler import (
     create_progress_note_sync, update_progress_note_sync, delete_progress_note_sync,
     create_or_update_issue_sync, create_or_update_resolution_sync, get_task_notes_data_sync
 )
+import html
 
 
 def show_task_notes_modal(task):
@@ -15,7 +16,7 @@ def show_task_notes_modal(task):
 
     @st.dialog(f"📝 Task Notes: {task.title}", width="large")
     def notes_modal():
-        # Add custom CSS for enhanced timeline styling
+        # Add custom CSS for enhanced timeline styling with proper text wrapping
         st.markdown("""
         <style>
         .timeline-note-card {
@@ -27,6 +28,12 @@ def show_task_notes_modal(task):
         }
         .note-content {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            white-space: pre-wrap !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
         }
         .note-header {
             background: linear-gradient(90deg, #007bff, #0056b3);
@@ -41,8 +48,35 @@ def show_task_notes_modal(task):
         }
         /* Ensure text wrapping in all containers */
         .stMarkdown, .stText {
-            word-wrap: break-word;
-            overflow-wrap: break-word;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            max-width: 100% !important;
+        }
+        /* Fix for code blocks and HTML content */
+        .note-text-content {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #212529;
+            line-height: 1.7;
+            font-size: 0.95rem;
+            white-space: pre-wrap !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
+            hyphens: auto;
+        }
+        /* Container fixes */
+        .note-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
+        }
+        /* Prevent horizontal overflow */
+        .timeline-container * {
+            max-width: 100% !important;
+            box-sizing: border-box !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -74,7 +108,7 @@ def show_task_notes_modal(task):
             # Task information header
             st.markdown(f"""
             <div style="background: linear-gradient(90deg, #007bff, #0056b3); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
-                <h3 style="margin: 0; color: white;">📋 {task.title}</h3>
+                <h3 style="margin: 0; color: white;">📋 {html.escape(task.title)}</h3>
                 <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Status: {task.status.title()} | Priority: {task.priority.title()} | Category: {task.category.title()}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -247,7 +281,7 @@ def show_task_notes_modal(task):
 
                             # Create the card header with HTML
                             st.markdown(f"""
-                            <div class="timeline-note-card" style="
+                            <div class="timeline-note-card note-container" style="
                                 background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
                                 border: 1px solid #dee2e6;
                                 border-left: 4px solid #007bff;
@@ -257,6 +291,9 @@ def show_task_notes_modal(task):
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                                 position: relative;
                                 cursor: default;
+                                max-width: 100%;
+                                width: 100%;
+                                box-sizing: border-box;
                             ">
                                 <!-- Date Header -->
                                 <div style="
@@ -266,12 +303,16 @@ def show_task_notes_modal(task):
                                     margin-bottom: 1rem;
                                     padding-bottom: 0.5rem;
                                     border-bottom: 2px solid #e9ecef;
+                                    flex-wrap: wrap;
+                                    gap: 0.5rem;
                                 ">
                                     <h4 style="
                                         margin: 0;
                                         color: #495057;
                                         font-size: 1.1rem;
                                         font-weight: 600;
+                                        flex: 1;
+                                        min-width: 0;
                                     ">
                                         📅 {note.note_date.strftime('%B %d, %Y')}
                                     </h4>
@@ -283,6 +324,7 @@ def show_task_notes_modal(task):
                                         font-size: 0.8rem;
                                         font-weight: 500;
                                         box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+                                        flex-shrink: 0;
                                     ">
                                         Entry #{note_number}
                                     </span>
@@ -296,6 +338,8 @@ def show_task_notes_modal(task):
                                     border: 1px solid #e9ecef;
                                     border-bottom: none;
                                     box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+                                    max-width: 100%;
+                                    box-sizing: border-box;
                                 ">
                                     <h5 style="
                                         margin: 0 0 0.75rem 0;
@@ -307,6 +351,7 @@ def show_task_notes_modal(task):
                                         display: flex;
                                         align-items: center;
                                         gap: 0.5rem;
+                                        flex-wrap: wrap;
                                     ">
                                         📊 Daily Progress & Analysis
                                         <span class="word-count-badge">{len(note.analysis_content.split())} words</span>
@@ -315,37 +360,26 @@ def show_task_notes_modal(task):
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # Create content container with proper styling
-                            with st.container():
-                                st.markdown("""
-                                <div style="
-                                    background: white;
-                                    border: 1px solid #e9ecef;
-                                    border-top: none;
-                                    border-radius: 0 0 8px 8px;
-                                    padding: 0 1.25rem 1.25rem 1.25rem;
-                                    margin: 0 1rem;
-                                    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-                                ">
-                                """, unsafe_allow_html=True)
-
-                                # Use Streamlit's text display for proper formatting
-                                st.markdown(f"""
-                                <div style="
-                                    color: #212529;
-                                    line-height: 1.7;
-                                    font-size: 0.95rem;
-                                    white-space: pre-wrap;
-                                    word-wrap: break-word;
-                                    max-width: 100%;
-                                    overflow-wrap: break-word;
-                                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                                ">
-                                {note.analysis_content}
+                            # Create content container with proper text wrapping
+                            st.markdown(f"""
+                            <div class="timeline-container" style="
+                                background: white;
+                                border: 1px solid #e9ecef;
+                                border-top: none;
+                                border-radius: 0 0 8px 8px;
+                                padding: 1.25rem;
+                                margin: 0 1rem;
+                                box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+                                max-width: calc(100% - 2rem);
+                                width: calc(100% - 2rem);
+                                box-sizing: border-box;
+                                overflow: hidden;
+                            ">
+                                <div class="note-text-content">
+                                    {html.escape(note.analysis_content)}
                                 </div>
-                                """, unsafe_allow_html=True)
-
-                                st.markdown("</div>", unsafe_allow_html=True)
+                            </div>
+                            """, unsafe_allow_html=True)
 
                             # Footer with timestamp
                             st.markdown(f"""
@@ -357,6 +391,8 @@ def show_task_notes_modal(task):
                                 padding: 0.75rem 1.5rem 1.5rem 1.5rem;
                                 margin: 0 1rem 1rem 1rem;
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                max-width: calc(100% - 2rem);
+                                box-sizing: border-box;
                             ">
                                 <div style="
                                     padding-top: 0.5rem;
@@ -471,9 +507,11 @@ def show_task_notes_modal(task):
                             border-radius: 10px;
                             padding: 1rem;
                             margin: 1rem 0;
+                            max-width: 100%;
+                            box-sizing: border-box;
                         ">
                             <h4 style="margin: 0 0 0.75rem 0; color: #1565c0;">📈 Timeline Summary</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; word-wrap: break-word;">
                                 <div><strong>📝 Total Entries:</strong> {len(notes)}</div>
                                 <div><strong>📊 Total Words:</strong> {total_words:,}</div>
                                 <div><strong>📏 Avg Words/Entry:</strong> {avg_words}</div>
@@ -505,7 +543,7 @@ def show_task_notes_summary(task, max_notes: int = 3):
             for note in notes:
                 with st.expander(f"📅 {note.note_date.strftime('%m/%d/%Y')}", expanded=False):
                     st.markdown(
-                        f"**🔍 Issue:** {note.issue_description[:100]}{'...' if len(note.issue_description) > 100 else ''}")
+                        f"**📝 Issue:** {note.issue_description[:100]}{'...' if len(note.issue_description) > 100 else ''}")
                     if note.resolution_notes:
                         st.markdown(f"**✅ Status:** Resolved")
                     else:
