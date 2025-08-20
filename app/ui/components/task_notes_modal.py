@@ -15,6 +15,38 @@ def show_task_notes_modal(task):
 
     @st.dialog(f"📝 Task Notes: {task.title}", width="large")
     def notes_modal():
+        # Add custom CSS for enhanced timeline styling
+        st.markdown("""
+        <style>
+        .timeline-note-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .timeline-note-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        }
+        .note-content {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .note-header {
+            background: linear-gradient(90deg, #007bff, #0056b3);
+        }
+        .word-count-badge {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 15px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+        /* Ensure text wrapping in all containers */
+        .stMarkdown, .stText {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         # Add close button at the top
         col1, col2 = st.columns([6, 1])
         with col2:
@@ -206,80 +238,217 @@ def show_task_notes_modal(task):
                             "📝 No notes have been added for this task yet. Use the 'Add New Note' tab to create your first note.")
                     else:
                         st.markdown(f"**📊 Total Notes: {len(notes)}**")
+                        st.markdown("---")
 
-                        # Display notes in timeline format
+                        # Display notes in enhanced timeline format
                         for i, note in enumerate(notes):
-                            with st.container():
-                                st.markdown(
-                                    f"### 📅 {note.note_date.strftime('%B %d, %Y')} (Entry #{len(notes) - i})")
+                            # Create a card-like container for each note
+                            note_number = len(notes) - i
+                            
+                            # Enhanced card styling with better text handling and hover effects
+                            # Escape HTML characters in the content to prevent XSS
+                            import html
+                            escaped_content = html.escape(note.analysis_content)
+                            
+                            st.markdown(f"""
+                            <div class="timeline-note-card" style="
+                                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                                border: 1px solid #dee2e6;
+                                border-left: 4px solid #007bff;
+                                border-radius: 12px;
+                                padding: 1.5rem;
+                                margin: 1rem 0;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                position: relative;
+                                cursor: default;
+                            ">
+                                <!-- Date Header -->
+                                <div style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    margin-bottom: 1rem;
+                                    padding-bottom: 0.5rem;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <h4 style="
+                                        margin: 0;
+                                        color: #495057;
+                                        font-size: 1.1rem;
+                                        font-weight: 600;
+                                    ">
+                                        📅 {note.note_date.strftime('%B %d, %Y')}
+                                    </h4>
+                                    <span style="
+                                        background: #007bff;
+                                        color: white;
+                                        padding: 0.25rem 0.75rem;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 500;
+                                        box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+                                    ">
+                                        Entry #{note_number}
+                                    </span>
+                                </div>
+                                
+                                <!-- Content Section -->
+                                <div style="
+                                    background: white;
+                                    border-radius: 8px;
+                                    padding: 1.25rem;
+                                    border: 1px solid #e9ecef;
+                                    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+                                ">
+                                    <h5 style="
+                                        margin: 0 0 0.75rem 0;
+                                        color: #6c757d;
+                                        font-size: 0.9rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 0.5rem;
+                                    ">
+                                        📊 Daily Progress & Analysis
+                                        <span class="word-count-badge">{len(note.analysis_content.split())} words</span>
+                                    </h5>
+                                    <div class="note-content" style="
+                                        color: #212529;
+                                        line-height: 1.7;
+                                        font-size: 0.95rem;
+                                        white-space: pre-wrap;
+                                        word-wrap: break-word;
+                                        max-width: 100%;
+                                        overflow-wrap: break-word;
+                                        hyphens: auto;
+                                        text-align: justify;
+                                    ">
+                                        {escaped_content}
+                                    </div>
+                                </div>
+                                
+                                <!-- Timestamp footer -->
+                                <div style="
+                                    margin-top: 1rem;
+                                    padding-top: 0.5rem;
+                                    border-top: 1px solid #e9ecef;
+                                    font-size: 0.8rem;
+                                    color: #6c757d;
+                                    text-align: right;
+                                ">
+                                    🕰️ Created: {note.note_date.strftime('%A, %B %d, %Y')}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
 
-                                # Progress section
-                                st.markdown("**📊 Daily Progress:**")
-                                st.markdown(f"> {note.analysis_content}")
+                            # Action buttons with better spacing
+                            col1, col2, col3, col4 = st.columns([1, 1, 2, 2])
+                            with col1:
+                                if st.button(f"✏️ Edit", key=f"edit_note_{note.id}", help="Edit this note", use_container_width=True):
+                                    st.session_state[f"editing_note_{note.id}"] = True
+                                    st.rerun()  # Refresh to show edit form
 
-                                # Action buttons
-                                col1, col2, col3 = st.columns([1, 1, 4])
-                                with col1:
-                                    if st.button(f"✏️ Edit", key=f"edit_note_{note.id}"):
-                                        st.session_state[f"editing_note_{note.id}"] = True
-                                        # Don't close modal - just enter edit mode
+                            with col2:
+                                if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}", help="Delete this note", use_container_width=True):
+                                    # Delete note directly from database
+                                    with st.spinner("Deleting note..."):
+                                        result = delete_progress_note_sync(note.id)
+                                    
+                                    if result['success']:
+                                        st.success(result['message'])
+                                        # Don't close modal - just show success message
+                                    else:
+                                        st.error(result['message'])
+                            
+                            with col3:
+                                # Show note statistics
+                                word_count = len(note.analysis_content.split())
+                                char_count = len(note.analysis_content)
+                                st.caption(f"📊 {char_count} characters")
+                            
+                            with col4:
+                                # Show relative time
+                                from datetime import datetime
+                                days_ago = (datetime.now().date() - note.note_date).days
+                                if days_ago == 0:
+                                    time_text = "Today"
+                                elif days_ago == 1:
+                                    time_text = "Yesterday"
+                                else:
+                                    time_text = f"{days_ago} days ago"
+                                st.caption(f"🕰️ {time_text}")
 
-                                with col2:
-                                    if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}"):
-                                        # Delete note directly from database
-                                        with st.spinner("Deleting note..."):
-                                            result = delete_progress_note_sync(note.id)
-                                        
-                                        if result['success']:
-                                            st.success(result['message'])
-                                            # Don't close modal - just show success message
-                                        else:
-                                            st.error(result['message'])
+                            # Edit form (if editing)
+                            if st.session_state.get(f"editing_note_{note.id}", False):
+                                st.markdown("")
+                                with st.expander("✏️ Edit Progress Note", expanded=True):
+                                    with st.form(f"edit_note_form_{note.id}"):
+                                        st.markdown("**Edit your progress note:**")
+                                        edit_analysis = st.text_area(
+                                            "Daily Progress & Analysis:", 
+                                            value=note.analysis_content, 
+                                            height=250,
+                                            help="Update your progress note with new information"
+                                        )
 
-                                # Edit form (if editing)
-                                if st.session_state.get(f"editing_note_{note.id}", False):
-                                    with st.expander("✏️ Edit Progress Note", expanded=True):
-                                        with st.form(f"edit_note_form_{note.id}"):
-                                            edit_analysis = st.text_area(
-                                                "Daily Progress & Analysis:", value=note.analysis_content, height=200)
+                                        col_save, col_cancel, col_preview = st.columns([1, 1, 2])
+                                        with col_save:
+                                            save_edit = st.form_submit_button(
+                                                "💾 Save Changes", type="primary")
+                                        with col_cancel:
+                                            cancel_edit = st.form_submit_button(
+                                                "❌ Cancel")
+                                        with col_preview:
+                                            if edit_analysis:
+                                                st.caption(f"Preview: {len(edit_analysis.split())} words")
 
-                                            col_save, col_cancel = st.columns(
-                                                2)
-                                            with col_save:
-                                                save_edit = st.form_submit_button(
-                                                    "💾 Save Changes", type="primary")
-                                            with col_cancel:
-                                                cancel_edit = st.form_submit_button(
-                                                    "❌ Cancel")
-
-                                            if save_edit:
-                                                # Update note directly in database
-                                                with st.spinner("Updating note..."):
-                                                    result = update_progress_note_sync(
-                                                        note_id=note.id,
-                                                        analysis_content=edit_analysis.strip()
-                                                    )
-                                                
-                                                if result['success']:
-                                                    st.success(result['message'])
-                                                    del st.session_state[f"editing_note_{note.id}"]
-                                                    # Don't close modal - just show success message
-                                                else:
-                                                    st.error(result['message'])
-
-                                            if cancel_edit:
+                                        if save_edit:
+                                            # Update note directly in database
+                                            with st.spinner("Updating note..."):
+                                                result = update_progress_note_sync(
+                                                    note_id=note.id,
+                                                    analysis_content=edit_analysis.strip()
+                                                )
+                                            
+                                            if result['success']:
+                                                st.success(result['message'])
                                                 del st.session_state[f"editing_note_{note.id}"]
-                                                # Don't close modal - just exit edit mode
+                                                # Don't close modal - just show success message
+                                            else:
+                                                st.error(result['message'])
 
-                                st.markdown("---")
+                                        if cancel_edit:
+                                            del st.session_state[f"editing_note_{note.id}"]
+                                            st.rerun()  # Refresh to exit edit mode
 
-                        # Summary statistics
+                            # Add some spacing between notes
+                            st.markdown("<br>", unsafe_allow_html=True)
+
+                        # Enhanced Summary statistics with card styling
+                        total_words = sum(len(note.analysis_content.split()) for note in notes)
+                        avg_words = total_words // len(notes) if notes else 0
+                        
+                        st.markdown("---")
                         st.markdown(f"""
-                        **📈 Summary:**
-                        - Total Progress Entries: {len(notes)}
-                        - Date Range: {notes[-1].note_date.strftime('%B %d, %Y') if notes else 'N/A'} to {notes[0].note_date.strftime('%B %d, %Y') if notes else 'N/A'}
-                        - Latest Entry: {notes[0].note_date.strftime('%B %d, %Y') if notes else 'N/A'}
-                        """)
+                        <div style="
+                            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                            border: 1px solid #90caf9;
+                            border-radius: 10px;
+                            padding: 1rem;
+                            margin: 1rem 0;
+                        ">
+                            <h4 style="margin: 0 0 0.75rem 0; color: #1565c0;">📈 Timeline Summary</h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">
+                                <div><strong>📝 Total Entries:</strong> {len(notes)}</div>
+                                <div><strong>📊 Total Words:</strong> {total_words:,}</div>
+                                <div><strong>📏 Avg Words/Entry:</strong> {avg_words}</div>
+                                <div><strong>📅 Date Range:</strong> {notes[-1].note_date.strftime('%b %d') if notes else 'N/A'} → {notes[0].note_date.strftime('%b %d, %Y') if notes else 'N/A'}</div>
+                                <div><strong>🕒 Latest Entry:</strong> {notes[0].note_date.strftime('%B %d, %Y') if notes else 'N/A'}</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
                 except Exception as e:
                     st.error(f"Error loading notes: {e}")

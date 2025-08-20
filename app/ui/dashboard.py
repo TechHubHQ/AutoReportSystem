@@ -522,7 +522,14 @@ async def render_kanban_board(dashboard_manager):
                 with col2:
                     category = st.selectbox(
                         "Category", ["in progress", "accomplishments", "highlights"])
-                due_date = st.date_input("Due Date")
+                
+                # Due date with option to leave empty
+                has_due_date = st.checkbox("Set due date", value=False, help="Check to set a due date")
+                if has_due_date:
+                    due_date = st.date_input("Due Date", help="Select the due date")
+                else:
+                    due_date = None
+                    st.info("No due date will be set")
 
                 col1, col2 = st.columns(2)
                 with col1:

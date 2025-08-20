@@ -88,7 +88,7 @@ def show_edit_task_modal(task):
                             task.category)
                     )
 
-                    # Handle due date
+                    # Handle due date with option to clear
                     current_due_date = None
                     if task.due_date:
                         if isinstance(task.due_date, str):
@@ -97,8 +97,14 @@ def show_edit_task_modal(task):
                         else:
                             current_due_date = task.due_date.date()
 
-                    new_due_date = st.date_input(
-                        "Due Date", value=current_due_date)
+                    # Checkbox to enable/disable due date
+                    has_due_date = st.checkbox("Set due date", value=current_due_date is not None, help="Check to set a due date")
+                    if has_due_date:
+                        new_due_date = st.date_input(
+                            "Due Date", value=current_due_date or datetime.now().date(), help="Select the due date")
+                    else:
+                        new_due_date = None
+                        st.info("No due date will be set")
 
                 col1, col2 = st.columns(2)
                 with col1:
