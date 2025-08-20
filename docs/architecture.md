@@ -31,7 +31,7 @@ flowchart TB
             AnalyticsInterface[Analytics Interface]
             MetricsInterface[Metrics Interface]
         end
-        
+
         subgraph BusinessServices ["Business Services"]
             ReportGenerator[Report Generator]
             EncryptionService[Encryption Service]
@@ -54,7 +54,7 @@ flowchart TB
             TemplateLoader[Template Loader]
             ContentLoader[Content Loader]
         end
-        
+
         subgraph GitIntegration ["Git Integration"]
             AutoCommit[Auto Commit]
             GitConfig[Git Config]
@@ -71,7 +71,7 @@ flowchart TB
             SMTPModel[SMTP Config]
             SessionModel[User Session]
         end
-        
+
         Database[(PostgreSQL Database)]
         DBConnector[DB Connector]
         Migrations[Alembic Migrations]
@@ -155,32 +155,38 @@ flowchart TB
 ## Technology Stack
 
 ### Frontend
+
 - **Streamlit**: Modern Python web framework for rapid UI development
 - **Plotly**: Interactive data visualization and charts
 - **Custom CSS**: Enhanced styling for modern UI/UX
 
 ### Backend
+
 - **FastAPI**: High-performance async web framework (for API endpoints)
 - **SQLAlchemy**: Modern Python SQL toolkit and ORM
 - **Alembic**: Database migration tool
 - **APScheduler**: Advanced Python Scheduler for background jobs
 
 ### Database
+
 - **PostgreSQL**: Primary relational database
 - **AsyncPG**: Async PostgreSQL driver for high performance
 
 ### Security
+
 - **bcrypt**: Password hashing
 - **Custom Session Management**: Secure user session handling
 - **Route Protection**: Role-based access control
 - **Encryption Service**: Data encryption for sensitive information
 
 ### Integrations
+
 - **SMTP**: Email delivery system
 - **Git**: Version control integration
 - **File System**: Template and content management
 
 ### Infrastructure
+
 - **Docker**: Containerization support
 - **Python-dotenv**: Environment configuration
 - **Logging**: Comprehensive application logging
@@ -189,6 +195,7 @@ flowchart TB
 ## Key Features
 
 ### 🎯 Task Management
+
 - **Kanban Board**: Visual task organization with drag-and-drop
 - **Status Tracking**: Todo, In Progress, Pending, Completed
 - **Priority Levels**: Low, Medium, High, Urgent
@@ -196,24 +203,28 @@ flowchart TB
 - **Task Analytics**: Productivity insights and trends
 
 ### 📊 Dashboard & Analytics
+
 - **Real-time Metrics**: Task completion rates and productivity stats
 - **Visual Charts**: Interactive Plotly visualizations
 - **System Monitoring**: CPU, memory, and disk usage tracking
 - **Historical Trends**: 30-day completion and creation trends
 
 ### ⚙️ Job Automation
+
 - **Scheduled Jobs**: Weekly, monthly, daily, and custom schedules
 - **Report Generation**: Automated report creation and delivery
 - **Email Integration**: SMTP-based email delivery system
 - **Job Monitoring**: Real-time job status and execution tracking
 
 ### 📝 Template Management
+
 - **Email Templates**: Rich HTML template designer
 - **Dynamic Content**: Variable substitution and personalization
 - **Template Categories**: Organized template library
 - **Preview System**: Real-time template preview
 
 ### 🔐 Security
+
 - **User Authentication**: Secure login/signup system
 - **Session Management**: Persistent and secure user sessions
 - **Route Protection**: Role-based access control
@@ -222,6 +233,7 @@ flowchart TB
 ## Data Models
 
 ### Core Entities
+
 - **User**: System users with roles and permissions
 - **Task**: Project tasks with status, priority, and due dates
 - **Job**: Scheduled automation jobs
@@ -230,6 +242,7 @@ flowchart TB
 - **UserSession**: Secure session management
 
 ### Relationships
+
 - Users can have multiple Tasks, Jobs, Templates, and Sessions
 - Tasks maintain status history for audit trails
 - Jobs can reference Templates for automated reporting
@@ -238,11 +251,13 @@ flowchart TB
 ## Deployment Architecture
 
 ### Development
+
 - Local development with SQLite/PostgreSQL
 - Hot-reload with Streamlit development server
 - Environment-based configuration
 
 ### Production
+
 - Docker containerization
 - PostgreSQL database
 - SMTP integration for email delivery
@@ -251,18 +266,21 @@ flowchart TB
 ## Security Considerations
 
 ### Authentication & Authorization
+
 - Secure password hashing with bcrypt
 - Session-based authentication
 - Route-level access control
 - CSRF protection through Streamlit
 
 ### Data Protection
+
 - Encrypted sensitive data storage
 - Secure database connections
 - Environment-based secrets management
 - Input validation and sanitization
 
 ### Infrastructure Security
+
 - Container-based deployment
 - Database connection pooling
 - Secure SMTP configurations
@@ -271,18 +289,21 @@ flowchart TB
 ## Performance Optimizations
 
 ### Database
+
 - Async database operations with AsyncPG
 - Connection pooling for scalability
 - Indexed queries for fast lookups
 - Efficient relationship loading
 
 ### Frontend
+
 - Streamlit caching for improved performance
 - Lazy loading of dashboard components
 - Optimized chart rendering with Plotly
 - Responsive design for mobile devices
 
 ### Background Processing
+
 - Async job scheduling with APScheduler
 - Non-blocking email delivery
 - Efficient report generation
@@ -291,6 +312,7 @@ flowchart TB
 ## Future Enhancements
 
 ### Planned Features
+
 - **API Integration**: RESTful API for external integrations
 - **Mobile App**: Native mobile application
 - **Advanced Analytics**: Machine learning insights
@@ -299,6 +321,7 @@ flowchart TB
 - **Notification System**: Real-time notifications and alerts
 
 ### Scalability Improvements
+
 - **Microservices Architecture**: Service decomposition
 - **Message Queues**: Async task processing
 - **Caching Layer**: Redis for performance

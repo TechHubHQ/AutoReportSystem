@@ -134,6 +134,10 @@ def apply_custom_css():
         position: relative;
         overflow: hidden;
         backdrop-filter: blur(10px);
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .task-card:hover {
@@ -157,6 +161,15 @@ def apply_custom_css():
 
     .task-card:hover::before {
         opacity: 1;
+    }
+
+    .task-content {
+        flex-grow: 1;
+        margin-bottom: 1rem;
+    }
+
+    .task-metadata {
+        margin-top: auto;
     }
 
     .priority-high { border-left-color: #f44336 !important; }
@@ -786,23 +799,31 @@ async def render_kanban_board(dashboard_manager):
                     st.markdown(f"""
                     <div class="task-card archived-task {color_info['all_classes']}">
                         <div class="archive-indicator">📦 ARCHIVED</div>
-                        <strong>{task.title}{notes_indicator}</strong><br>
-                        <small>{description_preview}</small><br>
-                        <div class="date-display created-date">📅 Created: {created_date_str}</div>
-                        <div class="date-display archive-date">📦 Archived: {archived_date_str}</div>
-                        <div class="date-display {due_date_class}">{due_date_display}</div>
-                        <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                        <div class="task-content">
+                            <strong>{task.title}{notes_indicator}</strong><br>
+                            <small>{description_preview}</small>
+                        </div>
+                        <div class="task-metadata">
+                            <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                            <div class="date-display archive-date">📦 Archived: {archived_date_str}</div>
+                            <div class="date-display {due_date_class}">{due_date_display}</div>
+                            <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
                     # Active task card with normal styling
                     st.markdown(f"""
                     <div class="task-card {color_info['all_classes']}">
-                        <strong>{task.title}{notes_indicator}</strong><br>
-                        <small>{description_preview}</small><br>
-                        <div class="date-display created-date">📅 Created: {created_date_str}</div>
-                        <div class="date-display {due_date_class}">{due_date_display}</div>
-                        <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                        <div class="task-content">
+                            <strong>{task.title}{notes_indicator}</strong><br>
+                            <small>{description_preview}</small>
+                        </div>
+                        <div class="task-metadata">
+                            <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                            <div class="date-display {due_date_class}">{due_date_display}</div>
+                            <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -1216,13 +1237,17 @@ async def render_system_monitoring(dashboard_manager):
         st.markdown("#### ℹ️ System Information")
         st.markdown(f"""
         <div class="task-card">
-            <strong>System Details</strong><br>
-            <small>🔧 CPU Cores: {system_info['cpu_cores']}</small><br>
-            <small>⚡ CPU Frequency: {system_info['cpu_frequency']}</small><br>
-            <small>🧠 Total Memory: {system_info['total_memory']}</small><br>
-            <small>💾 Total Disk: {system_info['total_disk']}</small><br>
-            <small>⏱️ Uptime: {system_info['system_uptime']}</small><br>
-            <small>🐍 Platform: {system_info['platform']}</small>
+            <div class="task-content">
+                <strong>System Details</strong>
+            </div>
+            <div class="task-metadata">
+                <small>🔧 CPU Cores: {system_info['cpu_cores']}</small><br>
+                <small>⚡ CPU Frequency: {system_info['cpu_frequency']}</small><br>
+                <small>🧠 Total Memory: {system_info['total_memory']}</small><br>
+                <small>💾 Total Disk: {system_info['total_disk']}</small><br>
+                <small>⏱️ Uptime: {system_info['system_uptime']}</small><br>
+                <small>🐍 Platform: {system_info['platform']}</small>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1293,12 +1318,16 @@ async def render_archived_tasks(dashboard_manager):
             st.markdown(f"""
             <div class="task-card archived-task {color_info['all_classes']}">
                 <div class="archive-indicator">📦 ARCHIVED</div>
-                <strong>{task.title}{notes_indicator}</strong><br>
-                <small>{description_preview}</small><br>
-                <div class="date-display created-date">📅 Created: {created_date_str}</div>
-                <div class="date-display archive-date">📦 Archived: {archived_date_str}</div>
-                <div class="date-display {due_date_class}">{due_date_display}</div>
-                <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                <div class="task-content">
+                    <strong>{task.title}{notes_indicator}</strong><br>
+                    <small>{description_preview}</small>
+                </div>
+                <div class="task-metadata">
+                    <div class="date-display created-date">📅 Created: {created_date_str}</div>
+                    <div class="date-display archive-date">📦 Archived: {archived_date_str}</div>
+                    <div class="date-display {due_date_class}">{due_date_display}</div>
+                    <small>🏷️ {task.category} | 🔥 {task.priority.title()} | 📊 {color_info['status_description']}</small>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
