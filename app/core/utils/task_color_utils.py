@@ -86,8 +86,8 @@ def get_combined_task_color(due_date: Optional[datetime], status: str, priority:
     Get combined color information for a task based on due date, status, and priority
 
     New Color Scheme Rules:
-    - TODO tasks: Green+Blue (far away), Orange+Blue (2 days), Red+Blue (overdue)
-    - IN PROGRESS tasks: Green+Purple (far away), Orange+Purple (2 days), Red+Purple (overdue)
+    - TODO tasks: Green+Blue (far away), Orange+Blue (2 days), Red+Blue (overdue), Navy+Blue (no due date)
+    - IN PROGRESS tasks: Green+Purple (far away), Orange+Purple (2 days), Red+Purple (overdue), Navy+Purple (no due date)
     - PENDING tasks: Always Orange double border
     - COMPLETED tasks: Always green (no change)
 
@@ -111,7 +111,13 @@ def get_combined_task_color(due_date: Optional[datetime], status: str, priority:
         combined_class = "status-pending"
     else:
         # For TODO and IN PROGRESS, combine due date urgency with status
-        if due_color == "due-overdue":
+        if due_color == "due-none":
+            # Navy + Blue (TODO) or Navy + Purple (IN PROGRESS) for no due date
+            if status == "todo":
+                combined_class = "due-none status-todo"
+            else:  # inprogress
+                combined_class = "due-none status-inprogress"
+        elif due_color == "due-overdue":
             # Red + Blue (TODO) or Red + Purple (IN PROGRESS)
             if status == "todo":
                 combined_class = "due-overdue status-todo"

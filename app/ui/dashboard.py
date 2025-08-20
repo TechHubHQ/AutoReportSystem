@@ -94,7 +94,7 @@ class DashboardManager:
 
 
 def apply_custom_css():
-    """Apply custom CSS for modern UI styling"""
+    """Apply custom CSS for modern UI styling with enhanced soft teal color scheme"""
     st.markdown("""
     <style>
     .main-header {
@@ -124,21 +124,39 @@ def apply_custom_css():
 
     .task-card {
         background: white;
-        padding: 1.2rem;
-        border-radius: 16px;
-        box-shadow: -6px 6px 20px rgba(0,0,0,0.15);
+        padding: 1.3rem;
+        border-radius: 18px;
+        box-shadow: -6px 6px 25px rgba(0,0,0,0.12);
         border-left: 5px solid #667eea;
-        margin-bottom: 1rem;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border: 1px solid rgba(0,0,0,0.08);
+        margin-bottom: 1.2rem;
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        border: 1px solid rgba(0,0,0,0.06);
         position: relative;
         overflow: hidden;
+        backdrop-filter: blur(10px);
     }
 
     .task-card:hover {
-        box-shadow: -8px 8px 30px rgba(0,0,0,0.25);
-        transform: translateY(-3px) translateX(2px);
+        box-shadow: -10px 10px 35px rgba(0,0,0,0.18);
+        transform: translateY(-4px) translateX(3px);
         border-left-width: 6px;
+        background: rgba(255,255,255,0.98);
+    }
+
+    .task-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .task-card:hover::before {
+        opacity: 1;
     }
 
     .priority-high { border-left-color: #f44336 !important; }
@@ -146,66 +164,89 @@ def apply_custom_css():
     .priority-medium { border-left-color: #ff9800 !important; }
     .priority-low { border-left-color: #4caf50 !important; }
 
-    /* New Color Scheme Implementation */
+    /* Enhanced Color Scheme Implementation */
     
-    /* COMPLETED TASKS - Always green (no change) */
+    /* COMPLETED TASKS - Enhanced green with better gradient */
     .status-completed {
-        background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%) !important;
+        background: linear-gradient(135deg, #E8F5E8 0%, #A5D6A7 100%) !important;
         border-left-color: #4CAF50 !important;
-        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+        box-shadow: -6px 6px 25px rgba(76, 175, 80, 0.25) !important;
+        border-left-width: 5px !important;
     }
 
-    /* PENDING TASKS - Always orange double border */
+    /* PENDING TASKS - Enhanced orange with better styling */
     .status-pending {
-        background: linear-gradient(135deg, #FFF3E0 0%, #FFCC80 100%) !important;
+        background: linear-gradient(135deg, #FFF8E1 0%, #FFD54F 100%) !important;
         border-left-color: #FF9800 !important;
         border-left-style: double !important;
         border-left-width: 8px !important;
-        box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.3) !important;
+        box-shadow: -6px 6px 25px rgba(255, 152, 0, 0.25) !important;
     }
 
     /* TODO TASKS - Combinations with Blue */
-    /* Overdue TODO: Red + Blue */
+    /* No due date TODO: Soft Teal + Blue - Beautiful calming combination */
+    .due-none.status-todo {
+        background: linear-gradient(135deg, #B2DFDB 0%, #E3F2FD 100%) !important;
+        border-left-color: #26A69A !important;
+        box-shadow: -6px 6px 25px rgba(38, 166, 154, 0.3) !important;
+        border-left-width: 5px !important;
+    }
+    
+    /* Overdue TODO: Enhanced Red + Blue */
     .due-overdue.status-todo {
-        background: linear-gradient(135deg, #FFCDD2 50%, #E3F2FD 50%) !important;
+        background: linear-gradient(135deg, #FFCDD2 0%, #E1F5FE 100%) !important;
         border-left-color: #F44336 !important;
-        box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
+        box-shadow: -8px 8px 30px rgba(244, 67, 54, 0.35) !important;
+        border-left-width: 6px !important;
     }
     
-    /* Urgent TODO (today/tomorrow): Orange + Blue */
+    /* Urgent TODO (today/tomorrow): Enhanced Orange + Blue */
     .due-urgent.status-todo {
-        background: linear-gradient(135deg, #FFCC80 50%, #E3F2FD 50%) !important;
+        background: linear-gradient(135deg, #FFE0B2 0%, #E3F2FD 100%) !important;
         border-left-color: #FF9800 !important;
-        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+        box-shadow: -7px 7px 28px rgba(255, 152, 0, 0.3) !important;
+        border-left-width: 5px !important;
     }
     
-    /* Safe TODO (far away): Green + Blue */
+    /* Safe TODO (far away): Enhanced Green + Blue */
     .due-safe.status-todo {
-        background: linear-gradient(135deg, #C8E6C9 50%, #E3F2FD 50%) !important;
+        background: linear-gradient(135deg, #C8E6C9 0%, #E3F2FD 100%) !important;
         border-left-color: #4CAF50 !important;
-        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+        box-shadow: -6px 6px 25px rgba(76, 175, 80, 0.25) !important;
+        border-left-width: 5px !important;
     }
 
     /* IN PROGRESS TASKS - Combinations with Purple */
-    /* Overdue IN PROGRESS: Red + Purple */
+    /* No due date IN PROGRESS: Soft Teal + Purple - Beautiful calming combination */
+    .due-none.status-inprogress {
+        background: linear-gradient(135deg, #B2DFDB 0%, #F3E5F5 100%) !important;
+        border-left-color: #26A69A !important;
+        box-shadow: -6px 6px 25px rgba(38, 166, 154, 0.3) !important;
+        border-left-width: 5px !important;
+    }
+    
+    /* Overdue IN PROGRESS: Enhanced Red + Purple */
     .due-overdue.status-inprogress {
-        background: linear-gradient(135deg, #FFCDD2 50%, #F3E5F5 50%) !important;
+        background: linear-gradient(135deg, #FFCDD2 0%, #F8E1FF 100%) !important;
         border-left-color: #F44336 !important;
-        box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4) !important;
+        box-shadow: -8px 8px 30px rgba(244, 67, 54, 0.35) !important;
+        border-left-width: 6px !important;
     }
     
-    /* Urgent IN PROGRESS (today/tomorrow): Orange + Purple */
+    /* Urgent IN PROGRESS (today/tomorrow): Enhanced Orange + Purple */
     .due-urgent.status-inprogress {
-        background: linear-gradient(135deg, #FFCC80 50%, #F3E5F5 50%) !important;
+        background: linear-gradient(135deg, #FFE0B2 0%, #F3E5F5 100%) !important;
         border-left-color: #FF9800 !important;
-        box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3) !important;
+        box-shadow: -7px 7px 28px rgba(255, 152, 0, 0.3) !important;
+        border-left-width: 5px !important;
     }
     
-    /* Safe IN PROGRESS (far away): Green + Purple */
+    /* Safe IN PROGRESS (far away): Enhanced Green + Purple */
     .due-safe.status-inprogress {
-        background: linear-gradient(135deg, #C8E6C9 50%, #F3E5F5 50%) !important;
+        background: linear-gradient(135deg, #C8E6C9 0%, #F3E5F5 100%) !important;
         border-left-color: #4CAF50 !important;
-        box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3) !important;
+        box-shadow: -6px 6px 25px rgba(76, 175, 80, 0.25) !important;
+        border-left-width: 5px !important;
     }
 
     /* Legacy support for old classes - fallback */
@@ -216,7 +257,7 @@ def apply_custom_css():
         border-left-color: #9C27B0 !important;
     }
 
-    /* Date display styling */
+    /* Enhanced Date display styling */
     .date-display {
         font-size: 0.9rem;
         color: #424242;
@@ -273,6 +314,7 @@ def apply_custom_css():
         margin: 0.5rem 0;
     }
 
+    /* Enhanced Tab styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
     }
@@ -299,7 +341,7 @@ def apply_custom_css():
         text-align: center;
     }
 
-    /* Action button styling */
+    /* Enhanced Action button styling */
     .stButton > button[title="Delete task permanently"] {
         background-color: #ff4444 !important;
         color: white !important;
@@ -333,7 +375,7 @@ def apply_custom_css():
         border: 1px solid #1e7e34 !important;
     }
 
-    /* Archived task card styling */
+    /* Enhanced Archived task card styling */
     .archived-task {
         opacity: 0.7 !important;
         background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%) !important;
@@ -437,68 +479,82 @@ async def render_kanban_board(dashboard_manager):
 
     # Color system information panel
     if st.session_state.get("show_color_guide", False):
-        @st.dialog("🎨 Task Color System Guide", width="large")
+        @st.dialog("🎨 Enhanced Task Color System Guide", width="large")
         def color_guide_dialog():
             st.markdown("""
-            ### New Enhanced Color System
-            Each task card uses **gradient combinations** based on due date urgency and task status:
+            ### ✨ Enhanced Color System with Soft Teal
+            Each task card uses **beautiful gradient combinations** based on due date urgency and task status:
 
             **TODO Tasks (Blue combinations):**
-            - 🔴+🔵 **Red + Blue**: Overdue TODO tasks
-            - 🟠+🔵 **Orange + Blue**: TODO tasks due today/tomorrow
-            - 🟢+🔵 **Green + Blue**: TODO tasks due later (safe)
+            - 🟢🔵 **Soft Teal + Blue**: TODO tasks with no due date set (calm, flexible, no pressure)
+            - 🔴+🔵 **Red + Blue**: Overdue TODO tasks (urgent attention needed)
+            - 🟠+🔵 **Orange + Blue**: TODO tasks due today/tomorrow (moderate urgency)
+            - 🟢+🔵 **Green + Blue**: TODO tasks due later (safe, well-planned)
 
             **IN PROGRESS Tasks (Purple combinations):**
-            - 🔴+🟣 **Red + Purple**: Overdue IN PROGRESS tasks
-            - 🟠+🟣 **Orange + Purple**: IN PROGRESS tasks due today/tomorrow
-            - 🟢+🟣 **Green + Purple**: IN PROGRESS tasks due later (safe)
+            - 🟢🟣 **Soft Teal + Purple**: IN PROGRESS tasks with no due date set (calm, flexible workflow)
+            - 🔴+🟣 **Red + Purple**: Overdue IN PROGRESS tasks (critical attention needed)
+            - 🟠+🟣 **Orange + Purple**: IN PROGRESS tasks due today/tomorrow (focus required)
+            - 🟢+🟣 **Green + Purple**: IN PROGRESS tasks due later (steady progress)
 
             **Special Status Rules:**
             - 🟠 **PENDING**: Always orange with double border (regardless of due date)
-            - 🟢 **COMPLETED**: Always green (no due date consideration)
+            - 🟢 **COMPLETED**: Always green (celebration of achievement)
 
-            **Visual Enhancements:**
-            - Stronger shadows for urgent tasks (overdue/due soon)
-            - Diagonal gradient split shows both urgency and status
-            - Double border styling for pending tasks
+            **✨ Visual Enhancements:**
+            - **Soft teal** represents "no due date" with elegant, calming blend
+            - Enhanced shadows and depth for better visual hierarchy
+            - Smooth hover animations with subtle lighting effects
+            - Improved gradient transitions for modern aesthetics
+            - Better text contrast and readability
             """)
 
-            # Color examples
-            st.markdown("#### Examples:")
-            col1, col2, col3, col4 = st.columns(4)
+            # Enhanced Color examples
+            st.markdown("#### 🎨 Color Examples:")
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
             with col1:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #FFCDD2 50%, #E3F2FD 50%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #F44336; 
-                           box-shadow: -8px 8px 25px rgba(244, 67, 54, 0.4); margin: 0.5rem 0;">
-                    <small><strong>Overdue TODO</strong><br>Red + Blue</small>
+                <div style="background: linear-gradient(135deg, #B2DFDB 0%, #E3F2FD 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 5px solid #26A69A; 
+                           box-shadow: -6px 6px 25px rgba(38, 166, 154, 0.3); margin: 0.5rem 0;">
+                    <small><strong>No Due Date TODO</strong><br>🟢 Soft Teal + Blue</small>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col2:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #FFCC80 50%, #F3E5F5 50%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #FF9800; 
-                           box-shadow: -8px 8px 25px rgba(255, 152, 0, 0.3); margin: 0.5rem 0;">
-                    <small><strong>Urgent IN PROGRESS</strong><br>Orange + Purple</small>
+                <div style="background: linear-gradient(135deg, #FFCDD2 0%, #E1F5FE 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 6px solid #F44336; 
+                           box-shadow: -8px 8px 30px rgba(244, 67, 54, 0.35); margin: 0.5rem 0;">
+                    <small><strong>Overdue TODO</strong><br>🔴 Red + Blue</small>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col3:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #FFF3E0 0%, #FFCC80 100%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 8px double #FF9800; 
-                           box-shadow: -6px 6px 20px rgba(255, 152, 0, 0.3); margin: 0.5rem 0;">
-                    <small><strong>PENDING</strong><br>Orange Double Border</small>
+                <div style="background: linear-gradient(135deg, #FFE0B2 0%, #F3E5F5 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 5px solid #FF9800; 
+                           box-shadow: -7px 7px 28px rgba(255, 152, 0, 0.3); margin: 0.5rem 0;">
+                    <small><strong>Urgent IN PROGRESS</strong><br>🟠 Orange + Purple</small>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col4:
                 st.markdown("""
-                <div style="background: linear-gradient(135deg, #E8F5E8 0%, #C8E6C9 100%); 
-                           padding: 0.5rem; border-radius: 8px; border-left: 4px solid #4CAF50; 
-                           box-shadow: -6px 6px 20px rgba(76, 175, 80, 0.3); margin: 0.5rem 0;">
-                    <small><strong>COMPLETED</strong><br>Always Green</small>
+                <div style="background: linear-gradient(135deg, #FFF8E1 0%, #FFD54F 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 8px double #FF9800; 
+                           box-shadow: -6px 6px 25px rgba(255, 152, 0, 0.25); margin: 0.5rem 0;">
+                    <small><strong>PENDING</strong><br>🟠 Orange Double Border</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col5:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #E8F5E8 0%, #A5D6A7 100%); 
+                           padding: 0.5rem; border-radius: 8px; border-left: 5px solid #4CAF50; 
+                           box-shadow: -6px 6px 25px rgba(76, 175, 80, 0.25); margin: 0.5rem 0;">
+                    <small><strong>COMPLETED</strong><br>🟢 Always Green</small>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -522,14 +578,16 @@ async def render_kanban_board(dashboard_manager):
                 with col2:
                     category = st.selectbox(
                         "Category", ["in progress", "accomplishments", "highlights"])
-                
-                # Due date with option to leave empty
-                has_due_date = st.checkbox("Set due date", value=False, help="Check to set a due date")
-                if has_due_date:
-                    due_date = st.date_input("Due Date", help="Select the due date")
-                else:
+
+                # Due date (optional - can be left empty)
+                due_date = st.date_input(
+                    "Due Date",
+                    value=None,
+                    help="Select the due date (leave empty if not needed)",
+                )
+
+                if not due_date:
                     due_date = None
-                    st.info("No due date will be set")
 
                 col1, col2 = st.columns(2)
                 with col1:
