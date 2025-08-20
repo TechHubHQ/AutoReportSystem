@@ -15,6 +15,12 @@ def show_edit_task_modal(task):
     if st.session_state.get(modal_key, False):
         @st.dialog(f"✏️ Edit Task: {task.title}", width="large")
         def edit_task_dialog():
+            # Add close button at the top
+            col1, col2 = st.columns([6, 1])
+            with col2:
+                if st.button("❌ Close", key=f"close_edit_modal_{task.id}"):
+                    st.session_state[modal_key] = False
+                    st.rerun()
             # Get color information for the task
             color_info = get_combined_task_color(
                 task.due_date, task.status, task.priority)
@@ -108,12 +114,12 @@ def show_edit_task_modal(task):
                             'due_date': datetime.combine(new_due_date, datetime.min.time()) if new_due_date else None
                         }
                         st.session_state[modal_key] = False
-                        st.rerun()
+                        # Modal will close automatically when session state changes
 
                 with col2:
                     if st.form_submit_button("❌ Cancel"):
                         st.session_state[modal_key] = False
-                        st.rerun()
+                        # Modal will close automatically when session state changes
 
         # Show the dialog
         edit_task_dialog()

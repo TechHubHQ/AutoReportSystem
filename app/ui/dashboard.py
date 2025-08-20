@@ -846,7 +846,7 @@ async def render_kanban_board(dashboard_manager):
         if st.session_state.get(f"show_notes_{task.id}", False):
             from app.ui.components.task_notes_modal import show_task_notes_modal
             show_task_notes_modal(task)
-            st.session_state[f"show_notes_{task.id}"] = False
+            # Don't automatically close the modal - let user close it manually
 
 
 async def render_productivity_analytics(dashboard_manager):
@@ -1283,7 +1283,7 @@ async def render_archived_tasks(dashboard_manager):
         if st.session_state.get(f"show_notes_{task.id}", False):
             from app.ui.components.task_notes_modal import show_task_notes_modal
             show_task_notes_modal(task)
-            st.session_state[f"show_notes_{task.id}"] = False
+            # Don't automatically close the modal - let user close it manually
 
 
 def dashboard(go_to_page):

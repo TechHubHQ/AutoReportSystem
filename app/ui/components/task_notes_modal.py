@@ -15,6 +15,12 @@ def show_task_notes_modal(task):
 
     @st.dialog(f"📝 Task Notes: {task.title}", width="large")
     def notes_modal():
+        # Add close button at the top
+        col1, col2 = st.columns([6, 1])
+        with col2:
+            if st.button("❌ Close", key=f"close_notes_modal_{task.id}"):
+                st.session_state[f"show_notes_{task.id}"] = False
+                st.rerun()
         try:
             # Get current user
             user = RouteProtection.get_current_user()
@@ -78,12 +84,13 @@ def show_task_notes_modal(task):
                                 
                                 if result['success']:
                                     st.success(result['message'])
-                                    st.rerun()  # Refresh to show updated data
+                                    # Don't close modal - just show success message
                                 else:
                                     st.error(result['message'])
 
                     with col2:
                         if st.form_submit_button("🗑️ Clear"):
+                            # Clear the form by rerunning without closing modal
                             st.rerun()
 
                 # Show existing issue info
@@ -131,7 +138,7 @@ def show_task_notes_modal(task):
                             
                             if result['success']:
                                 st.success(result['message'])
-                                st.rerun()  # Refresh to show updated data
+                                # Don't close modal - just show success message
                             else:
                                 st.error(result['message'])
 
@@ -169,12 +176,13 @@ def show_task_notes_modal(task):
                                 
                                 if result['success']:
                                     st.success(result['message'])
-                                    st.rerun()  # Refresh to show updated data
+                                    # Don't close modal - just show success message
                                 else:
                                     st.error(result['message'])
 
                     with col2:
                         if st.form_submit_button("🗑️ Clear"):
+                            # Clear the form by rerunning without closing modal
                             st.rerun()
 
                 # Show existing resolution info
@@ -214,7 +222,7 @@ def show_task_notes_modal(task):
                                 with col1:
                                     if st.button(f"✏️ Edit", key=f"edit_note_{note.id}"):
                                         st.session_state[f"editing_note_{note.id}"] = True
-                                        st.rerun()
+                                        # Don't close modal - just enter edit mode
 
                                 with col2:
                                     if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}"):
@@ -224,7 +232,7 @@ def show_task_notes_modal(task):
                                         
                                         if result['success']:
                                             st.success(result['message'])
-                                            st.rerun()  # Refresh to show updated data
+                                            # Don't close modal - just show success message
                                         else:
                                             st.error(result['message'])
 
@@ -255,13 +263,13 @@ def show_task_notes_modal(task):
                                                 if result['success']:
                                                     st.success(result['message'])
                                                     del st.session_state[f"editing_note_{note.id}"]
-                                                    st.rerun()  # Refresh to show updated data
+                                                    # Don't close modal - just show success message
                                                 else:
                                                     st.error(result['message'])
 
                                             if cancel_edit:
                                                 del st.session_state[f"editing_note_{note.id}"]
-                                                st.rerun()
+                                                # Don't close modal - just exit edit mode
 
                                 st.markdown("---")
 
