@@ -7,6 +7,7 @@ from app.core.interface.task_notes_handler import (
     create_or_update_issue_sync, create_or_update_resolution_sync, get_task_notes_data_sync
 )
 import html
+import re
 
 
 def show_task_notes_modal(task):
@@ -16,77 +17,191 @@ def show_task_notes_modal(task):
 
     @st.dialog(f"📝 Task Notes: {task.title}", width="large")
     def notes_modal():
-        # Add custom CSS for enhanced timeline styling with proper text wrapping
+        # Add comprehensive CSS for proper text handling
         st.markdown("""
         <style>
-        .timeline-note-card {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .timeline-note-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-        }
-        .note-content {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            word-break: break-word !important;
-            white-space: pre-wrap !important;
-            max-width: 100% !important;
-            overflow: hidden !important;
-        }
-        .note-header {
-            background: linear-gradient(90deg, #007bff, #0056b3);
-        }
-        .word-count-badge {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 15px;
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-            color: #6c757d;
-        }
-        /* Ensure text wrapping in all containers */
-        .stMarkdown, .stText {
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            word-break: break-word !important;
-            max-width: 100% !important;
-        }
-        /* Fix for code blocks and HTML content */
-        .note-text-content {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #212529;
-            line-height: 1.7;
-            font-size: 0.95rem;
-            white-space: pre-wrap !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            word-break: break-word !important;
-            max-width: 100% !important;
-            overflow: hidden !important;
-            hyphens: auto;
-        }
-        /* Container fixes */
-        .note-container {
+        /* Global text wrapping and container styles */
+        .main-content-wrapper {
             width: 100% !important;
             max-width: 100% !important;
-            overflow: hidden !important;
+            overflow-x: hidden !important;
         }
-        /* Prevent horizontal overflow */
-        .timeline-container * {
+        
+        /* Timeline card styling */
+        .timeline-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #007bff;
+            border-radius: 12px;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            overflow: hidden;
+        }
+        
+        .timeline-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        /* Header styling */
+        .card-header {
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .date-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #495057;
+            margin: 0;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .entry-badge {
+            background: #007bff;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+            white-space: nowrap;
+        }
+        
+        /* Content section styling */
+        .content-section {
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .section-header {
+            padding: 1rem 1.5rem 0.5rem 1.5rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .section-title {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .word-count {
+            background: #e9ecef;
+            color: #6c757d;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        /* Text content styling - CRITICAL FOR WRAPPING */
+        .note-text {
+            padding: 1.5rem;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #2c3e50;
+            
+            /* Essential wrapping properties */
+            white-space: pre-wrap !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            hyphens: auto;
+            
+            /* Container constraints */
+            width: 100% !important;
             max-width: 100% !important;
+            min-width: 0 !important;
+            overflow-x: hidden !important;
             box-sizing: border-box !important;
+            
+            /* Prevent code-like formatting issues */
+            font-family: inherit !important;
+        }
+        
+        /* Handle code blocks and technical content */
+        .note-text code {
+            background: #f1f3f4;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        
+        /* Footer styling */
+        .card-footer {
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-top: 1px solid #e9ecef;
+            font-size: 0.8rem;
+            color: #6c757d;
+            text-align: right;
+        }
+        
+        /* Action buttons container */
+        .action-buttons {
+            padding: 0 1.5rem 1.5rem 1.5rem;
+            background: white;
+        }
+        
+        /* Statistics container */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+            margin: 0.5rem 0;
+        }
+        
+        .stat-item {
+            background: rgba(255,255,255,0.8);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid rgba(144,202,249,0.3);
+            font-size: 0.9rem;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            
+            .date-title {
+                min-width: auto;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
         }
         </style>
         """, unsafe_allow_html=True)
 
-        # Add close button at the top
+        # Close button
         col1, col2 = st.columns([6, 1])
         with col2:
             if st.button("❌ Close", key=f"close_notes_modal_{task.id}"):
                 st.session_state[f"show_notes_{task.id}"] = False
                 st.rerun()
+
         try:
             # Get current user
             user = RouteProtection.get_current_user()
@@ -94,7 +209,7 @@ def show_task_notes_modal(task):
                 st.error("Please log in to manage task notes.")
                 return
 
-            # Load task notes data directly (no session state dependency)
+            # Load task notes data
             notes_data = get_task_notes_data_sync(task.id)
 
             if not notes_data['success']:
@@ -107,9 +222,17 @@ def show_task_notes_modal(task):
 
             # Task information header
             st.markdown(f"""
-            <div style="background: linear-gradient(90deg, #007bff, #0056b3); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
-                <h3 style="margin: 0; color: white;">📋 {html.escape(task.title)}</h3>
-                <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Status: {task.status.title()} | Priority: {task.priority.title()} | Category: {task.category.title()}</p>
+            <div style="
+                background: linear-gradient(90deg, #007bff, #0056b3); 
+                color: white; 
+                padding: 1.5rem; 
+                border-radius: 8px; 
+                margin-bottom: 1.5rem;
+            ">
+                <h3 style="margin: 0; color: white; font-size: 1.3rem;">📋 {html.escape(task.title)}</h3>
+                <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 0.95rem;">
+                    Status: {task.status.title()} | Priority: {task.priority.title()} | Category: {task.category.title()}
+                </p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -122,7 +245,6 @@ def show_task_notes_modal(task):
                 st.markdown(
                     "*Document the main issue or problem this task is meant to address*")
 
-                # Use the loaded issue data
                 existing_issue = task_issue
 
                 with st.form(f"issue_form_{task.id}"):
@@ -130,7 +252,7 @@ def show_task_notes_modal(task):
                         "What is the main issue or problem?",
                         value=existing_issue.issue_description if existing_issue else "",
                         height=200,
-                        placeholder="Describe the main issue, problem, or objective this task is addressing. What needs to be solved or accomplished?",
+                        placeholder="Describe the main issue, problem, or objective this task is addressing...",
                         help="Provide a clear description of the issue or objective for this task."
                     )
 
@@ -140,26 +262,21 @@ def show_task_notes_modal(task):
                             if not issue_content.strip():
                                 st.error("❌ Issue description is required!")
                             else:
-                                # Save issue directly to database
                                 with st.spinner("Saving issue..."):
                                     result = create_or_update_issue_sync(
                                         task_id=task.id,
                                         issue_description=issue_content.strip(),
                                         created_by=user.get('id')
                                     )
-
                                 if result['success']:
                                     st.success(result['message'])
-                                    # Don't close modal - just show success message
                                 else:
                                     st.error(result['message'])
 
                     with col2:
                         if st.form_submit_button("🗑️ Clear"):
-                            # Clear the form by rerunning without closing modal
                             st.rerun()
 
-                # Show existing issue info
                 if existing_issue:
                     st.markdown("---")
                     st.markdown("**📅 Current Issue:**")
@@ -182,8 +299,8 @@ def show_task_notes_modal(task):
                     analysis_content = st.text_area(
                         "Document your daily progress, work done, challenges, and findings:",
                         height=200,
-                        placeholder="What did you work on today? What progress was made? Any challenges encountered? Key findings or insights...",
-                        help="Document your detailed work, progress, analysis, and any insights gained during the day."
+                        placeholder="What did you work on today? What progress was made? Any challenges encountered?...",
+                        help="Document your detailed work, progress, analysis, and any insights gained."
                     )
 
                     submitted = st.form_submit_button(
@@ -193,7 +310,6 @@ def show_task_notes_modal(task):
                         if not analysis_content.strip():
                             st.error("❌ Progress content is required!")
                         else:
-                            # Save progress note directly to database
                             with st.spinner("Saving progress note..."):
                                 result = create_progress_note_sync(
                                     task_id=task.id,
@@ -201,10 +317,8 @@ def show_task_notes_modal(task):
                                     analysis_content=analysis_content.strip(),
                                     created_by=user.get('id')
                                 )
-
                             if result['success']:
                                 st.success(result['message'])
-                                # Don't close modal - just show success message
                             else:
                                 st.error(result['message'])
 
@@ -213,7 +327,6 @@ def show_task_notes_modal(task):
                 st.markdown(
                     "*Document the final resolution when the task is completed*")
 
-                # Use the loaded resolution data
                 existing_resolution = task_resolution
 
                 with st.form(f"resolution_form_{task.id}"):
@@ -221,8 +334,8 @@ def show_task_notes_modal(task):
                         "How was the issue resolved?",
                         value=existing_resolution.resolution_notes if existing_resolution else "",
                         height=200,
-                        placeholder="Describe how the issue was resolved, what solution was implemented, lessons learned, and final outcomes...",
-                        help="Document the final resolution, solution, and any important outcomes or lessons learned."
+                        placeholder="Describe how the issue was resolved, what solution was implemented...",
+                        help="Document the final resolution, solution, and important outcomes."
                     )
 
                     col1, col2 = st.columns(2)
@@ -232,26 +345,21 @@ def show_task_notes_modal(task):
                                 st.error(
                                     "❌ Resolution description is required!")
                             else:
-                                # Save resolution directly to database
                                 with st.spinner("Saving resolution..."):
                                     result = create_or_update_resolution_sync(
                                         task_id=task.id,
                                         resolution_notes=resolution_content.strip(),
                                         created_by=user.get('id')
                                     )
-
                                 if result['success']:
                                     st.success(result['message'])
-                                    # Don't close modal - just show success message
                                 else:
                                     st.error(result['message'])
 
                     with col2:
                         if st.form_submit_button("🗑️ Clear"):
-                            # Clear the form by rerunning without closing modal
                             st.rerun()
 
-                # Show existing resolution info
                 if existing_resolution:
                     st.markdown("---")
                     st.markdown("**✅ Current Resolution:**")
@@ -263,177 +371,82 @@ def show_task_notes_modal(task):
             with tab4:
                 st.markdown("### 📚 Notes Timeline")
 
+                # Use custom wrapper for timeline content
+                st.markdown('<div class="main-content-wrapper">',
+                            unsafe_allow_html=True)
+
                 try:
-                    # Use the loaded progress notes data
                     notes = progress_notes
 
                     if not notes:
                         st.info(
-                            "📝 No notes have been added for this task yet. Use the 'Add New Note' tab to create your first note.")
+                            "📝 No notes have been added for this task yet. Use the 'Daily Progress' tab to create your first note.")
                     else:
                         st.markdown(f"**📊 Total Notes: {len(notes)}**")
                         st.markdown("---")
 
-                        # Display notes in enhanced timeline format
+                        # Display notes with completely redesigned layout
                         for i, note in enumerate(notes):
-                            # Create a card-like container for each note
                             note_number = len(notes) - i
+                            word_count = len(note.analysis_content.split())
+                            char_count = len(note.analysis_content)
 
-                            # Create the card header with HTML
+                            # Clean and escape the content properly
+                            escaped_content = html.escape(
+                                note.analysis_content)
+
+                            # Create the complete timeline card
                             st.markdown(f"""
-                            <div class="timeline-note-card note-container" style="
-                                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                                border: 1px solid #dee2e6;
-                                border-left: 4px solid #007bff;
-                                border-radius: 12px 12px 0 0;
-                                padding: 1.5rem 1.5rem 0 1.5rem;
-                                margin: 1rem 0 0 0;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                                position: relative;
-                                cursor: default;
-                                max-width: 100%;
-                                width: 100%;
-                                box-sizing: border-box;
-                            ">
-                                <!-- Date Header -->
-                                <div style="
-                                    display: flex;
-                                    justify-content: space-between;
-                                    align-items: center;
-                                    margin-bottom: 1rem;
-                                    padding-bottom: 0.5rem;
-                                    border-bottom: 2px solid #e9ecef;
-                                    flex-wrap: wrap;
-                                    gap: 0.5rem;
-                                ">
-                                    <h4 style="
-                                        margin: 0;
-                                        color: #495057;
-                                        font-size: 1.1rem;
-                                        font-weight: 600;
-                                        flex: 1;
-                                        min-width: 0;
-                                    ">
-                                        📅 {note.note_date.strftime('%B %d, %Y')}
-                                    </h4>
-                                    <span style="
-                                        background: #007bff;
-                                        color: white;
-                                        padding: 0.25rem 0.75rem;
-                                        border-radius: 20px;
-                                        font-size: 0.8rem;
-                                        font-weight: 500;
-                                        box-shadow: 0 2px 4px rgba(0,123,255,0.3);
-                                        flex-shrink: 0;
-                                    ">
-                                        Entry #{note_number}
-                                    </span>
+                            <div class="timeline-card">
+                                <!-- Card Header -->
+                                <div class="card-header">
+                                    <h4 class="date-title">📅 {note.note_date.strftime('%B %d, %Y')}</h4>
+                                    <span class="entry-badge">Entry #{note_number}</span>
                                 </div>
                                 
-                                <!-- Content Header -->
-                                <div style="
-                                    background: white;
-                                    border-radius: 8px 8px 0 0;
-                                    padding: 1.25rem 1.25rem 0.5rem 1.25rem;
-                                    border: 1px solid #e9ecef;
-                                    border-bottom: none;
-                                    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-                                    max-width: 100%;
-                                    box-sizing: border-box;
-                                ">
-                                    <h5 style="
-                                        margin: 0 0 0.75rem 0;
-                                        color: #6c757d;
-                                        font-size: 0.9rem;
-                                        font-weight: 600;
-                                        text-transform: uppercase;
-                                        letter-spacing: 0.5px;
-                                        display: flex;
-                                        align-items: center;
-                                        gap: 0.5rem;
-                                        flex-wrap: wrap;
-                                    ">
-                                        📊 Daily Progress & Analysis
-                                        <span class="word-count-badge">{len(note.analysis_content.split())} words</span>
-                                    </h5>
+                                <!-- Content Section -->
+                                <div class="content-section">
+                                    <div class="section-header">
+                                        <h5 class="section-title">
+                                            📊 Daily Progress & Analysis
+                                            <span class="word-count">{word_count} words</span>
+                                        </h5>
+                                    </div>
+                                    
+                                    <div class="note-text">{escaped_content}</div>
                                 </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                            # Create content container with proper text wrapping
-                            st.markdown(f"""
-                            <div class="timeline-container" style="
-                                background: white;
-                                border: 1px solid #e9ecef;
-                                border-top: none;
-                                border-radius: 0 0 8px 8px;
-                                padding: 1.25rem;
-                                margin: 0 1rem;
-                                box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-                                max-width: calc(100% - 2rem);
-                                width: calc(100% - 2rem);
-                                box-sizing: border-box;
-                                overflow: hidden;
-                            ">
-                                <div class="note-text-content">
-                                    {html.escape(note.analysis_content)}
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                            # Footer with timestamp
-                            st.markdown(f"""
-                            <div style="
-                                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                                border: 1px solid #dee2e6;
-                                border-top: none;
-                                border-radius: 0 0 12px 12px;
-                                padding: 0.75rem 1.5rem 1.5rem 1.5rem;
-                                margin: 0 1rem 1rem 1rem;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                                max-width: calc(100% - 2rem);
-                                box-sizing: border-box;
-                            ">
-                                <div style="
-                                    padding-top: 0.5rem;
-                                    border-top: 1px solid #e9ecef;
-                                    font-size: 0.8rem;
-                                    color: #6c757d;
-                                    text-align: right;
-                                ">
+                                
+                                <!-- Card Footer -->
+                                <div class="card-footer">
                                     🕰️ Created: {note.note_date.strftime('%A, %B %d, %Y')}
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
 
-                            # Action buttons with better spacing
+                            # Action buttons using Streamlit columns
+                            st.markdown('<div class="action-buttons">',
+                                        unsafe_allow_html=True)
                             col1, col2, col3, col4 = st.columns([1, 1, 2, 2])
+
                             with col1:
-                                if st.button(f"✏️ Edit", key=f"edit_note_{note.id}", help="Edit this note", use_container_width=True):
+                                if st.button("✏️ Edit", key=f"edit_note_{note.id}", help="Edit this note", use_container_width=True):
                                     st.session_state[f"editing_note_{note.id}"] = True
-                                    st.rerun()  # Refresh to show edit form
+                                    st.rerun()
 
                             with col2:
-                                if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}", help="Delete this note", use_container_width=True):
-                                    # Delete note directly from database
+                                if st.button("🗑️ Delete", key=f"delete_note_{note.id}", help="Delete this note", use_container_width=True):
                                     with st.spinner("Deleting note..."):
                                         result = delete_progress_note_sync(
                                             note.id)
-
                                     if result['success']:
                                         st.success(result['message'])
-                                        # Don't close modal - just show success message
                                     else:
                                         st.error(result['message'])
 
                             with col3:
-                                # Show note statistics
-                                word_count = len(note.analysis_content.split())
-                                char_count = len(note.analysis_content)
                                 st.caption(f"📊 {char_count} characters")
 
                             with col4:
-                                # Show relative time
                                 from datetime import datetime
                                 days_ago = (datetime.now().date() -
                                             note.note_date).days
@@ -445,18 +458,17 @@ def show_task_notes_modal(task):
                                     time_text = f"{days_ago} days ago"
                                 st.caption(f"🕰️ {time_text}")
 
-                            # Edit form (if editing)
+                            st.markdown('</div>', unsafe_allow_html=True)
+
+                            # Edit form
                             if st.session_state.get(f"editing_note_{note.id}", False):
-                                st.markdown("")
                                 with st.expander("✏️ Edit Progress Note", expanded=True):
                                     with st.form(f"edit_note_form_{note.id}"):
-                                        st.markdown(
-                                            "**Edit your progress note:**")
                                         edit_analysis = st.text_area(
                                             "Daily Progress & Analysis:",
                                             value=note.analysis_content,
                                             height=250,
-                                            help="Update your progress note with new information"
+                                            help="Update your progress note"
                                         )
 
                                         col_save, col_cancel, col_preview = st.columns([
@@ -473,28 +485,22 @@ def show_task_notes_modal(task):
                                                     f"Preview: {len(edit_analysis.split())} words")
 
                                         if save_edit:
-                                            # Update note directly in database
                                             with st.spinner("Updating note..."):
                                                 result = update_progress_note_sync(
                                                     note_id=note.id,
                                                     analysis_content=edit_analysis.strip()
                                                 )
-
                                             if result['success']:
                                                 st.success(result['message'])
                                                 del st.session_state[f"editing_note_{note.id}"]
-                                                # Don't close modal - just show success message
                                             else:
                                                 st.error(result['message'])
 
                                         if cancel_edit:
                                             del st.session_state[f"editing_note_{note.id}"]
-                                            st.rerun()  # Refresh to exit edit mode
+                                            st.rerun()
 
-                            # Add some spacing between notes
-                            st.markdown("<br>", unsafe_allow_html=True)
-
-                        # Enhanced Summary statistics with card styling
+                        # Timeline Summary
                         total_words = sum(
                             len(note.analysis_content.split()) for note in notes)
                         avg_words = total_words // len(notes) if notes else 0
@@ -504,25 +510,25 @@ def show_task_notes_modal(task):
                         <div style="
                             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
                             border: 1px solid #90caf9;
-                            border-radius: 10px;
-                            padding: 1rem;
-                            margin: 1rem 0;
-                            max-width: 100%;
-                            box-sizing: border-box;
+                            border-radius: 12px;
+                            padding: 1.5rem;
+                            margin: 1.5rem 0;
                         ">
-                            <h4 style="margin: 0 0 0.75rem 0; color: #1565c0;">📈 Timeline Summary</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; word-wrap: break-word;">
-                                <div><strong>📝 Total Entries:</strong> {len(notes)}</div>
-                                <div><strong>📊 Total Words:</strong> {total_words:,}</div>
-                                <div><strong>📏 Avg Words/Entry:</strong> {avg_words}</div>
-                                <div><strong>📅 Date Range:</strong> {notes[-1].note_date.strftime('%b %d') if notes else 'N/A'} → {notes[0].note_date.strftime('%b %d, %Y') if notes else 'N/A'}</div>
-                                <div><strong>🕒 Latest Entry:</strong> {notes[0].note_date.strftime('%B %d, %Y') if notes else 'N/A'}</div>
+                            <h4 style="margin: 0 0 1rem 0; color: #1565c0; font-size: 1.1rem;">📈 Timeline Summary</h4>
+                            <div class="stats-grid">
+                                <div class="stat-item"><strong>📝 Total Entries:</strong> {len(notes)}</div>
+                                <div class="stat-item"><strong>📊 Total Words:</strong> {total_words:,}</div>
+                                <div class="stat-item"><strong>📏 Avg Words/Entry:</strong> {avg_words}</div>
+                                <div class="stat-item"><strong>📅 Date Range:</strong> {notes[-1].note_date.strftime('%b %d') if notes else 'N/A'} → {notes[0].note_date.strftime('%b %d, %Y') if notes else 'N/A'}</div>
+                                <div class="stat-item"><strong>🕒 Latest Entry:</strong> {notes[0].note_date.strftime('%B %d, %Y') if notes else 'N/A'}</div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
 
                 except Exception as e:
                     st.error(f"Error loading notes: {e}")
+
+                st.markdown('</div>', unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Error in notes modal: {e}")
@@ -542,12 +548,19 @@ def show_task_notes_summary(task, max_notes: int = 3):
             st.markdown("**📝 Recent Notes:**")
             for note in notes:
                 with st.expander(f"📅 {note.note_date.strftime('%m/%d/%Y')}", expanded=False):
-                    st.markdown(
-                        f"**📝 Issue:** {note.issue_description[:100]}{'...' if len(note.issue_description) > 100 else ''}")
-                    if note.resolution_notes:
-                        st.markdown(f"**✅ Status:** Resolved")
+                    # Display content properly wrapped
+                    st.text_area(
+                        "Note Content",
+                        value=note.analysis_content[:200] + (
+                            "..." if len(note.analysis_content) > 200 else ""),
+                        height=100,
+                        disabled=True,
+                        label_visibility="collapsed"
+                    )
+                    if hasattr(note, 'resolution_notes') and note.resolution_notes:
+                        st.markdown("**✅ Status:** Resolved")
                     else:
-                        st.markdown(f"**⏳ Status:** In Progress")
+                        st.markdown("**⏳ Status:** In Progress")
         else:
             st.markdown("*No notes available*")
 
