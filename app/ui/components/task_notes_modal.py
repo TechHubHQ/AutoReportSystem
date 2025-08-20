@@ -46,7 +46,7 @@ def show_task_notes_modal(task):
         }
         </style>
         """, unsafe_allow_html=True)
-        
+
         # Add close button at the top
         col1, col2 = st.columns([6, 1])
         with col2:
@@ -62,11 +62,11 @@ def show_task_notes_modal(task):
 
             # Load task notes data directly (no session state dependency)
             notes_data = get_task_notes_data_sync(task.id)
-            
+
             if not notes_data['success']:
                 st.error(f"Error loading task notes: {notes_data['message']}")
                 return
-                
+
             progress_notes = notes_data['progress_notes']
             task_issue = notes_data['issue']
             task_resolution = notes_data['resolution']
@@ -113,7 +113,7 @@ def show_task_notes_modal(task):
                                         issue_description=issue_content.strip(),
                                         created_by=user.get('id')
                                     )
-                                
+
                                 if result['success']:
                                     st.success(result['message'])
                                     # Don't close modal - just show success message
@@ -167,7 +167,7 @@ def show_task_notes_modal(task):
                                     analysis_content=analysis_content.strip(),
                                     created_by=user.get('id')
                                 )
-                            
+
                             if result['success']:
                                 st.success(result['message'])
                                 # Don't close modal - just show success message
@@ -205,7 +205,7 @@ def show_task_notes_modal(task):
                                         resolution_notes=resolution_content.strip(),
                                         created_by=user.get('id')
                                     )
-                                
+
                                 if result['success']:
                                     st.success(result['message'])
                                     # Don't close modal - just show success message
@@ -244,20 +244,16 @@ def show_task_notes_modal(task):
                         for i, note in enumerate(notes):
                             # Create a card-like container for each note
                             note_number = len(notes) - i
-                            
-                            # Enhanced card styling with better text handling and hover effects
-                            # Escape HTML characters in the content to prevent XSS
-                            import html
-                            escaped_content = html.escape(note.analysis_content)
-                            
+
+                            # Create the card header with HTML
                             st.markdown(f"""
                             <div class="timeline-note-card" style="
                                 background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
                                 border: 1px solid #dee2e6;
                                 border-left: 4px solid #007bff;
-                                border-radius: 12px;
-                                padding: 1.5rem;
-                                margin: 1rem 0;
+                                border-radius: 12px 12px 0 0;
+                                padding: 1.5rem 1.5rem 0 1.5rem;
+                                margin: 1rem 0 0 0;
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                                 position: relative;
                                 cursor: default;
@@ -292,12 +288,13 @@ def show_task_notes_modal(task):
                                     </span>
                                 </div>
                                 
-                                <!-- Content Section -->
+                                <!-- Content Header -->
                                 <div style="
                                     background: white;
-                                    border-radius: 8px;
-                                    padding: 1.25rem;
+                                    border-radius: 8px 8px 0 0;
+                                    padding: 1.25rem 1.25rem 0.5rem 1.25rem;
                                     border: 1px solid #e9ecef;
+                                    border-bottom: none;
                                     box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
                                 ">
                                     <h5 style="
@@ -314,24 +311,54 @@ def show_task_notes_modal(task):
                                         📊 Daily Progress & Analysis
                                         <span class="word-count-badge">{len(note.analysis_content.split())} words</span>
                                     </h5>
-                                    <div class="note-content" style="
-                                        color: #212529;
-                                        line-height: 1.7;
-                                        font-size: 0.95rem;
-                                        white-space: pre-wrap;
-                                        word-wrap: break-word;
-                                        max-width: 100%;
-                                        overflow-wrap: break-word;
-                                        hyphens: auto;
-                                        text-align: justify;
-                                    ">
-                                        {escaped_content}
-                                    </div>
                                 </div>
-                                
-                                <!-- Timestamp footer -->
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            # Create content container with proper styling
+                            with st.container():
+                                st.markdown("""
                                 <div style="
-                                    margin-top: 1rem;
+                                    background: white;
+                                    border: 1px solid #e9ecef;
+                                    border-top: none;
+                                    border-radius: 0 0 8px 8px;
+                                    padding: 0 1.25rem 1.25rem 1.25rem;
+                                    margin: 0 1rem;
+                                    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+                                ">
+                                """, unsafe_allow_html=True)
+
+                                # Use Streamlit's text display for proper formatting
+                                st.markdown(f"""
+                                <div style="
+                                    color: #212529;
+                                    line-height: 1.7;
+                                    font-size: 0.95rem;
+                                    white-space: pre-wrap;
+                                    word-wrap: break-word;
+                                    max-width: 100%;
+                                    overflow-wrap: break-word;
+                                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                ">
+                                {note.analysis_content}
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                                st.markdown("</div>", unsafe_allow_html=True)
+
+                            # Footer with timestamp
+                            st.markdown(f"""
+                            <div style="
+                                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                                border: 1px solid #dee2e6;
+                                border-top: none;
+                                border-radius: 0 0 12px 12px;
+                                padding: 0.75rem 1.5rem 1.5rem 1.5rem;
+                                margin: 0 1rem 1rem 1rem;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            ">
+                                <div style="
                                     padding-top: 0.5rem;
                                     border-top: 1px solid #e9ecef;
                                     font-size: 0.8rem;
@@ -354,24 +381,26 @@ def show_task_notes_modal(task):
                                 if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}", help="Delete this note", use_container_width=True):
                                     # Delete note directly from database
                                     with st.spinner("Deleting note..."):
-                                        result = delete_progress_note_sync(note.id)
-                                    
+                                        result = delete_progress_note_sync(
+                                            note.id)
+
                                     if result['success']:
                                         st.success(result['message'])
                                         # Don't close modal - just show success message
                                     else:
                                         st.error(result['message'])
-                            
+
                             with col3:
                                 # Show note statistics
                                 word_count = len(note.analysis_content.split())
                                 char_count = len(note.analysis_content)
                                 st.caption(f"📊 {char_count} characters")
-                            
+
                             with col4:
                                 # Show relative time
                                 from datetime import datetime
-                                days_ago = (datetime.now().date() - note.note_date).days
+                                days_ago = (datetime.now().date() -
+                                            note.note_date).days
                                 if days_ago == 0:
                                     time_text = "Today"
                                 elif days_ago == 1:
@@ -385,15 +414,17 @@ def show_task_notes_modal(task):
                                 st.markdown("")
                                 with st.expander("✏️ Edit Progress Note", expanded=True):
                                     with st.form(f"edit_note_form_{note.id}"):
-                                        st.markdown("**Edit your progress note:**")
+                                        st.markdown(
+                                            "**Edit your progress note:**")
                                         edit_analysis = st.text_area(
-                                            "Daily Progress & Analysis:", 
-                                            value=note.analysis_content, 
+                                            "Daily Progress & Analysis:",
+                                            value=note.analysis_content,
                                             height=250,
                                             help="Update your progress note with new information"
                                         )
 
-                                        col_save, col_cancel, col_preview = st.columns([1, 1, 2])
+                                        col_save, col_cancel, col_preview = st.columns([
+                                                                                       1, 1, 2])
                                         with col_save:
                                             save_edit = st.form_submit_button(
                                                 "💾 Save Changes", type="primary")
@@ -402,7 +433,8 @@ def show_task_notes_modal(task):
                                                 "❌ Cancel")
                                         with col_preview:
                                             if edit_analysis:
-                                                st.caption(f"Preview: {len(edit_analysis.split())} words")
+                                                st.caption(
+                                                    f"Preview: {len(edit_analysis.split())} words")
 
                                         if save_edit:
                                             # Update note directly in database
@@ -411,7 +443,7 @@ def show_task_notes_modal(task):
                                                     note_id=note.id,
                                                     analysis_content=edit_analysis.strip()
                                                 )
-                                            
+
                                             if result['success']:
                                                 st.success(result['message'])
                                                 del st.session_state[f"editing_note_{note.id}"]
@@ -427,9 +459,10 @@ def show_task_notes_modal(task):
                             st.markdown("<br>", unsafe_allow_html=True)
 
                         # Enhanced Summary statistics with card styling
-                        total_words = sum(len(note.analysis_content.split()) for note in notes)
+                        total_words = sum(
+                            len(note.analysis_content.split()) for note in notes)
                         avg_words = total_words // len(notes) if notes else 0
-                        
+
                         st.markdown("---")
                         st.markdown(f"""
                         <div style="
