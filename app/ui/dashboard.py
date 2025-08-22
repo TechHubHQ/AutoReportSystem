@@ -914,7 +914,8 @@ async def render_kanban_board(dashboard_manager):
                         status=update_data['status'],
                         priority=update_data['priority'],
                         category=update_data['category'],
-                        due_date=update_data['due_date']
+                        due_date=update_data['due_date'],
+                        updated_by=update_data.get('updated_by')
                     )
                     st.success("✅ Task updated successfully!")
                     del st.session_state[f'pending_task_update_{task.id}']

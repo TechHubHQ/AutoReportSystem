@@ -112,6 +112,8 @@ def show_edit_task_modal(task):
                 with col1:
                     if st.form_submit_button("💾 Save Changes", type="primary"):
                         # Store task update data for the parent async context to handle
+                        from app.security.route_protection import RouteProtection
+                        user = RouteProtection.get_current_user()
                         st.session_state[f'pending_task_update_{task.id}'] = {
                             'task_id': task.id,
                             'title': new_title,
@@ -119,9 +121,11 @@ def show_edit_task_modal(task):
                             'status': new_status,
                             'priority': new_priority,
                             'category': new_category,
-                            'due_date': datetime.combine(new_due_date, datetime.min.time()) if new_due_date else None
+                            'due_date': datetime.combine(new_due_date, datetime.min.time()) if new_due_date else None,
+                            'updated_by': user.get('id') if user else None
                         }
                         st.session_state[modal_key] = False
+                        st.rerun()
                         # Modal will close automatically when session state changes
 
                 with col2:
