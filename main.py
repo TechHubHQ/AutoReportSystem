@@ -10,6 +10,8 @@ from app.ui.template_designer import template_designer
 from app.ui.user_settings import settings
 from app.ui.dashboard import dashboard
 from app.ui.jobs_dashboard import jobs_dashboard
+from app.ui.job_email_config import job_email_config
+from app.ui.system_monitor import system_monitor
 from app.ui.signup import signup
 from app.ui.login import login
 from app.database.db_connector import init_db
@@ -240,6 +242,14 @@ elif st.session_state.page == "template_designer":
 elif st.session_state.page == "smtp_conf":
     # This route is protected by RouteProtection.check_route_access()
     smtp_conf(go_to_page)
+
+elif st.session_state.page == "job_email_config":
+    # This route is protected by RouteProtection.check_route_access()
+    job_email_config(go_to_page)
+
+elif st.session_state.page == "system_monitor":
+    # This route is protected by RouteProtection.check_route_access()
+    system_monitor(go_to_page)
 
 else:
     # Unknown page - redirect to home

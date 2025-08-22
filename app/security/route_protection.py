@@ -21,7 +21,9 @@ class RouteProtection:
         "template_designer",
         "smtp_conf",
         "jobs",
-        "job_management"
+        "job_management",
+        "job_email_config",
+        "system_monitor"
     }
 
     # Define public routes that don't require authentication

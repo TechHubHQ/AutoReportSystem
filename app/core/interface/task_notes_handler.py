@@ -34,6 +34,10 @@ async def create_progress_note_direct(task_id: int, note_date: date, timeline_co
     try:
         # Create the note with a descriptive issue description
         issue_description = f"Daily progress for {note_date.strftime('%B %d, %Y')}"
+        
+        # Ensure analysis_content is not None (database constraint)
+        if analysis_content is None or analysis_content.strip() == "":
+            analysis_content = "Progress note - analysis pending"
 
         note = await create_task_note(
             task_id=task_id,
@@ -86,10 +90,17 @@ async def update_progress_note_direct(note_id: int, timeline_content: str = None
                 'note': None
             }
         
+        # Prepare analysis content - ensure it's not empty if provided
+        processed_analysis = None
+        if analysis_content is not None:
+            processed_analysis = analysis_content.strip()
+            if processed_analysis == "":
+                processed_analysis = "Progress note - analysis pending"
+        
         note = await update_task_note(
             note_id=note_id,
             timeline_content=timeline_content.strip() if timeline_content else None,
-            analysis_content=analysis_content.strip() if analysis_content else None
+            analysis_content=processed_analysis
         )
 
         logger.info(f"Successfully updated progress note {note_id}")

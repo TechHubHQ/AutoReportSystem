@@ -23,6 +23,10 @@ async def create_task_note(task_id: int, note_date: date, issue_description: str
             raise Exception(
                 f"A note already exists for task {task_id} on {note_date}. Please update the existing note instead.")
 
+        # Ensure analysis_content is never None due to NOT NULL constraint
+        if analysis_content is None or analysis_content.strip() == "":
+            analysis_content = "Progress note - analysis pending"
+
         new_note = TaskNote(
             task_id=task_id,
             note_date=note_date,
@@ -124,7 +128,11 @@ async def update_task_note(note_id: int, issue_description: str = None,
         if timeline_content is not None:
             update_data['timeline_content'] = timeline_content
         if analysis_content is not None:
-            update_data['analysis_content'] = analysis_content
+            # Ensure analysis_content is never empty due to NOT NULL constraint
+            if analysis_content.strip() == "":
+                update_data['analysis_content'] = "Progress note - analysis pending"
+            else:
+                update_data['analysis_content'] = analysis_content
         if resolution_notes is not None:
             update_data['resolution_notes'] = resolution_notes
 

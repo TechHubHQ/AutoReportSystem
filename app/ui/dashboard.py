@@ -1138,9 +1138,9 @@ async def render_productivity_analytics(dashboard_manager):
 
 
 async def render_system_monitoring(dashboard_manager):
-    """Render system monitoring dashboard"""
-    st.markdown("### 🖥️ System Monitoring")
-
+    """Render basic system monitoring dashboard"""
+    st.markdown("### 🖥️ System Overview")
+    
     # Get current system status with loader
     with LoaderContext("Collecting system metrics...", "inline"):
         system_status = await get_current_system_status()
@@ -1180,77 +1180,14 @@ async def render_system_monitoring(dashboard_manager):
             <p style="margin: 0.5rem 0 0 0; color: #666;">Health Score</p>
         </div>
         """, unsafe_allow_html=True)
-
-    # System alerts
-    st.markdown("#### 🚨 System Alerts")
-    for alert in system_status['alerts']:
-        if "Critical" in alert:
-            st.error(alert)
-        elif "Warning" in alert:
-            st.warning(alert)
-        else:
-            st.success(alert)
-
-    # Historical metrics chart
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("#### 📊 Resource Usage Trends")
-        with LoaderContext("Loading historical data...", "inline"):
-            historical_data = await get_historical_metrics(hours=12)
-
-        if historical_data['data']:
-            df_metrics = pd.DataFrame(historical_data['data'])
-            df_metrics['timestamp'] = pd.to_datetime(df_metrics['timestamp'])
-
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=df_metrics['timestamp'],
-                y=df_metrics['cpu_usage'],
-                mode='lines+markers',
-                name='CPU Usage (%)',
-                line=dict(color='#667eea')
-            ))
-            fig.add_trace(go.Scatter(
-                x=df_metrics['timestamp'],
-                y=df_metrics['memory_usage'],
-                mode='lines+markers',
-                name='Memory Usage (%)',
-                line=dict(color='#764ba2')
-            ))
-            fig.add_trace(go.Scatter(
-                x=df_metrics['timestamp'],
-                y=df_metrics['disk_usage'],
-                mode='lines+markers',
-                name='Disk Usage (%)',
-                line=dict(color='#ff9800')
-            ))
-
-            fig.update_layout(
-                title="System Resource Usage (Last 12 Hours)",
-                xaxis_title="Time",
-                yaxis_title="Usage (%)",
-                height=400
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
+    
+    # Link to full system monitor
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        st.markdown("#### ℹ️ System Information")
-        st.markdown(f"""
-        <div class="task-card">
-            <div class="task-content">
-                <strong>System Details</strong>
-            </div>
-            <div class="task-metadata">
-                <small>🔧 CPU Cores: {system_info['cpu_cores']}</small><br>
-                <small>⚡ CPU Frequency: {system_info['cpu_frequency']}</small><br>
-                <small>🧠 Total Memory: {system_info['total_memory']}</small><br>
-                <small>💾 Total Disk: {system_info['total_disk']}</small><br>
-                <small>⏱️ Uptime: {system_info['system_uptime']}</small><br>
-                <small>🐍 Platform: {system_info['platform']}</small>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        if st.button("🖥️ Open Full System Monitor", type="primary", use_container_width=True):
+            # This would need to be handled by the parent component
+            st.info("Full system monitor with database health checks and tools available in the navigation menu!")
 
 
 async def render_archived_tasks(dashboard_manager):
@@ -1402,7 +1339,7 @@ def dashboard(go_to_page):
 
     # Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Monitor", "📈 Task Analysis", "📦 Archive"])
+        ["📋 Kanban Board", "📊 Productivity Analytics", "🖥️ System Overview", "📈 Task Analysis", "📦 Archive"])
 
     with tab1:
         asyncio.run(render_kanban_board(dashboard_manager))

@@ -13,7 +13,7 @@ from app.config.logging_config import get_logger
 from app.core.utils.datetime_utils import is_last_friday, get_date_in_timezone
 from app.core.interface.job_tracking_interface import JobExecutionTracker
 from app.core.jobs.execution_lock import JobExecutionLock
-from app.core.jobs.job_config import get_job_email_config
+from app.core.interface.job_email_config_interface import get_job_email_config_dict
 
 logger = get_logger(__name__)
 
@@ -93,19 +93,49 @@ async def send_report(to_email, user_id):
 
     await email_service.send_email(
         to_address=to_email,
-        subject="Weekly Progress Report",
+        subject="Weekly Update",
         content=report_content,
         html=True
     )
 
 
-async def send_weekly_report(to_email=None, force=False, job_id=None):
+async def send_weekly_report(to_email=None, force=False, job_id=None, user_id=None):
     """Send weekly reports on every Friday except the last Friday of the month (IST)."""
     # Use provided job_id or default to 'weekly_reporter'
     actual_job_id = job_id if job_id else 'weekly_reporter'
     
-    # Get email configuration for this job
-    email_config = get_job_email_config(actual_job_id)
+    # Get email configuration for this job - requires user_id
+    # For now, we'll get the first user with active SMTP config if user_id not provided
+    if user_id is None:
+        # Get first user with active SMTP config
+        db = await get_db()
+        try:
+            result = await db.execute(
+                select(User).join(SMTPConf, User.email == SMTPConf.sender_email)
+                .where(SMTPConf.is_active == "True")
+                .limit(1)
+            )
+            first_user = result.scalar_one_or_none()
+            if first_user:
+                user_id = first_user.id
+            else:
+                logger.error("No user with active SMTP configuration found")
+                return {
+                    'job_id': actual_job_id,
+                    'status': 'error',
+                    'message': 'No user with active SMTP configuration found',
+                    'details': [],
+                    'users_processed': 0,
+                    'emails_sent': 0,
+                    'errors': ['No user with active SMTP configuration found'],
+                    'execution_time': datetime.now().isoformat(),
+                    'forced': force
+                }
+        finally:
+            await db.close()
+    
+    # Get email configuration for this job and user
+    email_config = await get_job_email_config_dict(actual_job_id, user_id)
     
     # Use email config recipient if to_email not provided
     if to_email is None:

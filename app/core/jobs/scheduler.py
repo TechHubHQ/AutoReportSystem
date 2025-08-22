@@ -160,9 +160,12 @@ async def start_scheduler():
     scheduler.add_listener(job_error_event_listener, EVENT_JOB_ERROR)
 
     for job_config in JOB_CONFIG:
+        # Get the actual function from the lambda
+        job_func = job_config["func"]()
+        
         scheduler.add_job(
             id=job_config["id"],
-            func=job_config["func"],
+            func=job_func,
             trigger=job_config["trigger"],
             max_instances=job_config.get("max_instances", 1),
             replace_existing=job_config.get("replace_existing", True),

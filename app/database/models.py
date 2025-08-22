@@ -110,7 +110,7 @@ class TaskNote(Base):
     # Daily actions and activities timeline
     timeline_content = Column(Text, nullable=True)
     # Detailed progress analysis
-    analysis_content = Column(Text, nullable=False)
+    analysis_content = Column(Text, nullable=True)
     # Resolution information (can be null until resolved)
     resolution_notes = Column(Text, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -252,6 +252,33 @@ class JobExecutionLog(Base):
 
     # Many-to-one: JobExecutionLog → JobExecution
     execution = relationship("JobExecution", backref="logs")
+
+
+class JobEmailConfig(Base):
+    __tablename__ = "job_email_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, nullable=False, index=True)  # e.g., "weekly_reporter", "monthly_reporter"
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+    recipient = Column(String, nullable=False)
+    subject = Column(String, nullable=False)
+    template = Column(String, nullable=True)
+    recipient_name = Column(String, nullable=True)
+    send_empty_reports = Column(Boolean, default=False, nullable=False)
+    html_format = Column(Boolean, default=True, nullable=False)
+    retry_failed_sends = Column(Boolean, default=True, nullable=False)
+    max_retries = Column(Integer, default=3, nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Many-to-one: JobEmailConfig → User
+    user = relationship("User", backref="job_email_configs")
+
+    # Unique constraint: one config per job per user
+    __table_args__ = (UniqueConstraint('job_id', 'user_id', name='unique_job_user_email_config'),)
 
 
 class UserSession(Base):

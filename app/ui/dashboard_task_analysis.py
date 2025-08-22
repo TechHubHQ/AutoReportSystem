@@ -745,42 +745,73 @@ async def render_task_analysis(dashboard_manager):
         t = e['task']
         if e['progress_notes']:
             for note in e['progress_notes']:
-                export_rows.append({
+                # Get analysis content, but exclude default placeholder
+                analysis_content = getattr(note, "analysis_content", "") or ""
+                if analysis_content.strip() == "Progress note - analysis pending":
+                    analysis_content = ""
+                
+                row_data = {
                     "task_id": t.id,
                     "task_title": t.title,
                     "task_status": t.status,
                     "task_priority": t.priority,
                     "issue": getattr(e['issue'], "issue_description", "") if e['issue'] else "",
-                    "analysis": getattr(note, "analysis_content", "") or "",
                     "timeline": getattr(note, "timeline_content", "") or "",
                     "note_date": getattr(note, "note_date", "").strftime("%Y-%m-%d") if getattr(note, "note_date", None) else "",
                     "resolution": getattr(e['resolution'], "resolution_notes", "") if e['resolution'] else ""
-                })
+                }
+                
+                # Only include analysis column if there's meaningful analysis content in the dataset
+                if has_any_analysis:
+                    row_data["analysis"] = analysis_content
+                
+                export_rows.append(row_data)
         else:
-            export_rows.append({
+            row_data = {
                 "task_id": t.id,
                 "task_title": t.title,
                 "task_status": t.status,
                 "task_priority": t.priority,
                 "issue": getattr(e['issue'], "issue_description", "") if e['issue'] else "",
-                "analysis": "",
                 "timeline": "",
                 "note_date": "",
                 "resolution": getattr(e['resolution'], "resolution_notes", "") if e['resolution'] else ""
-            })
+            }
+            
+            # Only include analysis column if there's meaningful analysis content in the dataset
+            if has_any_analysis:
+                row_data["analysis"] = ""
+            
+            export_rows.append(row_data)
 
     df_export = pd.DataFrame(export_rows)
     csv_bytes = df_export.to_csv(index=False).encode('utf-8')
     st.download_button("⬇ Export CSV", csv_bytes,
                        file_name="task_analysis_export.csv", mime="text/csv")
 
+    # Check if any tasks have meaningful analysis content
+    has_any_analysis = False
+    for e in display_set:
+        notes = e['progress_notes'] or []
+        for note in notes:
+            a = getattr(note, 'analysis_content', '') or ''
+            if a.strip() and a.strip() != "Progress note - analysis pending":
+                has_any_analysis = True
+                break
+        if has_any_analysis:
+            break
+    
     # Build HTML table with rowspan for merged task cells — now grouping progress notes by date
     table_html = [
         '<div class="table-wrapper"><table class="analysis-table"><thead>']
     table_html.append('<tr>')
     table_html.append('<th class="col-task">Task Name</th>')
     table_html.append('<th class="col-issue">Issue</th>')
-    table_html.append('<th class="col-analysis">Analysis</th>')
+    
+    # Only show analysis column if there's meaningful analysis content
+    if has_any_analysis:
+        table_html.append('<th class="col-analysis">Analysis</th>')
+    
     table_html.append('<th class="col-timeline">Timeline</th>')
     table_html.append('<th class="col-res">Resolution</th>')
     table_html.append('</tr></thead><tbody>')
@@ -817,11 +848,12 @@ async def render_task_analysis(dashboard_manager):
         if notes:
             for idx, key in enumerate(sorted_keys):
                 group_notes = groups[key]
-                # Prepare combined analysis (join per-note analysis)
+                # Prepare combined analysis (join per-note analysis) - only show if not empty
                 analysis_parts = []
                 for gn in group_notes:
                     a = getattr(gn, 'analysis_content', '') or ''
-                    if a.strip():
+                    # Skip default placeholder text and empty content
+                    if a.strip() and a.strip() != "Progress note - analysis pending":
                         analysis_parts.append(
                             f"<div class='analysis-entry'>{_esc(a).replace('\n', '<br>')}</div>")
                 analysis_html = ''.join(
@@ -849,20 +881,37 @@ async def render_task_analysis(dashboard_manager):
                 else:
                     date_label = 'Undated'
 
-                # First row: include task cell + issue + analysis + timeline + resolution
+                # Check if we have any meaningful analysis content for this date group
+                has_analysis_content = any(analysis_parts)
+                
+                # First row: include task cell + issue + analysis (if column exists) + timeline + resolution
                 if idx == 0:
                     row = "<tr>"
                     row += f"<td class='task-cell' rowspan='{n}'><div>{task_title}</div><div class='task-meta'>{task_meta}</div></td>"
                     row += f"<td class='issue-cell' rowspan='{n}'><div class='cell-content'>{issue_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
-                    row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{analysis_html}</div></div></td>"
+                    
+                    # Only include analysis column if the table has analysis column
+                    if has_any_analysis:
+                        if has_analysis_content:
+                            row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{analysis_html}</div></div></td>"
+                        else:
+                            row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div><small style=\"color:#9aa2af;\">—</small></div></div></td>"
+                    
                     row += f"<td class='timeline-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{timeline_html}</div></div></td>"
                     row += f"<td class='res-cell' rowspan='{n}'><div class='cell-content'>{resolution_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
                     row += "</tr>"
                     table_html.append(row)
                 else:
-                    # subsequent date-group rows: only analysis + timeline
+                    # subsequent date-group rows: only analysis (if column exists) + timeline
                     row = "<tr>"
-                    row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{analysis_html}</div></div></td>"
+                    
+                    # Only include analysis column if the table has analysis column
+                    if has_any_analysis:
+                        if has_analysis_content:
+                            row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{analysis_html}</div></div></td>"
+                        else:
+                            row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div><small style=\"color:#9aa2af;\">—</small></div></div></td>"
+                    
                     row += f"<td class='timeline-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{timeline_html}</div></div></td>"
                     row += "</tr>"
                     table_html.append(row)
@@ -871,7 +920,11 @@ async def render_task_analysis(dashboard_manager):
             row = "<tr>"
             row += f"<td class='task-cell'><div>{task_title}</div><div class='task-meta'>{task_meta}</div></td>"
             row += f"<td class='issue-cell'><div class='cell-content'>{issue_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
-            row += f"<td class='analysis-cell'><div class='cell-content'><small style=\"color:#9aa2af;\">No analysis</small></div></td>"
+            
+            # Only include analysis column if the table has analysis column
+            if has_any_analysis:
+                row += f"<td class='analysis-cell'><div class='cell-content'><small style=\"color:#9aa2af;\">No analysis</small></div></td>"
+            
             row += f"<td class='timeline-cell'><div class='cell-content'><small style=\"color:#9aa2af;\">No timeline</small></div></td>"
             row += f"<td class='res-cell'><div class='cell-content'>{resolution_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
             row += "</tr>"
@@ -882,9 +935,10 @@ async def render_task_analysis(dashboard_manager):
     st.markdown(table_final, unsafe_allow_html=True)
 
     # Small legend / tips
-    st.markdown("""
+    analysis_note = " The Analysis column is hidden when no meaningful analysis content exists." if not has_any_analysis else ""
+    st.markdown(f"""
     <div style="margin-top:0.5rem; font-size:13px; color:#6b7280;">
-        <strong>Tips:</strong> The task name, issue and resolution are merged vertically and the Timeline column is grouped by date — multiple notes from the same date are displayed under a single date header.
+        <strong>Tips:</strong> The task name, issue and resolution are merged vertically and the Timeline column is grouped by date — multiple notes from the same date are displayed under a single date header.{analysis_note}
         Use the Export button to download the flattened CSV for editing in Excel.
     </div>
     """, unsafe_allow_html=True)
