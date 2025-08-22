@@ -529,6 +529,24 @@ def apply_jobs_css():
         transition: stroke-dashoffset 0.35s;
         transform-origin: 50% 50%;
     }
+    
+    /* Enhanced Tab styling - matching dashboard */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 0 1.5rem;
+        font-weight: 600;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
 
