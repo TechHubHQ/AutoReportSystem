@@ -1,12 +1,128 @@
 import html
 import asyncio
 import streamlit as st
+import re
 from datetime import date
 from app.security.route_protection import RouteProtection
 from app.core.interface.task_notes_handler import (
     create_progress_note_sync, update_progress_note_sync, delete_progress_note_sync,
     create_or_update_issue_sync, create_or_update_resolution_sync, get_task_notes_data_sync
 )
+
+
+def show_formatting_help():
+    """Display formatting help for users"""
+    with st.expander("📝 Text Formatting Guide", expanded=False):
+        st.markdown("""
+        **Available Formatting Options:**
+        
+        • **Bold text**: `**bold text**` → **bold text**
+        • *Italic text*: `*italic text*` → *italic text*
+        • <u>Underlined text</u>: `<u>underlined text</u>` → <u>underlined text</u>
+        • ~~Strikethrough~~: `~~strikethrough~~` → ~~strikethrough~~
+        • `Code text`: `` `code text` `` → `code text`
+        • [Links](url): `[Link Text](https://example.com)` → [Link Text](https://example.com)
+        
+        **Lists:**
+        • Bullet points: Start lines with `•` or `-`
+        • Numbered lists: Start lines with `1.`, `2.`, etc.
+        
+        **Special:**
+        • Line breaks: Use double space at end of line or empty line
+        • Horizontal rule: `---` on its own line
+        
+        **Examples:**
+        ```
+        **Important:** This is a *critical* update.
+        
+        <u>Key findings:</u>
+        • ~~Old approach~~ didn't work
+        • New `solution()` implemented
+        • [Documentation](https://docs.example.com) updated
+        ```
+        """, unsafe_allow_html=True)
+
+
+def apply_text_formatting(text):
+    """Apply markdown-like formatting to text for HTML display"""
+    if not text:
+        return ""
+    
+    # Escape HTML first to prevent XSS
+    formatted_text = html.escape(text)
+    
+    # Apply formatting patterns
+    # Bold: **text** -> <strong>text</strong>
+    formatted_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', formatted_text)
+    
+    # Italic: *text* -> <em>text</em>
+    formatted_text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<em>\1</em>', formatted_text)
+    
+    # Underline: <u>text</u> (already HTML, just preserve)
+    formatted_text = re.sub(r'&lt;u&gt;(.*?)&lt;/u&gt;', r'<u>\1</u>', formatted_text)
+    
+    # Strikethrough: ~~text~~ -> <del>text</del>
+    formatted_text = re.sub(r'~~(.*?)~~', r'<del>\1</del>', formatted_text)
+    
+    # Code: `text` -> <code>text</code>
+    formatted_text = re.sub(r'`([^`]+?)`', r'<code style="background-color: #f1f3f4; padding: 2px 4px; border-radius: 3px; font-family: monospace;">\1</code>', formatted_text)
+    
+    # Links: [text](url) -> <a href="url">text</a>
+    formatted_text = re.sub(r'\[([^\]]+?)\]\(([^\)]+?)\)', r'<a href="\2" target="_blank" style="color: #007bff; text-decoration: none;">\1</a>', formatted_text)
+    
+    # Line breaks
+    formatted_text = formatted_text.replace('\n', '<br>')
+    
+    # Horizontal rules
+    formatted_text = re.sub(r'<br>---<br>', '<hr style="margin: 10px 0; border: none; border-top: 1px solid #ddd;">', formatted_text)
+    
+    return formatted_text
+
+
+def show_formatting_toolbar(text_area_key, content_type="text"):
+    """Show formatting toolbar with quick insert buttons"""
+    st.markdown(f"**🎨 Formatting Toolbar for {content_type.title()}:**")
+    
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    
+    with col1:
+        if st.button("**B**", help="Bold text", key=f"bold_{text_area_key}"):
+            st.session_state[f"format_insert_{text_area_key}"] = "**bold text**"
+    
+    with col2:
+        if st.button("*I*", help="Italic text", key=f"italic_{text_area_key}"):
+            st.session_state[f"format_insert_{text_area_key}"] = "*italic text*"
+    
+    with col3:
+        if st.button("<u>U</u>", help="Underline text", key=f"underline_{text_area_key}"):
+            st.session_state[f"format_insert_{text_area_key}"] = "<u>underlined text</u>"
+    
+    with col4:
+        if st.button("~~S~~", help="Strikethrough", key=f"strike_{text_area_key}"):
+            st.session_state[f"format_insert_{text_area_key}"] = "~~strikethrough~~"
+    
+    with col5:
+        if st.button("`C`", help="Code text", key=f"code_{text_area_key}"):
+            st.session_state[f"format_insert_{text_area_key}"] = "`code text`"
+    
+    with col6:
+        if st.button("🔗", help="Insert link", key=f"link_{text_area_key}"):
+            st.session_state[f"format_insert_{text_area_key}"] = "[Link Text](https://example.com)"
+    
+    # Show insert message if formatting was clicked
+    if f"format_insert_{text_area_key}" in st.session_state:
+        st.info(f"💡 Copy this formatting: `{st.session_state[f'format_insert_{text_area_key}']}`")
+        # Clear the message after showing
+        del st.session_state[f"format_insert_{text_area_key}"]
+
+
+def render_formatted_content(content, content_type="Timeline"):
+    """Render content with formatting applied"""
+    if not content or not content.strip():
+        return ""
+    
+    formatted_content = apply_text_formatting(content)
+    return f"<div><strong>📅 {content_type}:</strong><br>{formatted_content}</div>"
 
 
 def show_task_notes_modal(task):
@@ -56,6 +172,12 @@ def show_task_notes_modal(task):
                 st.markdown("### 🔍 Task Issue Description")
                 st.markdown(
                     "*Document the main issue or problem this task is meant to address*")
+                
+                # Show formatting help
+                show_formatting_help()
+                
+                # Formatting toolbar for issue (outside form)
+                show_formatting_toolbar(f"issue_{task.id}", "Issue Description")
 
                 # Use the loaded issue data
                 existing_issue = task_issue
@@ -65,8 +187,8 @@ def show_task_notes_modal(task):
                         "What is the main issue or problem?",
                         value=existing_issue.issue_description if existing_issue else "",
                         height=200,
-                        placeholder="Describe the main issue, problem, or objective this task is addressing. What needs to be solved or accomplished?",
-                        help="Provide a clear description of the issue or objective for this task."
+                        placeholder="**Problem:** Describe the main issue\n\n**Impact:** What are the consequences?\n\n**Requirements:** What needs to be accomplished?",
+                        help="Provide a clear description of the issue or objective for this task. Use formatting options above!"
                     )
 
                     col1, col2 = st.columns(2)
@@ -98,13 +220,24 @@ def show_task_notes_modal(task):
                 if existing_issue:
                     st.markdown("---")
                     st.markdown("**📅 Current Issue:**")
-                    st.info(existing_issue.issue_description)
+                    formatted_issue = apply_text_formatting(existing_issue.issue_description)
+                    st.markdown(f'<div style="padding: 1rem; background-color: #e7f3ff; border-left: 4px solid #007bff; border-radius: 4px;">{formatted_issue}</div>', unsafe_allow_html=True)
                     if existing_issue.updated_at:
                         st.caption(
                             f"Last updated: {existing_issue.updated_at.strftime('%B %d, %Y at %I:%M %p')}")
 
             with tab2:
                 st.markdown("### ➕ Add Daily Progress Note")
+                
+                # Show formatting help
+                show_formatting_help()
+                
+                # Formatting toolbars for timeline and analysis (outside form)
+                st.markdown("#### 📅 Daily Timeline")
+                show_formatting_toolbar(f"timeline_add_{task.id}", "Timeline")
+                
+                st.markdown("#### 📊 Detailed Analysis")
+                show_formatting_toolbar(f"analysis_add_{task.id}", "Analysis")
 
                 with st.form(f"add_note_form_{task.id}"):
                     note_date_input = st.date_input(
@@ -113,20 +246,22 @@ def show_task_notes_modal(task):
                         help="Select the date for this progress entry"
                     )
 
-                    st.markdown("#### 📅 Daily Timeline")
+                    st.markdown("**Timeline Content:**")
                     timeline_content = st.text_area(
                         "What actions did you take today?",
                         height=150,
-                        placeholder="• 9:00 AM - Started working on feature X\n• 10:30 AM - Met with team to discuss requirements\n• 2:00 PM - Implemented solution Y\n• 4:00 PM - Tested and debugged...",
-                        help="Document the specific actions, meetings, and activities you performed during the day."
+                        placeholder="• **9:00 AM** - Started working on *feature X*\n• **10:30 AM** - Met with team to discuss requirements\n• **2:00 PM** - Implemented `solution Y`\n• **4:00 PM** - Tested and debugged...",
+                        help="Document the specific actions, meetings, and activities you performed during the day. Use formatting options above!",
+                        key=f"timeline_content_add_{task.id}"
                     )
 
-                    st.markdown("#### 📊 Detailed Analysis")
+                    st.markdown("**Analysis Content:**")
                     analysis_content = st.text_area(
                         "Provide detailed analysis of your work:",
                         height=150,
-                        placeholder="Detailed analysis of progress, challenges encountered, solutions implemented, key findings, insights gained, next steps...",
-                        help="Document your detailed analysis, insights, challenges, and findings from today's work."
+                        placeholder="**Key Findings:**\n• ~~Old approach~~ didn't work due to *performance issues*\n• New `solution()` implemented with <u>significant improvements</u>\n• [Documentation](https://docs.example.com) updated\n\n**Next Steps:**\n• Test in production environment\n• Monitor performance metrics",
+                        help="Document your detailed analysis, insights, challenges, and findings from today's work. Use formatting options above!",
+                        key=f"analysis_content_add_{task.id}"
                     )
 
                     submitted = st.form_submit_button(
@@ -157,6 +292,12 @@ def show_task_notes_modal(task):
                 st.markdown("### ✅ Task Resolution Notes")
                 st.markdown(
                     "*Document the final resolution when the task is completed*")
+                
+                # Show formatting help
+                show_formatting_help()
+                
+                # Formatting toolbar for resolution (outside form)
+                show_formatting_toolbar(f"resolution_{task.id}", "Resolution")
 
                 # Use the loaded resolution data
                 existing_resolution = task_resolution
@@ -166,8 +307,8 @@ def show_task_notes_modal(task):
                         "How was the issue resolved?",
                         value=existing_resolution.resolution_notes if existing_resolution else "",
                         height=200,
-                        placeholder="Describe how the issue was resolved, what solution was implemented, lessons learned, and final outcomes...",
-                        help="Document the final resolution, solution, and any important outcomes or lessons learned."
+                        placeholder="**Solution:** Describe the implemented solution\n\n**Results:** What were the outcomes?\n\n**Lessons Learned:** Key insights and takeaways\n\n**Follow-up:** Any remaining tasks or monitoring needed",
+                        help="Document the final resolution, solution, and any important outcomes or lessons learned. Use formatting options above!"
                     )
 
                     col1, col2 = st.columns(2)
@@ -200,7 +341,8 @@ def show_task_notes_modal(task):
                 if existing_resolution:
                     st.markdown("---")
                     st.markdown("**✅ Current Resolution:**")
-                    st.success(existing_resolution.resolution_notes)
+                    formatted_resolution = apply_text_formatting(existing_resolution.resolution_notes)
+                    st.markdown(f'<div style="padding: 1rem; background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">{formatted_resolution}</div>', unsafe_allow_html=True)
                     if existing_resolution.updated_at:
                         st.caption(
                             f"Last updated: {existing_resolution.updated_at.strftime('%B %d, %Y at %I:%M %p')}")
@@ -309,21 +451,30 @@ def show_task_notes_modal(task):
                             time_ago = "Today" if note.note_date == date.today(
                             ) else f"{(date.today() - note.note_date).days} day(s) ago"
 
-                            # Prepare timeline content for display
+                            # Prepare timeline content for display with formatting
                             timeline_display = ""
                             if note.timeline_content and note.timeline_content.strip():
-                                timeline_lines = note.timeline_content.strip().split('\n')
-                                truncated_timeline = '\n'.join(
-                                    timeline_lines[:3])
-                                timeline_display = f"<div style='margin-bottom: 10px;'><strong>📅 Timeline:</strong><br>{html.escape(truncated_timeline if not st.session_state[is_expanded_key] else note.timeline_content).replace('\n', '<br>')}</div>"
+                                if st.session_state[is_expanded_key]:
+                                    # Show full content with formatting
+                                    timeline_display = render_formatted_content(note.timeline_content, "Timeline")
+                                else:
+                                    # Show truncated content with formatting
+                                    timeline_lines = note.timeline_content.strip().split('\n')
+                                    truncated_timeline = '\n'.join(timeline_lines[:3])
+                                    timeline_display = render_formatted_content(truncated_timeline, "Timeline")
+                                timeline_display = f"<div style='margin-bottom: 10px;'>{timeline_display}</div>"
 
-                            # Prepare analysis content for display
+                            # Prepare analysis content for display with formatting
                             analysis_display = ""
                             if note.analysis_content and note.analysis_content.strip():
-                                analysis_lines = note.analysis_content.strip().split('\n')
-                                truncated_analysis = '\n'.join(
-                                    analysis_lines[:3])
-                                analysis_display = f"<div><strong>📊 Analysis:</strong><br>{html.escape(truncated_analysis if not st.session_state[is_expanded_key] else note.analysis_content).replace('\n', '<br>')}</div>"
+                                if st.session_state[is_expanded_key]:
+                                    # Show full content with formatting
+                                    analysis_display = render_formatted_content(note.analysis_content, "Analysis")
+                                else:
+                                    # Show truncated content with formatting
+                                    analysis_lines = note.analysis_content.strip().split('\n')
+                                    truncated_analysis = '\n'.join(analysis_lines[:3])
+                                    analysis_display = render_formatted_content(truncated_analysis, "Analysis")
 
                             # Render note card
                             st.markdown(
@@ -387,23 +538,33 @@ def show_task_notes_modal(task):
                             # Edit mode (only if in edit state)
                             if st.session_state.get(f"editing_note_{note.id}", False):
                                 with st.expander("✏️ Edit Note", expanded=True):
+                                    # Show formatting help for editing
+                                    show_formatting_help()
+                                    
+                                    # Formatting toolbars for editing (outside form)
+                                    st.markdown("#### 📅 Timeline Content")
+                                    show_formatting_toolbar(f"timeline_edit_{note.id}", "Timeline")
+                                    
+                                    st.markdown("#### 📊 Analysis Content")
+                                    show_formatting_toolbar(f"analysis_edit_{note.id}", "Analysis")
+                                    
                                     with st.form(f"edit_note_form_{note.id}"):
-                                        st.markdown("#### 📅 Timeline Content")
+                                        st.markdown("**Timeline:**")
                                         updated_timeline = st.text_area(
                                             "Edit timeline content:",
                                             value=note.timeline_content or "",
                                             height=150,
                                             key=f"edit_timeline_{note.id}",
-                                            placeholder="Daily actions and activities..."
+                                            placeholder="Daily actions and activities with formatting..."
                                         )
 
-                                        st.markdown("#### 📊 Analysis Content")
+                                        st.markdown("**Analysis:**")
                                         updated_analysis = st.text_area(
                                             "Edit analysis content:",
                                             value=note.analysis_content or "",
                                             height=150,
                                             key=f"edit_analysis_{note.id}",
-                                            placeholder="Detailed analysis and insights..."
+                                            placeholder="Detailed analysis and insights with formatting..."
                                         )
 
                                         col_save, col_cancel = st.columns(2)
@@ -485,7 +646,8 @@ def show_task_notes_modal(task):
                                 time_ago = "Today" if note.note_date == date.today(
                                 ) else f"{(date.today() - note.note_date).days} day(s) ago"
 
-                                # Analysis card
+                                # Analysis card with formatting
+                                formatted_analysis = apply_text_formatting(note.analysis_content)
                                 st.markdown(
                                     f"""
                                     <div class="note-card" style="border-left: 4px solid #28a745;">
@@ -503,7 +665,7 @@ def show_task_notes_modal(task):
                                         <p class="note-meta"><i>📊 {time_ago}</i></p>
                                         <div class="note-content">
                                             <strong>📊 Detailed Analysis:</strong><br>
-                                            {html.escape(note.analysis_content).replace('\n', '<br>')}
+                                            {formatted_analysis}
                                         </div>
                                     </div>
                                     """, unsafe_allow_html=True
@@ -517,13 +679,19 @@ def show_task_notes_modal(task):
                                 # Edit mode for analysis only
                                 if st.session_state.get(f"editing_analysis_{note.id}", False):
                                     with st.expander("✏️ Edit Analysis", expanded=True):
+                                        # Show formatting help for analysis editing
+                                        show_formatting_help()
+                                        
+                                        # Formatting toolbar for analysis editing (outside form)
+                                        show_formatting_toolbar(f"analysis_only_edit_{note.id}", "Analysis")
+                                        
                                         with st.form(f"edit_analysis_form_{note.id}"):
                                             updated_analysis = st.text_area(
                                                 "Edit analysis content:",
                                                 value=note.analysis_content or "",
                                                 height=200,
                                                 key=f"edit_analysis_textarea_{note.id}",
-                                                placeholder="Detailed analysis and insights..."
+                                                placeholder="Detailed analysis and insights with formatting..."
                                             )
 
                                             col_save, col_cancel = st.columns(
