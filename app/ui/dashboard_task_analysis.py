@@ -521,7 +521,7 @@ def apply_modern_task_analysis_css():
 
 
 async def render_task_analysis(dashboard_manager):
-    """Render task analysis as an Excel-like table with merged cells (rowspan)"""
+    """Render task analysis as an Excel-like table with merged cells (rowspan), grouping timeline by date."""
     apply_modern_task_analysis_css()
 
     # Extra CSS for table view (sticky header, palette, merged-cell visuals)
@@ -629,6 +629,12 @@ async def render_task_analysis(dashboard_manager):
     .badge-status { background: linear-gradient(90deg,#4fc3f7,#667eea); }
     .badge-priority { background: linear-gradient(90deg,#ffb86b,#ff6b6b); color: #111; }
 
+    /* Grouped date header inside timeline cell */
+    .timeline-date-group { margin-bottom: 8px; }
+    .timeline-date-title { font-weight: 700; color: #92400e; margin-bottom: 6px; }
+    .timeline-entry { margin-left: 8px; margin-bottom: 6px; }
+    .analysis-entry { margin-left: 8px; margin-bottom: 6px; }
+
     @media (max-width: 900px) {
         table.analysis-table { min-width: 900px; font-size: 13px; border-spacing: 8px; }
     }
@@ -638,7 +644,8 @@ async def render_task_analysis(dashboard_manager):
     # Controls bar (compact)
     col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 1, 1])
     with col1:
-        view_scope = st.selectbox("Scope", ["All Tasks", "Current Month", "Archived Only"], index=0)
+        view_scope = st.selectbox(
+            "Scope", ["All Tasks", "Current Month", "Archived Only"], index=0)
     with col2:
         status_filter = st.multiselect("Status", ["todo", "inprogress", "pending", "completed"],
                                        default=["todo", "inprogress", "pending", "completed"])
@@ -646,9 +653,11 @@ async def render_task_analysis(dashboard_manager):
         priority_filter = st.multiselect("Priority", ["low", "medium", "high", "urgent"],
                                          default=["low", "medium", "high", "urgent"])
     with col4:
-        items_per_page = st.selectbox("Rows/page", [10, 20, 50, "All"], index=1)
+        items_per_page = st.selectbox(
+            "Rows/page", [10, 20, 50, "All"], index=1)
     with col5:
-        search_query = st.text_input("Search", help="Search across title, issue, analysis, timeline, resolution")
+        search_query = st.text_input(
+            "Search", help="Search across title, issue, analysis, timeline, resolution")
 
     # Load data (same as previous logic)
     with LoaderContext("Loading tasks for table view...", "inline"):
@@ -691,7 +700,8 @@ async def render_task_analysis(dashboard_manager):
             (e_task['resolution'].resolution_notes if e_task['resolution'] else "") or ""
         ]
         for note in e_task['progress_notes']:
-            fields.append((note.timeline_content or "") + " " + (note.analysis_content or ""))
+            fields.append((note.timeline_content or "") +
+                          " " + (note.analysis_content or ""))
         combined = " ".join(fields).lower()
         return s in combined
 
@@ -711,13 +721,14 @@ async def render_task_analysis(dashboard_manager):
         if 'analysis_table_page' not in st.session_state:
             st.session_state.analysis_table_page = 1
 
-        colp1, colp2, colp3 = st.columns([1,2,1])
+        colp1, colp2, colp3 = st.columns([1, 2, 1])
         with colp1:
             if st.button("◀ Prev", disabled=st.session_state.analysis_table_page <= 1):
                 st.session_state.analysis_table_page -= 1
                 st.rerun()
         with colp2:
-            st.markdown(f"<div style='text-align:center; padding:6px;'>Page {st.session_state.analysis_table_page} / {total_pages}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align:center; padding:6px;'>Page {st.session_state.analysis_table_page} / {total_pages}</div>", unsafe_allow_html=True)
         with colp3:
             if st.button("Next ▶", disabled=st.session_state.analysis_table_page >= total_pages):
                 st.session_state.analysis_table_page += 1
@@ -760,10 +771,12 @@ async def render_task_analysis(dashboard_manager):
 
     df_export = pd.DataFrame(export_rows)
     csv_bytes = df_export.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇ Export CSV", csv_bytes, file_name="task_analysis_export.csv", mime="text/csv")
+    st.download_button("⬇ Export CSV", csv_bytes,
+                       file_name="task_analysis_export.csv", mime="text/csv")
 
-    # Build HTML table with rowspan for merged task cells
-    table_html = ['<div class="table-wrapper"><table class="analysis-table"><thead>']
+    # Build HTML table with rowspan for merged task cells — now grouping progress notes by date
+    table_html = [
+        '<div class="table-wrapper"><table class="analysis-table"><thead>']
     table_html.append('<tr>')
     table_html.append('<th class="col-task">Task Name</th>')
     table_html.append('<th class="col-issue">Issue</th>')
@@ -778,36 +791,79 @@ async def render_task_analysis(dashboard_manager):
     for e in display_set:
         t = e['task']
         notes = e['progress_notes'] or []
-        n = max(1, len(notes))
+
+        # Group notes by date (multiple notes on same date will be combined into one timeline row)
+        groups = {}
+        for note in notes:
+            note_date = getattr(note, 'note_date', None)
+            key = note_date.strftime('%Y-%m-%d') if note_date else 'undated'
+            groups.setdefault(key, []).append(note)
+
+        # Sort groups by date descending (latest first)
+        sorted_keys = sorted(groups.keys(), reverse=True)
+        # If there were no notes, ensure we still show one row
+        if not sorted_keys:
+            sorted_keys = ['']
+
+        n = max(1, len(sorted_keys))
 
         # prepare escaped task-level fields
         task_title = _esc(t.title or "")
         task_meta = f"ID: {_esc(str(t.id))} &nbsp; <span class='badge badge-status'>{_esc(t.status)}</span> <span class='badge badge-priority'>{_esc(t.priority)}</span>"
         issue_text = _esc(getattr(e['issue'], "issue_description", "") or "")
-        resolution_text = _esc(getattr(e['resolution'], "resolution_notes", "") or "")
+        resolution_text = _esc(
+            getattr(e['resolution'], "resolution_notes", "") or "")
 
         if notes:
-            for idx, note in enumerate(notes):
-                analysis_text = _esc(getattr(note, "analysis_content", "") or "")
-                timeline_text = _esc(getattr(note, "timeline_content", "") or "")
-                note_date = getattr(note, "note_date", None)
-                note_date_str = note_date.strftime("%b %d, %Y") if note_date else ""
+            for idx, key in enumerate(sorted_keys):
+                group_notes = groups[key]
+                # Prepare combined analysis (join per-note analysis)
+                analysis_parts = []
+                for gn in group_notes:
+                    a = getattr(gn, 'analysis_content', '') or ''
+                    if a.strip():
+                        analysis_parts.append(
+                            f"<div class='analysis-entry'>{_esc(a).replace('\n', '<br>')}</div>")
+                analysis_html = ''.join(
+                    analysis_parts) if analysis_parts else '<small style="color:#9aa2af;">—</small>'
+
+                # Prepare combined timeline entries for the date group
+                timeline_parts = []
+                for gn in group_notes:
+                    tl = getattr(gn, 'timeline_content', '') or ''
+                    if tl.strip():
+                        # Keep user's formatting newlines but escape
+                        timeline_parts.append(
+                            f"<div class='timeline-entry'>• {_esc(tl).replace('\n', '<br>')}</div>")
+                timeline_html = ''.join(
+                    timeline_parts) if timeline_parts else '<small style="color:#9aa2af;">—</small>'
+
+                # Human-readable date label
+                if key and key != 'undated':
+                    from datetime import datetime
+                    try:
+                        dt = datetime.strptime(key, '%Y-%m-%d')
+                        date_label = dt.strftime('%A, %b %d, %Y')
+                    except Exception:
+                        date_label = key
+                else:
+                    date_label = 'Undated'
+
                 # First row: include task cell + issue + analysis + timeline + resolution
                 if idx == 0:
                     row = "<tr>"
                     row += f"<td class='task-cell' rowspan='{n}'><div>{task_title}</div><div class='task-meta'>{task_meta}</div></td>"
-                    # issue (merged for n rows)
                     row += f"<td class='issue-cell' rowspan='{n}'><div class='cell-content'>{issue_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
-                    row += f"<td class='analysis-cell'><div class='cell-content'>{analysis_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
-                    row += f"<td class='timeline-cell'><div class='cell-content'>{timeline_text or '<small style=\"color:#9aa2af;\">—</small>'}<br><small style='color:#6b7280'>{note_date_str}</small></div></td>"
+                    row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{analysis_html}</div></div></td>"
+                    row += f"<td class='timeline-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{timeline_html}</div></div></td>"
                     row += f"<td class='res-cell' rowspan='{n}'><div class='cell-content'>{resolution_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
                     row += "</tr>"
                     table_html.append(row)
                 else:
-                    # subsequent note rows: only analysis + timeline
+                    # subsequent date-group rows: only analysis + timeline
                     row = "<tr>"
-                    row += f"<td class='analysis-cell'><div class='cell-content'>{analysis_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
-                    row += f"<td class='timeline-cell'><div class='cell-content'>{timeline_text or '<small style=\"color:#9aa2af;\">—</small>'}<br><small style='color:#6b7280'>{note_date_str}</small></div></td>"
+                    row += f"<td class='analysis-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{analysis_html}</div></div></td>"
+                    row += f"<td class='timeline-cell'><div class='cell-content'><div class='timeline-date-group'><div class='timeline-date-title'>{_esc(date_label)}</div>{timeline_html}</div></div></td>"
                     row += "</tr>"
                     table_html.append(row)
         else:
@@ -828,7 +884,7 @@ async def render_task_analysis(dashboard_manager):
     # Small legend / tips
     st.markdown("""
     <div style="margin-top:0.5rem; font-size:13px; color:#6b7280;">
-        <strong>Tips:</strong> The task name, issue and resolution are merged vertically when a task has multiple analysis entries (like merged cells in Excel).
+        <strong>Tips:</strong> The task name, issue and resolution are merged vertically and the Timeline column is grouped by date — multiple notes from the same date are displayed under a single date header.
         Use the Export button to download the flattened CSV for editing in Excel.
     </div>
     """, unsafe_allow_html=True)
