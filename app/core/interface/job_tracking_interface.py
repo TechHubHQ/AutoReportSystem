@@ -12,6 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, update, desc, func, and_
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.database.db_connector import get_db
 from app.database.models import Job, JobExecution, JobExecutionLog
@@ -100,9 +101,11 @@ class JobExecutionTracker:
         """Set result data for this execution"""
         try:
             db = await get_db()
+            # Convert datetime objects to ISO strings for JSON serialization
+            serializable_data = self._make_json_serializable(result_data)
             query = update(JobExecution).where(
                 JobExecution.execution_id == self.execution_id
-            ).values(result_data=json.dumps(result_data))
+            ).values(result_data=json.dumps(serializable_data))
             await db.execute(query)
             await db.commit()
         except Exception as e:
@@ -111,17 +114,35 @@ class JobExecutionTracker:
         finally:
             await db.close()
 
+    def _make_json_serializable(self, obj):
+        """Convert datetime objects and other non-serializable objects to JSON-serializable format"""
+        if isinstance(obj, dict):
+            return {key: self._make_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif hasattr(obj, '__dict__'):
+            # Handle objects with attributes
+            return str(obj)
+        else:
+            return obj
+
     async def _get_or_create_job(self) -> int:
-        """Get or create job record"""
+        """Get or create job record with race condition handling"""
+        db = None
         try:
             db = await get_db()
 
-            # Try to find existing job
+            # Try to find existing job first
             result = await db.execute(select(Job).where(Job.name == self.job_name))
             job = result.scalar_one_or_none()
 
-            if not job:
-                # Create new job record
+            if job:
+                return job.id
+
+            # Try to create new job record
+            try:
                 job = Job(
                     name=self.job_name,
                     description=f"Auto-created job for {self.job_name}",
@@ -135,13 +156,27 @@ class JobExecutionTracker:
                 await db.commit()
                 await db.refresh(job)
                 logger.info(f"Created new job record for {self.job_name}")
+                return job.id
+            except IntegrityError:
+                # Handle race condition - another process created the job
+                await db.rollback()
+                logger.info(f"Job {self.job_name} was created by another process, fetching existing record")
+                
+                # Fetch the existing job created by another process
+                result = await db.execute(select(Job).where(Job.name == self.job_name))
+                job = result.scalar_one_or_none()
+                
+                if job:
+                    return job.id
+                else:
+                    raise Exception(f"Failed to create or find job {self.job_name}")
 
-            return job.id
         except Exception as e:
             logger.error(f"Error getting/creating job record: {e}")
             raise
         finally:
-            await db.close()
+            if db is not None:
+                await db.close()
 
     async def _create_execution_record(self):
         """Create initial execution record"""

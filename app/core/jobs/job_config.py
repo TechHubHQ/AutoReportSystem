@@ -21,6 +21,8 @@ JOB_CONFIG = [
         ),
         "max_instances": 1,
         "replace_existing": True,
+        "coalesce": True,  # Combine multiple pending executions into one
+        "misfire_grace_time": 300,  # 5 minutes grace time for missed executions
     },
     {
         "id": "monthly_reporter",
@@ -33,6 +35,8 @@ JOB_CONFIG = [
         ),
         "max_instances": 1,
         "replace_existing": True,
+        "coalesce": True,  # Combine multiple pending executions into one
+        "misfire_grace_time": 300,  # 5 minutes grace time for missed executions
     },
     {
         "id": "task_lifecycle_manager",
@@ -44,5 +48,7 @@ JOB_CONFIG = [
         ),
         "max_instances": 1,
         "replace_existing": True,
+        "coalesce": True,  # Combine multiple pending executions into one
+        "misfire_grace_time": 600,  # 10 minutes grace time for missed executions
     }
 ]

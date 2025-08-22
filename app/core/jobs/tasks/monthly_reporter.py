@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.config.logging_config import get_logger
 from app.core.utils.datetime_utils import is_last_friday, get_date_in_timezone
 from app.core.interface.job_tracking_interface import JobExecutionTracker
+from app.core.jobs.execution_lock import JobExecutionLock
 
 logger = get_logger(__name__)
 
@@ -97,25 +98,41 @@ async def send_monthly_report(to_email="santhosh.bommana@medicasapp.com", force=
     # Use provided job_id or default to 'monthly_reporter'
     actual_job_id = job_id if job_id else 'monthly_reporter'
 
-    # Use the new job tracking system
-    async with JobExecutionTracker(
-        job_name=actual_job_id,
-        trigger_type="scheduled" if not force else "manual"
-    ) as tracker:
+    # Use execution lock to prevent concurrent runs
+    async with JobExecutionLock(actual_job_id, timeout_minutes=30) as lock:
+        if not lock.acquired:
+            logger.info(f"Monthly reporter job {actual_job_id} is already running, skipping this execution")
+            return {
+                'job_id': actual_job_id,
+                'status': 'skipped',
+                'message': 'Job already running, execution skipped to prevent duplicates',
+                'details': ['Another instance of this job is currently executing'],
+                'users_processed': 0,
+                'emails_sent': 0,
+                'errors': [],
+                'execution_time': datetime.now().isoformat(),
+                'forced': force
+            }
 
-        await tracker.log("INFO", "Starting monthly report execution")
+        # Use the new job tracking system
+        async with JobExecutionTracker(
+            job_name=actual_job_id,
+            trigger_type="scheduled" if not force else "manual"
+        ) as tracker:
 
-        execution_result = {
-            'job_id': actual_job_id,
-            'status': 'success',
-            'message': '',
-            'details': [],
-            'users_processed': 0,
-            'emails_sent': 0,
-            'errors': [],
-            'execution_time': datetime.now(),
-            'forced': force
-        }
+            await tracker.log("INFO", "Starting monthly report execution")
+
+            execution_result = {
+                'job_id': actual_job_id,
+                'status': 'success',
+                'message': '',
+                'details': [],
+                'users_processed': 0,
+                'emails_sent': 0,
+                'errors': [],
+                'execution_time': datetime.now().isoformat(),
+                'forced': force
+            }
 
         db = None
         try:

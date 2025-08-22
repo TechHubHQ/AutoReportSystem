@@ -55,6 +55,12 @@ def job_error_event_listener(event):
     execution_history[event.job_id].append(record)
     logger.error(
         f"Job {event.job_id} failed at {record.execution_time}: {event.exception}")
+    
+    # Log additional details for debugging
+    if hasattr(event, 'retval'):
+        logger.error(f"Job {event.job_id} return value: {event.retval}")
+    if hasattr(event, 'traceback'):
+        logger.error(f"Job {event.job_id} traceback: {event.traceback}")
 
 
 async def health_check():
@@ -82,7 +88,7 @@ async def health_check():
     logger.info(f"Number of jobs: {len(scheduler.get_jobs())}")
 
     for job in scheduler.get_jobs():
-        logger.info(f"Job {job.id} next run at {job.next_run_time}")
+        logger.info(f"Job {job.id} next run at {job.next_run_time} (max_instances: {job.max_instances})")
 
         job_history = execution_history.get(job.id, [])
         if job_history:
@@ -95,6 +101,10 @@ async def health_check():
 
             logger.info(
                 f"Job {job.id} stats (past hour) - Runs: {len(recent_executions)} | Success: {success_count} | Failures: {failure_count} | Last: {last_run}")
+            
+            # Warn if there are too many executions in the past hour
+            if len(recent_executions) > 2:
+                logger.warning(f"Job {job.id} has {len(recent_executions)} executions in the past hour - possible duplicate runs")
         else:
             logger.info(f"Job {job.id} execution stats: No executions yet")
 
@@ -103,7 +113,21 @@ async def health_check():
         func=health_check,
         trigger="interval",
         hours=1,
-        replace_existing=True
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True
+    )
+    
+    # Add cleanup task for stale locks
+    from app.core.jobs.execution_lock import cleanup_stale_locks
+    scheduler.add_job(
+        id="cleanup_stale_locks",
+        func=cleanup_stale_locks,
+        trigger="interval",
+        hours=2,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True
     )
 
 
@@ -116,8 +140,14 @@ async def start_scheduler():
     logger.info(
         f"Starting async scheduler. PID: {pid}, Thread ID: {thread_id}, Thread Name: {thread_name}")
 
-    # Create scheduler instance
-    scheduler = AsyncIOScheduler()
+    # Create scheduler instance with improved configuration
+    scheduler = AsyncIOScheduler(
+        job_defaults={
+            'coalesce': True,
+            'max_instances': 1,
+            'misfire_grace_time': 300
+        }
+    )
 
     # Set the global instance and start time in a thread-safe way
     with _scheduler_lock:
@@ -136,9 +166,14 @@ async def start_scheduler():
             trigger=job_config["trigger"],
             max_instances=job_config.get("max_instances", 1),
             replace_existing=job_config.get("replace_existing", True),
+            coalesce=job_config.get("coalesce", True),
+            misfire_grace_time=job_config.get("misfire_grace_time", 300),
         )
         logger.info(
-            f"Scheduled async job {job_config['id']} with trigger {job_config['trigger']}")
+            f"Scheduled async job {job_config['id']} with trigger {job_config['trigger']} "
+            f"(max_instances={job_config.get('max_instances', 1)}, "
+            f"coalesce={job_config.get('coalesce', True)}, "
+            f"misfire_grace_time={job_config.get('misfire_grace_time', 300)}s)")
 
     scheduler.start()
     logger.info("Scheduler started successfully.")
