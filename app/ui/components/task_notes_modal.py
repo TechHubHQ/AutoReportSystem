@@ -510,7 +510,7 @@ def show_task_notes_modal(task):
                                 )
 
                                 # Quick edit button for analysis
-                                if st.button(f"✏️ Edit Analysis", key=f"edit_analysis_only_{note.id}"):
+                                if st.button(f"✏️ Edit Analysis", key=f"edit_analysis_btn_{note.id}"):
                                     st.session_state[f"editing_analysis_{note.id}"] = True
                                     st.rerun()
 
@@ -522,7 +522,7 @@ def show_task_notes_modal(task):
                                                 "Edit analysis content:",
                                                 value=note.analysis_content or "",
                                                 height=200,
-                                                key=f"edit_analysis_only_{note.id}",
+                                                key=f"edit_analysis_textarea_{note.id}",
                                                 placeholder="Detailed analysis and insights..."
                                             )
 
