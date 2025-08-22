@@ -10,8 +10,8 @@ logger = get_logger(__name__)
 
 
 async def create_task_note(task_id: int, note_date: date, issue_description: str,
-                           analysis_content: str, resolution_notes: str = None,
-                           created_by: int = None) -> TaskNote:
+                           timeline_content: str = None, analysis_content: str = None, 
+                           resolution_notes: str = None, created_by: int = None) -> TaskNote:
     """Create a new task note for a specific date - saves directly to database"""
     db = None
     try:
@@ -27,6 +27,7 @@ async def create_task_note(task_id: int, note_date: date, issue_description: str
             task_id=task_id,
             note_date=note_date,
             issue_description=issue_description,
+            timeline_content=timeline_content,
             analysis_content=analysis_content,
             resolution_notes=resolution_notes,
             created_by=created_by
@@ -101,7 +102,8 @@ async def get_task_note_by_id(note_id: int) -> Optional[TaskNote]:
 
 
 async def update_task_note(note_id: int, issue_description: str = None,
-                           analysis_content: str = None, resolution_notes: str = None) -> TaskNote:
+                           timeline_content: str = None, analysis_content: str = None, 
+                           resolution_notes: str = None) -> TaskNote:
     """Update an existing task note - saves directly to database"""
     db = None
     try:
@@ -119,6 +121,8 @@ async def update_task_note(note_id: int, issue_description: str = None,
         update_data = {}
         if issue_description is not None:
             update_data['issue_description'] = issue_description
+        if timeline_content is not None:
+            update_data['timeline_content'] = timeline_content
         if analysis_content is not None:
             update_data['analysis_content'] = analysis_content
         if resolution_notes is not None:
@@ -140,6 +144,7 @@ async def update_task_note(note_id: int, issue_description: str = None,
             task_id=current_note.task_id,
             note_date=current_note.note_date,
             issue_description=update_data.get('issue_description', current_note.issue_description),
+            timeline_content=update_data.get('timeline_content', current_note.timeline_content),
             analysis_content=update_data.get('analysis_content', current_note.analysis_content),
             resolution_notes=update_data.get('resolution_notes', current_note.resolution_notes),
             created_by=current_note.created_by,
@@ -260,6 +265,7 @@ async def create_task_issue(task_id: int, issue_description: str, created_by: in
                 task_id=task_id,
                 note_date=issue_date,
                 issue_description=issue_description,
+                timeline_content=None,
                 analysis_content="Task issue description",
                 resolution_notes=None,
                 created_by=created_by
@@ -305,6 +311,7 @@ async def create_task_resolution(task_id: int, resolution_notes: str, created_by
                 task_id=task_id,
                 note_date=resolution_date,
                 issue_description="Task resolution",
+                timeline_content=None,
                 analysis_content="Task resolution notes",
                 resolution_notes=resolution_notes,
                 created_by=created_by

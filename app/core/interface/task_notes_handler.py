@@ -17,14 +17,15 @@ from app.config.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-async def create_progress_note_direct(task_id: int, note_date: date, analysis_content: str, created_by: int = None) -> dict:
+async def create_progress_note_direct(task_id: int, note_date: date, timeline_content: str = None, analysis_content: str = None, created_by: int = None) -> dict:
     """
     Create a progress note directly and return result with status.
 
     Args:
         task_id: ID of the task
         note_date: Date for the note
-        analysis_content: Progress content
+        timeline_content: Daily actions and activities
+        analysis_content: Detailed analysis content
         created_by: User ID who created the note
 
     Returns:
@@ -38,6 +39,7 @@ async def create_progress_note_direct(task_id: int, note_date: date, analysis_co
             task_id=task_id,
             note_date=note_date,
             issue_description=issue_description,
+            timeline_content=timeline_content,
             analysis_content=analysis_content,
             resolution_notes=None,
             created_by=created_by
@@ -62,13 +64,14 @@ async def create_progress_note_direct(task_id: int, note_date: date, analysis_co
         }
 
 
-async def update_progress_note_direct(note_id: int, analysis_content: str) -> dict:
+async def update_progress_note_direct(note_id: int, timeline_content: str = None, analysis_content: str = None) -> dict:
     """
     Update a progress note directly and return result with status.
 
     Args:
         note_id: ID of the note to update
-        analysis_content: New progress content
+        timeline_content: New timeline content
+        analysis_content: New analysis content
 
     Returns:
         dict: {'success': bool, 'message': str, 'note': TaskNote or None}
@@ -76,16 +79,17 @@ async def update_progress_note_direct(note_id: int, analysis_content: str) -> di
     try:
         logger.info(f"Starting update of progress note {note_id}")
         
-        if not analysis_content or not analysis_content.strip():
+        if not timeline_content and not analysis_content:
             return {
                 'success': False,
-                'message': 'Analysis content cannot be empty',
+                'message': 'At least one of timeline or analysis content must be provided',
                 'note': None
             }
         
         note = await update_task_note(
             note_id=note_id,
-            analysis_content=analysis_content.strip()
+            timeline_content=timeline_content.strip() if timeline_content else None,
+            analysis_content=analysis_content.strip() if analysis_content else None
         )
 
         logger.info(f"Successfully updated progress note {note_id}")
@@ -321,14 +325,14 @@ def run_async_operation(coro):
 
 
 # Convenience sync wrappers for Streamlit usage
-def create_progress_note_sync(task_id: int, note_date: date, analysis_content: str, created_by: int = None) -> dict:
+def create_progress_note_sync(task_id: int, note_date: date, timeline_content: str = None, analysis_content: str = None, created_by: int = None) -> dict:
     """Sync wrapper for create_progress_note_direct"""
-    return run_async_operation(create_progress_note_direct(task_id, note_date, analysis_content, created_by))
+    return run_async_operation(create_progress_note_direct(task_id, note_date, timeline_content, analysis_content, created_by))
 
 
-def update_progress_note_sync(note_id: int, analysis_content: str) -> dict:
+def update_progress_note_sync(note_id: int, timeline_content: str = None, analysis_content: str = None) -> dict:
     """Sync wrapper for update_progress_note_direct"""
-    return run_async_operation(update_progress_note_direct(note_id, analysis_content))
+    return run_async_operation(update_progress_note_direct(note_id, timeline_content, analysis_content))
 
 
 def delete_progress_note_sync(note_id: int) -> dict:

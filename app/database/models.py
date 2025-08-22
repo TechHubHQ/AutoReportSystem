@@ -107,6 +107,8 @@ class TaskNote(Base):
     note_date = Column(Date, nullable=False)
     # Clear explanation of the issue
     issue_description = Column(Text, nullable=False)
+    # Daily actions and activities timeline
+    timeline_content = Column(Text, nullable=True)
     # Detailed progress analysis
     analysis_content = Column(Text, nullable=False)
     # Resolution information (can be null until resolved)

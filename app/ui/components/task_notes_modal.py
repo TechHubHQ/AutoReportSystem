@@ -49,8 +49,8 @@ def show_task_notes_modal(task):
             """, unsafe_allow_html=True)
 
             # Tabs for different views
-            tab1, tab2, tab3, tab4 = st.tabs(
-                ["🔍 Issue", "📝 Daily Progress", "✅ Resolution", "📚 Timeline"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(
+                ["🔍 Issue", "📝 Daily Progress", "✅ Resolution", "📚 Timeline", "📊 Analysis"])
 
             with tab1:
                 st.markdown("### 🔍 Task Issue Description")
@@ -113,27 +113,37 @@ def show_task_notes_modal(task):
                         help="Select the date for this progress entry"
                     )
 
-                    st.markdown("#### 📊 Daily Progress & Analysis")
+                    st.markdown("#### 📅 Daily Timeline")
+                    timeline_content = st.text_area(
+                        "What actions did you take today?",
+                        height=150,
+                        placeholder="• 9:00 AM - Started working on feature X\n• 10:30 AM - Met with team to discuss requirements\n• 2:00 PM - Implemented solution Y\n• 4:00 PM - Tested and debugged...",
+                        help="Document the specific actions, meetings, and activities you performed during the day."
+                    )
+
+                    st.markdown("#### 📊 Detailed Analysis")
                     analysis_content = st.text_area(
-                        "Document your daily progress, work done, challenges, and findings:",
-                        height=200,
-                        placeholder="What did you work on today? What progress was made? Any challenges encountered? Key findings or insights...",
-                        help="Document your detailed work, progress, analysis, and any insights gained during the day."
+                        "Provide detailed analysis of your work:",
+                        height=150,
+                        placeholder="Detailed analysis of progress, challenges encountered, solutions implemented, key findings, insights gained, next steps...",
+                        help="Document your detailed analysis, insights, challenges, and findings from today's work."
                     )
 
                     submitted = st.form_submit_button(
                         "💾 Save Progress Note", type="primary")
 
                     if submitted:
-                        if not analysis_content.strip():
-                            st.error("❌ Progress content is required!")
+                        if not timeline_content.strip() and not analysis_content.strip():
+                            st.error(
+                                "❌ At least one of Timeline or Analysis content is required!")
                         else:
                             # Save progress note directly to database
                             with st.spinner("Saving progress note..."):
                                 result = create_progress_note_sync(
                                     task_id=task.id,
                                     note_date=note_date_input,
-                                    analysis_content=analysis_content.strip(),
+                                    timeline_content=timeline_content.strip() if timeline_content.strip() else None,
+                                    analysis_content=analysis_content.strip() if analysis_content.strip() else None,
                                     created_by=user.get('id')
                                 )
 
@@ -294,14 +304,26 @@ def show_task_notes_modal(task):
                             if is_expanded_key not in st.session_state:
                                 st.session_state[is_expanded_key] = False
 
-                            note_date_str = note.note_date.strftime('%A, %B %d, %Y')
-                            time_ago = "Today" if note.note_date == date.today() else f"{(date.today() - note.note_date).days} day(s) ago"
+                            note_date_str = note.note_date.strftime(
+                                '%A, %B %d, %Y')
+                            time_ago = "Today" if note.note_date == date.today(
+                            ) else f"{(date.today() - note.note_date).days} day(s) ago"
 
-                            # Truncate content to ~5 lines visually
-                            content_lines = note.analysis_content.split('\n')
-                            cleaned_content = note.analysis_content.strip()
-                            content_lines = cleaned_content.split('\n')
-                            truncated_content = '\n'.join(content_lines[:5])
+                            # Prepare timeline content for display
+                            timeline_display = ""
+                            if note.timeline_content and note.timeline_content.strip():
+                                timeline_lines = note.timeline_content.strip().split('\n')
+                                truncated_timeline = '\n'.join(
+                                    timeline_lines[:3])
+                                timeline_display = f"<div style='margin-bottom: 10px;'><strong>📅 Timeline:</strong><br>{html.escape(truncated_timeline if not st.session_state[is_expanded_key] else note.timeline_content).replace('\n', '<br>')}</div>"
+
+                            # Prepare analysis content for display
+                            analysis_display = ""
+                            if note.analysis_content and note.analysis_content.strip():
+                                analysis_lines = note.analysis_content.strip().split('\n')
+                                truncated_analysis = '\n'.join(
+                                    analysis_lines[:3])
+                                analysis_display = f"<div><strong>📊 Analysis:</strong><br>{html.escape(truncated_analysis if not st.session_state[is_expanded_key] else note.analysis_content).replace('\n', '<br>')}</div>"
 
                             # Render note card
                             st.markdown(
@@ -320,7 +342,8 @@ def show_task_notes_modal(task):
                                     </div>
                                     <p class="note-meta"><i>📝 {time_ago}</i></p>
                                     <div class="note-content {'expanded' if st.session_state[is_expanded_key] else ''}">
-                                        {html.escape(truncated_content).replace('\n', '<br>') if not st.session_state[is_expanded_key] else html.escape(cleaned_content).replace('\n', '<br>')}
+                                        {timeline_display}
+                                        {analysis_display}
                                     </div>
                                     <div class="read-more-container" style="margin-top: 0.5rem;">
                                         </div>
@@ -335,7 +358,8 @@ def show_task_notes_modal(task):
                                 use_container_width=False,
                                 type="secondary",
                                 help="Expand or collapse note content",
-                                on_click=lambda nk=is_expanded_key: st.session_state.update({nk: not st.session_state[nk]})
+                                on_click=lambda nk=is_expanded_key: st.session_state.update(
+                                    {nk: not st.session_state[nk]})
                             )
 
                             # Re-run to reflect state change
@@ -352,7 +376,8 @@ def show_task_notes_modal(task):
                             with col2:
                                 if st.button(f"🗑️ Delete", key=f"delete_note_{note.id}"):
                                     with st.spinner("Deleting note..."):
-                                        result = delete_progress_note_sync(note.id)
+                                        result = delete_progress_note_sync(
+                                            note.id)
                                     if result['success']:
                                         st.success(result['message'])
                                         st.rerun()
@@ -363,30 +388,50 @@ def show_task_notes_modal(task):
                             if st.session_state.get(f"editing_note_{note.id}", False):
                                 with st.expander("✏️ Edit Note", expanded=True):
                                     with st.form(f"edit_note_form_{note.id}"):
-                                        updated_content = st.text_area(
-                                            "Edit your progress note:",
-                                            value=note.analysis_content,
-                                            height=200,
-                                            key=f"edit_text_{note.id}"
+                                        st.markdown("#### 📅 Timeline Content")
+                                        updated_timeline = st.text_area(
+                                            "Edit timeline content:",
+                                            value=note.timeline_content or "",
+                                            height=150,
+                                            key=f"edit_timeline_{note.id}",
+                                            placeholder="Daily actions and activities..."
                                         )
+
+                                        st.markdown("#### 📊 Analysis Content")
+                                        updated_analysis = st.text_area(
+                                            "Edit analysis content:",
+                                            value=note.analysis_content or "",
+                                            height=150,
+                                            key=f"edit_analysis_{note.id}",
+                                            placeholder="Detailed analysis and insights..."
+                                        )
+
                                         col_save, col_cancel = st.columns(2)
                                         with col_save:
-                                            save_clicked = st.form_submit_button("💾 Save", type="primary")
+                                            save_clicked = st.form_submit_button(
+                                                "💾 Save", type="primary")
                                         with col_cancel:
-                                            cancel_clicked = st.form_submit_button("❌ Cancel")
+                                            cancel_clicked = st.form_submit_button(
+                                                "❌ Cancel")
 
                                         if save_clicked:
-                                            with st.spinner("Updating..."):
-                                                result = update_progress_note_sync(
-                                                    note_id=note.id,
-                                                    analysis_content=updated_content.strip()
-                                                )
-                                            if result['success']:
-                                                st.success("✅ Note updated successfully!")
-                                                del st.session_state[f"editing_note_{note.id}"]
-                                                st.rerun()
+                                            if not updated_timeline.strip() and not updated_analysis.strip():
+                                                st.error(
+                                                    "❌ At least one of Timeline or Analysis content is required!")
                                             else:
-                                                st.error(result['message'])
+                                                with st.spinner("Updating..."):
+                                                    result = update_progress_note_sync(
+                                                        note_id=note.id,
+                                                        timeline_content=updated_timeline.strip() if updated_timeline.strip() else None,
+                                                        analysis_content=updated_analysis.strip() if updated_analysis.strip() else None
+                                                    )
+                                                if result['success']:
+                                                    st.success(
+                                                        "✅ Note updated successfully!")
+                                                    del st.session_state[f"editing_note_{note.id}"]
+                                                    st.rerun()
+                                                else:
+                                                    st.error(result['message'])
 
                                         if cancel_clicked:
                                             del st.session_state[f"editing_note_{note.id}"]
@@ -409,9 +454,130 @@ def show_task_notes_modal(task):
 
                 except Exception as e:
                     st.error(f"❌ Failed to load timeline: {str(e)}")
+
+            with tab5:
+                st.markdown("### 📊 Analysis View")
+
+                try:
+                    # Use the loaded progress notes data
+                    notes = progress_notes
+
+                    if not notes:
+                        st.info(
+                            "📊 No analysis entries have been added for this task yet. Start documenting your analysis using the 'Daily Progress' tab."
+                        )
+                    else:
+                        st.markdown(
+                            f"**📊 Total Analysis Entries: {len(notes)}**")
+                        st.markdown("---")
+
+                        # Filter notes that have analysis content
+                        analysis_notes = [
+                            note for note in notes if note.analysis_content and note.analysis_content.strip()]
+
+                        if not analysis_notes:
+                            st.info(
+                                "📊 No detailed analysis content found. Add analysis content in the 'Daily Progress' tab.")
+                        else:
+                            for i, note in enumerate(analysis_notes):
+                                note_date_str = note.note_date.strftime(
+                                    '%A, %B %d, %Y')
+                                time_ago = "Today" if note.note_date == date.today(
+                                ) else f"{(date.today() - note.note_date).days} day(s) ago"
+
+                                # Analysis card
+                                st.markdown(
+                                    f"""
+                                    <div class="note-card" style="border-left: 4px solid #28a745;">
+                                        <div class="note-header">
+                                            <h4 class="note-date">📊 {note_date_str}</h4>
+                                            <span style="
+                                                background-color: #28a745;
+                                                color: white;
+                                                padding: 4px 8px;
+                                                border-radius: 8px;
+                                                font-size: 0.8em;
+                                                font-weight: 500;
+                                            ">Analysis #{len(analysis_notes) - i}</span>
+                                        </div>
+                                        <p class="note-meta"><i>📊 {time_ago}</i></p>
+                                        <div class="note-content">
+                                            <strong>📊 Detailed Analysis:</strong><br>
+                                            {html.escape(note.analysis_content).replace('\n', '<br>')}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True
+                                )
+
+                                # Quick edit button for analysis
+                                if st.button(f"✏️ Edit Analysis", key=f"edit_analysis_only_{note.id}"):
+                                    st.session_state[f"editing_analysis_{note.id}"] = True
+                                    st.rerun()
+
+                                # Edit mode for analysis only
+                                if st.session_state.get(f"editing_analysis_{note.id}", False):
+                                    with st.expander("✏️ Edit Analysis", expanded=True):
+                                        with st.form(f"edit_analysis_form_{note.id}"):
+                                            updated_analysis = st.text_area(
+                                                "Edit analysis content:",
+                                                value=note.analysis_content or "",
+                                                height=200,
+                                                key=f"edit_analysis_only_{note.id}",
+                                                placeholder="Detailed analysis and insights..."
+                                            )
+
+                                            col_save, col_cancel = st.columns(
+                                                2)
+                                            with col_save:
+                                                save_clicked = st.form_submit_button(
+                                                    "💾 Save Analysis", type="primary")
+                                            with col_cancel:
+                                                cancel_clicked = st.form_submit_button(
+                                                    "❌ Cancel")
+
+                                            if save_clicked:
+                                                if not updated_analysis.strip():
+                                                    st.error(
+                                                        "❌ Analysis content cannot be empty!")
+                                                else:
+                                                    with st.spinner("Updating analysis..."):
+                                                        result = update_progress_note_sync(
+                                                            note_id=note.id,
+                                                            timeline_content=note.timeline_content,  # Keep existing timeline
+                                                            analysis_content=updated_analysis.strip()
+                                                        )
+                                                    if result['success']:
+                                                        st.success(
+                                                            "✅ Analysis updated successfully!")
+                                                        del st.session_state[f"editing_analysis_{note.id}"]
+                                                        st.rerun()
+                                                    else:
+                                                        st.error(
+                                                            result['message'])
+
+                                            if cancel_clicked:
+                                                del st.session_state[f"editing_analysis_{note.id}"]
+                                                st.rerun()
+
+                                st.markdown("---")
+
+                        # Summary Box for Analysis
+                        st.markdown(
+                            f"""
+                            <div class="summary-box" style="border-left: 4px solid #28a745;">
+                                <strong>📊 Analysis Summary</strong><br>
+                                • 📊 <strong>{len(analysis_notes)}</strong> detailed analysis entries<br>
+                                • 🗓️ <strong>Date Range:</strong> {analysis_notes[-1].note_date.strftime('%b %d')} – {analysis_notes[0].note_date.strftime('%b %d, %Y')}<br>
+                                • 🔍 <strong>Latest Analysis:</strong> {time_ago}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                except Exception as e:
+                    st.error(f"❌ Failed to load analysis: {str(e)}")
         except Exception as e:
             st.error(f"Error loading notes: {e}")
-
 
     # Show the modal
     notes_modal()
