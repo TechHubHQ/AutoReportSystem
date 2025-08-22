@@ -1,590 +1,834 @@
-import streamlit as st
+import math
 import pandas as pd
+import streamlit as st
 from app.ui.components.loader import LoaderContext
 
 
-async def render_task_analysis(dashboard_manager):
-    """Render comprehensive task analysis with enhanced UI for better readability"""
-    st.markdown("### 📈 Comprehensive Task Analysis")
-    st.markdown(
-        "*Enhanced view with expandable sections for better note readability*")
-
-    # Add custom CSS for better styling
+def apply_modern_task_analysis_css():
+    """Apply modern CSS styling for the task analysis dashboard"""
     st.markdown("""
     <style>
-    .task-analysis-card {
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    .main-container {
+        font-family: 'Inter', sans-serif;
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        border-radius: 15px;
-        padding: 20px;
-        margin: 10px 0;
-        border-left: 5px solid #667eea;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
+        min-height: 100vh;
+        padding: 0;
     }
     
-    .task-analysis-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+    /* Modern Header */
+    .analysis-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem 2rem;
+        border-radius: 0 0 30px 30px;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+        position: relative;
+        overflow: hidden;
     }
     
-    .task-header {
+    .analysis-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        animation: float 20s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+    }
+    
+    .header-content {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .analysis-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .analysis-subtitle {
+        font-size: 1.2rem;
+        font-weight: 300;
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+    }
+    
+    /* Stats Cards */
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+        padding: 0 1rem;
+    }
+    
+    .stat-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+    }
+    
+    .stat-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6B7280;
+        font-weight: 500;
+        margin: 0.5rem 0 0 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Modern Task Cards */
+    .task-timeline-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .task-card-modern {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        margin: 2rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+    
+    .task-card-modern:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
+    
+    .task-header-modern {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        padding: 2rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        position: relative;
+    }
+    
+    .task-title-modern {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 0.5rem 0;
+        line-height: 1.2;
+    }
+    
+    .task-meta-modern {
         display: flex;
-        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
         align-items: center;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #e0e6ed;
+        color: #64748b;
+        font-size: 0.9rem;
+        font-weight: 500;
     }
     
-    .task-title {
-        font-size: 1.2em;
-        font-weight: bold;
-        color: #2c3e50;
+    .task-id-badge {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Timeline Section */
+    .timeline-section {
+        padding: 0;
+        position: relative;
+    }
+    
+    .timeline-header {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        padding: 1.5rem 2rem;
+        border-bottom: 2px solid #f59e0b;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .timeline-icon {
+        width: 40px;
+        height: 40px;
+        background: #f59e0b;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .timeline-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #92400e;
         margin: 0;
     }
     
-    .task-id {
-        background: #667eea;
-        color: white;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 0.8em;
-        font-weight: bold;
+    .timeline-content {
+        padding: 2rem;
+        line-height: 1.8;
+        color: #374151;
+        font-size: 1rem;
+        background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        border-left: 4px solid #f59e0b;
+        margin: 0;
+        min-height: 100px;
+        position: relative;
     }
     
-    .note-section {
-        background: white;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
-        border-left: 3px solid #4fc3f7;
+    .timeline-content::before {
+        content: '"';
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        font-size: 4rem;
+        color: #f59e0b;
+        opacity: 0.2;
+        font-family: Georgia, serif;
     }
     
-    .note-header {
-        font-weight: bold;
-        color: #34495e;
-        margin-bottom: 8px;
+    /* Analysis Section */
+    .analysis-section {
+        padding: 0;
+        position: relative;
+    }
+    
+    .analysis-header {
+        background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+        padding: 1.5rem 2rem;
+        border-bottom: 2px solid #8b5cf6;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 1rem;
     }
     
-    .note-content {
-        color: #555;
-        line-height: 1.6;
+    .analysis-icon {
+        width: 40px;
+        height: 40px;
+        background: #8b5cf6;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .analysis-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #5b21b6;
+        margin: 0;
+    }
+    
+    .analysis-content {
+        padding: 2rem;
+        line-height: 1.8;
+        color: #374151;
+        font-size: 1rem;
+        background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        border-left: 4px solid #8b5cf6;
+        margin: 0;
+        min-height: 100px;
+        position: relative;
+    }
+    
+    .analysis-content::before {
+        content: '💡';
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 2rem;
+        opacity: 0.3;
+    }
+    
+    /* Issue/Resolution Sections */
+    .issue-section {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-left: 4px solid #ef4444;
+        padding: 1.5rem 2rem;
+        margin: 0;
+        position: relative;
+    }
+    
+    .issue-section::before {
+        content: '⚠️';
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 1.5rem;
+    }
+    
+    .resolution-section {
+        background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        border-left: 4px solid #22c55e;
+        padding: 1.5rem 2rem;
+        margin: 0;
+        position: relative;
+    }
+    
+    .resolution-section::before {
+        content: '✅';
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        font-size: 1.5rem;
+    }
+    
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0 0 1rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .section-content {
+        line-height: 1.8;
+        color: #374151;
+        font-size: 0.95rem;
         white-space: pre-wrap;
         word-wrap: break-word;
     }
     
-    .issue-section {
-        border-left-color: #ff9800;
-    }
-    
-    .resolution-section {
-        border-left-color: #6bcf7f;
-    }
-    
-    .no-content {
-        color: #999;
-        font-style: italic;
-    }
-    
-    .metric-card {
-        background: white;
-        border-radius: 10px;
-        padding: 15px;
+    /* Empty States */
+    .empty-state {
         text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 3rem 2rem;
+        color: #9ca3af;
+        font-style: italic;
+        background: rgba(0, 0, 0, 0.02);
+        border-radius: 12px;
+        margin: 1rem;
     }
     
-    .view-toggle {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 15px 0;
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    /* Progress Notes Timeline */
+    .notes-timeline {
+        position: relative;
+        margin: 2rem 0;
+    }
+    
+    .note-item {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #3b82f6;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+    
+    .note-item:hover {
+        transform: translateX(8px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    
+    .note-date {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #3b82f6;
+        margin: 0 0 1rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .note-date::before {
+        content: '📅';
+        font-size: 1rem;
+    }
+    
+    /* Filters and Controls */
+    .controls-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .controls-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0 0 1.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .controls-title::before {
+        content: '🎛️';
+        font-size: 1.2rem;
+    }
+    
+    /* Search and Pagination */
+    .search-container {
+        background: white;
+        border-radius: 16px;
+        padding: 1rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+        margin: 1rem 0;
+    }
+    
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+        margin: 2rem 0;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .page-info {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .analysis-title {
+            font-size: 2rem;
+        }
+        
+        .task-header-modern {
+            padding: 1.5rem;
+        }
+        
+        .task-title-modern {
+            font-size: 1.5rem;
+        }
+        
+        .timeline-content,
+        .analysis-content {
+            padding: 1.5rem;
+        }
+        
+        .stats-container {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+    }
+    
+    /* Loading Animation */
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem 2rem;
+        gap: 1rem;
+    }
+    
+    .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+        color: #6b7280;
+        font-weight: 500;
+        font-size: 1.1rem;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Filter options
-    col1, col2, col3 = st.columns(3)
+
+async def render_task_analysis(dashboard_manager):
+    """Render task analysis as an Excel-like table with merged cells (rowspan)"""
+    apply_modern_task_analysis_css()
+
+    # Extra CSS for table view (sticky header, palette, merged-cell visuals)
+    st.markdown("""
+    <style>
+    /* Table wrapper with rounded outer corners */
+    .table-wrapper {
+        width: 100%;
+        overflow: auto;
+        border-radius: 14px;                 /* outer rounded container */
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(250,250,255,0.98));
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    /* Use separate border model + spacing so cells become rounded "tiles" */
+    table.analysis-table {
+        border-collapse: separate;           /* important for rounded cells */
+        border-spacing: 10px;                /* gap between rounded cells */
+        width: 100%;
+        min-width: 1100px;
+        font-family: Inter, Arial, sans-serif;
+        font-size: 14px;
+    }
+
+    /* Sticky header remains but each header cell is rounded */
+    table.analysis-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        padding: 12px 12px;
+        text-align: left;
+        color: white;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        border-radius: 10px;                 /* rounded header cells */
+        box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+    }
+
+    /* Header gradients follow the palette (kept) */
+    th.col-task { background: linear-gradient(90deg,#667eea,#764ba2); }
+    th.col-issue { background: linear-gradient(90deg,#f97316,#fb923c); }
+    th.col-analysis { background: linear-gradient(90deg,#8b5cf6,#c4b5fd); }
+    th.col-timeline { background: linear-gradient(90deg,#f59e0b,#fde68a); color: #222; }
+    th.col-res { background: linear-gradient(90deg,#10b981,#34d399); color: #fff; }
+
+    /* Body cells styled as rounded tiles */
+    table.analysis-table td {
+        background: rgba(255,255,255,0.95);
+        padding: 12px;
+        vertical-align: top;
+        border: none;                        /* remove hard borders—we rely on spacing */
+        border-radius: 10px;                 /* rounded tile look */
+        box-shadow: 0 6px 18px rgba(15,23,42,0.03);
+        min-width: 180px;
+    }
+
+    /* Subtle hover to lift the tile */
+    table.analysis-table tbody tr:hover td {
+        transform: translateY(-3px);
+        transition: transform 0.18s ease;
+        box-shadow: 0 12px 30px rgba(15,23,42,0.06);
+    }
+
+    /* Column accent backgrounds (subtle, still rounded) */
+    td.task-cell {
+        background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.03));
+        min-width: 220px;
+        font-weight: 600;
+    }
+    td.issue-cell {
+        background: linear-gradient(135deg, rgba(254,202,202,0.05), rgba(254,165,165,0.02));
+        min-width: 260px;
+    }
+    td.analysis-cell {
+        background: linear-gradient(135deg, rgba(237,233,254,0.05), rgba(220,213,255,0.02));
+        min-width: 340px;
+    }
+    td.timeline-cell {
+        background: linear-gradient(135deg, rgba(255,249,235,0.05), rgba(255,244,199,0.02));
+        min-width: 260px;
+    }
+    td.res-cell {
+        background: linear-gradient(135deg, rgba(220,252,231,0.05), rgba(187,247,208,0.02));
+        min-width: 260px;
+    }
+
+    /* Reduce scrollbar visual noise on mac/windows */
+    .table-wrapper::-webkit-scrollbar { height: 8px; }
+    .table-wrapper::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 8px; }
+
+    /* cell content and badge style unchanged */
+    .task-meta { font-size: 12px; color: #6b7280; margin-top: 6px; font-weight: 500; }
+    .cell-content {
+        max-height: 220px;              /* give more vertical room */
+        overflow-y: auto;               /* only vertical scroll */
+        overflow-x: hidden;
+        white-space: normal;            /* normal wrapping, no big gaps */
+        word-break: break-word;         /* break long words gracefully */
+        line-height: 1.5;               /* improve readability */
+        padding-right: 6px;             /* so scrollbar doesn’t overlap text */
+    }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: white; margin-right: 6px; }
+    .badge-status { background: linear-gradient(90deg,#4fc3f7,#667eea); }
+    .badge-priority { background: linear-gradient(90deg,#ffb86b,#ff6b6b); color: #111; }
+
+    @media (max-width: 900px) {
+        table.analysis-table { min-width: 900px; font-size: 13px; border-spacing: 8px; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Controls bar (compact)
+    col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 1, 1])
     with col1:
-        view_scope = st.selectbox(
-            "View Scope:",
-            ["All Tasks", "Current Month", "Archived Only"],
-            help="Select which tasks to include in the analysis"
-        )
-
+        view_scope = st.selectbox("Scope", ["All Tasks", "Current Month", "Archived Only"], index=0)
     with col2:
-        status_filter = st.multiselect(
-            "Filter by Status:",
-            ["todo", "inprogress", "pending", "completed"],
-            default=["todo", "inprogress", "pending", "completed"],
-            help="Select task statuses to include"
-        )
-
+        status_filter = st.multiselect("Status", ["todo", "inprogress", "pending", "completed"],
+                                       default=["todo", "inprogress", "pending", "completed"])
     with col3:
-        priority_filter = st.multiselect(
-            "Filter by Priority:",
-            ["low", "medium", "high", "urgent"],
-            default=["low", "medium", "high", "urgent"],
-            help="Select task priorities to include"
-        )
+        priority_filter = st.multiselect("Priority", ["low", "medium", "high", "urgent"],
+                                         default=["low", "medium", "high", "urgent"])
+    with col4:
+        items_per_page = st.selectbox("Rows/page", [10, 20, 50, "All"], index=1)
+    with col5:
+        search_query = st.text_input("Search", help="Search across title, issue, analysis, timeline, resolution")
 
-    # Load tasks based on scope
-    with LoaderContext("Loading task analysis data...", "inline"):
+    # Load data (same as previous logic)
+    with LoaderContext("Loading tasks for table view...", "inline"):
         if view_scope == "Current Month":
             tasks = await dashboard_manager.get_current_month_user_tasks()
         elif view_scope == "Archived Only":
             tasks = await dashboard_manager.get_archived_user_tasks()
-        else:  # All Tasks
+        else:
             current_tasks = await dashboard_manager.get_user_tasks()
             archived_tasks = await dashboard_manager.get_archived_user_tasks()
             tasks = current_tasks + archived_tasks
 
-        # Apply filters
-        filtered_tasks = [
-            task for task in tasks
-            if task.status in status_filter and task.priority in priority_filter
-        ]
-
-        if not filtered_tasks:
-            st.info("📋 No tasks match the selected filters.")
-            return
-
-        # Load detailed analysis data for all filtered tasks
         from app.core.interface.task_notes_interface import (
             get_task_issue, get_task_resolution, get_task_progress_notes
         )
 
-        analysis_data = []
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-
-        for i, task in enumerate(filtered_tasks):
-            status_text.text(
-                f"Loading analysis for task {i+1}/{len(filtered_tasks)}: {task.title}")
-            progress_bar.progress((i + 1) / len(filtered_tasks))
-
-            # Get issue, resolution, and progress notes
+        enhanced_tasks = []
+        for task in tasks:
             task_issue = await get_task_issue(task.id)
             task_resolution = await get_task_resolution(task.id)
-            progress_notes = await get_task_progress_notes(task.id)
+            progress_notes = await get_task_progress_notes(task.id) or []
+            enhanced_tasks.append({
+                "task": task,
+                "issue": task_issue,
+                "resolution": task_resolution,
+                "progress_notes": progress_notes,
+                "notes_count": len(progress_notes)
+            })
 
-            # Create a record for each progress note
-            for note in progress_notes:
-                analysis_data.append({
-                    'ID': task.id,
-                    'Created At': task.created_at.strftime('%Y-%m-%d') if task.created_at else 'N/A',
-                    'Title': task.title,
-                    'Issue': task_issue.issue_description if task_issue else 'No issue documented',
-                    'Notes Date': note.note_date.strftime('%Y-%m-%d'),
-                    'Timeline': note.timeline_content if note.timeline_content else 'No timeline content',
-                    'Analysis': note.analysis_content if note.analysis_content else 'No analysis content',
-                    'Resolution Notes': task_resolution.resolution_notes if task_resolution else 'No resolution documented'
-                })
-            else:
-                # If no progress notes, still show the task with empty analysis
-                analysis_data.append({
-                    'ID': task.id,
-                    'Created At': task.created_at.strftime('%Y-%m-%d') if task.created_at else 'N/A',
-                    'Title': task.title,
-                    'Issue': task_issue.issue_description if task_issue else 'No issue documented',
-                    'Notes Date': 'No notes',
-                    'Timeline': 'No timeline content',
-                    'Analysis': 'No analysis content',
-                    'Resolution Notes': task_resolution.resolution_notes if task_resolution else 'No resolution documented'
-                })
+    # Apply filters and search
+    def _matches_search(e_task):
+        if not search_query:
+            return True
+        s = search_query.lower()
+        t = e_task['task']
+        fields = [
+            t.title or "",
+            t.description or "",
+            (e_task['issue'].issue_description if e_task['issue'] else "") or "",
+            (e_task['resolution'].resolution_notes if e_task['resolution'] else "") or ""
+        ]
+        for note in e_task['progress_notes']:
+            fields.append((note.timeline_content or "") + " " + (note.analysis_content or ""))
+        combined = " ".join(fields).lower()
+        return s in combined
 
-        progress_bar.empty()
-        status_text.empty()
+    filtered = [
+        e for e in enhanced_tasks
+        if e['task'].status in status_filter and e['task'].priority in priority_filter and _matches_search(e)
+    ]
 
-    # Display summary statistics
-    col1, col2, col3, col4 = st.columns(4)
+    if not filtered:
+        st.info("No tasks found for the current filters/search.")
+        return
 
-    with col1:
-        unique_tasks = len(set(item['ID'] for item in analysis_data))
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #667eea; margin: 0;">📋 {unique_tasks}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">Unique Tasks</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        total_notes = len(
-            [item for item in analysis_data if item['Notes Date'] != 'No notes'])
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #4fc3f7; margin: 0;">📝 {total_notes}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">Progress Notes</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col3:
-        tasks_with_issues = len(set(
-            item['ID'] for item in analysis_data if item['Issue'] != 'No issue documented'))
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #ff9800; margin: 0;">🔍 {tasks_with_issues}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">With Issues</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col4:
-        tasks_resolved = len(set(
-            item['ID'] for item in analysis_data if item['Resolution Notes'] != 'No resolution documented'))
-        st.markdown(f"""
-        <div class="metric-card">
-            <h3 style="color: #6bcf7f; margin: 0;">✅ {tasks_resolved}</h3>
-            <p style="margin: 0.5rem 0 0 0; color: #666;">Resolved</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # Display options
-    st.markdown("---")
-    col1, col2, col3 = st.columns([2, 2, 2])
-    with col1:
-        view_mode = st.radio(
-            "📋 Display Mode:",
-            ["Card View", "Table View"],
-            help="Choose how to display the task analysis data"
-        )
-    with col2:
-        if view_mode == "Card View":
-            group_by_task = st.checkbox(
-                "📑 Group by Task",
-                value=True,
-                help="Group all notes under each task for better organization"
-            )
-        else:
-            show_full_content = st.checkbox(
-                "📄 Show full content",
-                help="Show complete text instead of truncated versions"
-            )
-    with col3:
-        items_per_page = st.selectbox(
-            "📄 Items per page:",
-            [5, 10, 20, 50, "All"],
-            index=1,
-            help="Number of items to display per page"
-        )
-
-    # Sort data by ID and Notes Date for better grouping
-    analysis_data.sort(key=lambda x: (
-        x['ID'], x['Notes Date'] if x['Notes Date'] != 'No notes' else '9999-12-31'))
-
-    # Pagination setup
+    # Pagination
     if items_per_page != "All":
-        total_items = len(analysis_data) if view_mode == "Table View" else len(
-            set(item['ID'] for item in analysis_data))
-        total_pages = (total_items - 1) // items_per_page + \
-            1 if total_items > 0 else 1
+        per_page = items_per_page
+        total_pages = math.ceil(len(filtered) / per_page)
+        if 'analysis_table_page' not in st.session_state:
+            st.session_state.analysis_table_page = 1
 
-        if 'current_page' not in st.session_state:
-            st.session_state.current_page = 1
-
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col1:
-            if st.button("⬅️ Previous", disabled=st.session_state.current_page <= 1):
-                st.session_state.current_page -= 1
+        colp1, colp2, colp3 = st.columns([1,2,1])
+        with colp1:
+            if st.button("◀ Prev", disabled=st.session_state.analysis_table_page <= 1):
+                st.session_state.analysis_table_page -= 1
                 st.rerun()
-        with col2:
-            st.markdown(
-                f"<div style='text-align: center; padding: 8px;'><strong>Page {st.session_state.current_page} of {total_pages}</strong></div>", unsafe_allow_html=True)
-        with col3:
-            if st.button("Next ➡️", disabled=st.session_state.current_page >= total_pages):
-                st.session_state.current_page += 1
+        with colp2:
+            st.markdown(f"<div style='text-align:center; padding:6px;'>Page {st.session_state.analysis_table_page} / {total_pages}</div>", unsafe_allow_html=True)
+        with colp3:
+            if st.button("Next ▶", disabled=st.session_state.analysis_table_page >= total_pages):
+                st.session_state.analysis_table_page += 1
                 st.rerun()
 
-    # Display based on selected mode
-    if view_mode == "Card View":
-        st.markdown("#### 📋 Task Analysis Cards")
-        st.markdown("*Click on expandable sections to view detailed content*")
+        start = (st.session_state.analysis_table_page - 1) * per_page
+        display_set = filtered[start:start + per_page]
+    else:
+        display_set = filtered
 
-        if group_by_task:
-            # Group data by task ID
-            tasks_dict = {}
-            for item in analysis_data:
-                task_id = item['ID']
-                if task_id not in tasks_dict:
-                    tasks_dict[task_id] = {
-                        'task_info': item,
-                        'notes': []
-                    }
-                if item['Notes Date'] != 'No notes':
-                    tasks_dict[task_id]['notes'].append(item)
-
-            # Apply pagination for tasks
-            task_ids = list(tasks_dict.keys())
-            if items_per_page != "All":
-                start_idx = (st.session_state.current_page - 1) * \
-                    items_per_page
-                end_idx = start_idx + items_per_page
-                task_ids = task_ids[start_idx:end_idx]
-
-            # Display each task as a card
-            for task_id in task_ids:
-                task_data = tasks_dict[task_id]
-                task_info = task_data['task_info']
-                notes = task_data['notes']
-
-                # Task card container
-                st.markdown(f"""
-                <div class="task-analysis-card">
-                    <div class="task-header">
-                        <h3 class="task-title">📋 {task_info['Title']}</h3>
-                        <span class="task-id">ID: {task_id}</span>
-                    </div>
-                    <p><strong>📅 Created:</strong> {task_info['Created At']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Issue section
-                with st.expander(f"🔍 Issue Description ({task_id})", expanded=False):
-                    if task_info['Issue'] != 'No issue documented':
-                        st.markdown(f"""
-                        <div class="note-section issue-section">
-                            <div class="note-content">{task_info['Issue']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(
-                            "<div class='no-content'>No issue documented for this task</div>", unsafe_allow_html=True)
-
-                # Progress notes section
-                with st.expander(f"📝 Progress Notes ({len(notes)} notes)", expanded=True):
-                    if notes:
-                        for i, note in enumerate(notes):
-                            st.markdown(f"""
-                            <div class="note-section">
-                                <div class="note-header">
-                                    📅 {note['Notes Date']} - Note #{i+1}
-                                </div>
-                                <div class="note-content">
-                                    <strong>📅 Timeline:</strong><br>
-                                    {note['Timeline'] if note['Timeline'] != 'No timeline content' else '<em>No timeline content</em>'}<br><br>
-                                    <strong>📊 Analysis:</strong><br>
-                                    {note['Analysis'] if note['Analysis'] != 'No analysis content' else '<em>No analysis content</em>'}
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(
-                            "<div class='no-content'>No progress notes available for this task</div>", unsafe_allow_html=True)
-
-                # Resolution section
-                with st.expander(f"✅ Resolution Notes ({task_id})", expanded=False):
-                    if task_info['Resolution Notes'] != 'No resolution documented':
-                        st.markdown(f"""
-                        <div class="note-section resolution-section">
-                            <div class="note-content">{task_info['Resolution Notes']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(
-                            "<div class='no-content'>No resolution documented for this task</div>", unsafe_allow_html=True)
-
-                st.markdown("---")
-        else:
-            # Display individual notes as separate cards
-            if items_per_page != "All":
-                start_idx = (st.session_state.current_page - 1) * \
-                    items_per_page
-                end_idx = start_idx + items_per_page
-                display_items = analysis_data[start_idx:end_idx]
-            else:
-                display_items = analysis_data
-
-            for item in display_items:
-                st.markdown(f"""
-                <div class="task-analysis-card">
-                    <div class="task-header">
-                        <h4 class="task-title">📋 {item['Title']}</h4>
-                        <span class="task-id">ID: {item['ID']}</span>
-                    </div>
-                    <p><strong>📅 Created:</strong> {item['Created At']} | <strong>📝 Note Date:</strong> {item['Notes Date']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    with st.expander("🔍 Issue", expanded=False):
-                        if item['Issue'] != 'No issue documented':
-                            st.markdown(
-                                f"<div class='note-content'>{item['Issue']}</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(
-                                "<div class='no-content'>No issue documented</div>", unsafe_allow_html=True)
-
-                with col2:
-                    with st.expander("📅 Timeline", expanded=False):
-                        if item['Timeline'] != 'No timeline content':
-                            st.markdown(
-                                f"<div class='note-content'>{item['Timeline']}</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(
-                                "<div class='no-content'>No timeline content</div>", unsafe_allow_html=True)
-
-                with col3:
-                    with st.expander("📊 Analysis", expanded=True):
-                        if item['Analysis'] != 'No analysis content':
-                            st.markdown(
-                                f"<div class='note-content'>{item['Analysis']}</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(
-                                "<div class='no-content'>No analysis content</div>", unsafe_allow_html=True)
-
-                # Add resolution in a separate row
-                with st.expander("✅ Resolution", expanded=False):
-                    if item['Resolution Notes'] != 'No resolution documented':
-                        st.markdown(
-                            f"<div class='note-content'>{item['Resolution Notes']}</div>", unsafe_allow_html=True)
-                    else:
-                        st.markdown(
-                            "<div class='no-content'>No resolution documented</div>", unsafe_allow_html=True)
-
-                st.markdown("---")
-
-    else:  # Table View
-        st.markdown("#### 📊 Task Analysis Table")
-        st.markdown("*Traditional table view with sortable columns*")
-
-        # Prepare data for display
-        display_data = []
-        for item in analysis_data:
-            display_item = {
-                'ID': item['ID'],
-                'Created At': item['Created At'],
-                'Title': item['Title'],
-                'Issue': item['Issue'] if show_full_content else (item['Issue'][:100] + '...' if len(item['Issue']) > 100 else item['Issue']),
-                'Notes Date': item['Notes Date'],
-                'Timeline': item['Timeline'] if show_full_content else (item['Timeline'][:100] + '...' if len(item['Timeline']) > 100 else item['Timeline']),
-                'Analysis': item['Analysis'] if show_full_content else (item['Analysis'][:100] + '...' if len(item['Analysis']) > 100 else item['Analysis']),
-                'Resolution Notes': item['Resolution Notes'] if show_full_content else (item['Resolution Notes'][:100] + '...' if len(item['Resolution Notes']) > 100 else item['Resolution Notes'])
-            }
-            display_data.append(display_item)
-
-        # Apply pagination
-        if items_per_page != "All":
-            start_idx = (st.session_state.current_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            display_data = display_data[start_idx:end_idx]
-
-        # Create DataFrame and display
-        df = pd.DataFrame(display_data)
-
-        # Display the table
-        st.dataframe(
-            df,
-            use_container_width=True,
-            height=600
-        )
-
-    # Export options
-    st.markdown("---")
-    st.markdown("#### 📥 Export Options")
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("📊 Export to CSV"):
-            csv_data = df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download CSV",
-                data=csv_data,
-                file_name=f"task_notes_analysis_{view_scope.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-
-    with col2:
-        if st.button("📄 Export Full Report"):
-            # Create detailed report with full content
-            full_data = []
-            for item in analysis_data:
-                full_data.append({
-                    'Task ID': item['ID'],
-                    'Created At': item['Created At'],
-                    'Task Title': item['Title'],
-                    'Issue Description': item['Issue'],
-                    'Notes Date': item['Notes Date'],
-                    'Timeline Content': item['Timeline'],
-                    'Analysis Content': item['Analysis'],
-                    'Resolution Notes': item['Resolution Notes']
+    # Build flat DataFrame for export
+    export_rows = []
+    for e in display_set:
+        t = e['task']
+        if e['progress_notes']:
+            for note in e['progress_notes']:
+                export_rows.append({
+                    "task_id": t.id,
+                    "task_title": t.title,
+                    "task_status": t.status,
+                    "task_priority": t.priority,
+                    "issue": getattr(e['issue'], "issue_description", "") if e['issue'] else "",
+                    "analysis": getattr(note, "analysis_content", "") or "",
+                    "timeline": getattr(note, "timeline_content", "") or "",
+                    "note_date": getattr(note, "note_date", "").strftime("%Y-%m-%d") if getattr(note, "note_date", None) else "",
+                    "resolution": getattr(e['resolution'], "resolution_notes", "") if e['resolution'] else ""
                 })
+        else:
+            export_rows.append({
+                "task_id": t.id,
+                "task_title": t.title,
+                "task_status": t.status,
+                "task_priority": t.priority,
+                "issue": getattr(e['issue'], "issue_description", "") if e['issue'] else "",
+                "analysis": "",
+                "timeline": "",
+                "note_date": "",
+                "resolution": getattr(e['resolution'], "resolution_notes", "") if e['resolution'] else ""
+            })
 
-            full_df = pd.DataFrame(full_data)
-            csv_data = full_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Full Report",
-                data=csv_data,
-                file_name=f"detailed_task_notes_analysis_{view_scope.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
+    df_export = pd.DataFrame(export_rows)
+    csv_bytes = df_export.to_csv(index=False).encode('utf-8')
+    st.download_button("⬇ Export CSV", csv_bytes, file_name="task_analysis_export.csv", mime="text/csv")
 
-    with col3:
-        if st.button("📈 Generate Summary"):
-            st.markdown("#### 📈 Analysis Summary")
+    # Build HTML table with rowspan for merged task cells
+    table_html = ['<div class="table-wrapper"><table class="analysis-table"><thead>']
+    table_html.append('<tr>')
+    table_html.append('<th class="col-task">Task Name</th>')
+    table_html.append('<th class="col-issue">Issue</th>')
+    table_html.append('<th class="col-analysis">Analysis</th>')
+    table_html.append('<th class="col-timeline">Timeline</th>')
+    table_html.append('<th class="col-res">Resolution</th>')
+    table_html.append('</tr></thead><tbody>')
 
-            # Task distribution
-            st.markdown("**Task Analysis:**")
-            st.markdown(f"- Total unique tasks: {unique_tasks}")
-            st.markdown(f"- Total progress notes: {total_notes}")
-            st.markdown(
-                f"- Average notes per task: {total_notes/unique_tasks:.1f}" if unique_tasks > 0 else "- Average notes per task: 0")
+    # Helper to escape content
+    from html import escape as _esc
 
-            # Documentation completeness
-            st.markdown("**Documentation Completeness:**")
-            st.markdown(
-                f"- Tasks with issues: {tasks_with_issues}/{unique_tasks} ({(tasks_with_issues/unique_tasks*100):.1f}%)" if unique_tasks > 0 else "- Tasks with issues: 0%")
-            st.markdown(
-                f"- Tasks with resolutions: {tasks_resolved}/{unique_tasks} ({(tasks_resolved/unique_tasks*100):.1f}%)" if unique_tasks > 0 else "- Tasks with resolutions: 0%")
+    for e in display_set:
+        t = e['task']
+        notes = e['progress_notes'] or []
+        n = max(1, len(notes))
 
-    # Quick actions
-    st.markdown("---")
-    st.markdown("#### ⚡ Quick Actions")
-    col1, col2, col3 = st.columns(3)
+        # prepare escaped task-level fields
+        task_title = _esc(t.title or "")
+        task_meta = f"ID: {_esc(str(t.id))} &nbsp; <span class='badge badge-status'>{_esc(t.status)}</span> <span class='badge badge-priority'>{_esc(t.priority)}</span>"
+        issue_text = _esc(getattr(e['issue'], "issue_description", "") or "")
+        resolution_text = _esc(getattr(e['resolution'], "resolution_notes", "") or "")
 
-    with col1:
-        if st.button("🔍 Show Tasks Without Issues"):
-            tasks_without_issues = list(set(
-                item['ID'] for item in analysis_data if item['Issue'] == 'No issue documented'))
-            if tasks_without_issues:
-                st.markdown(
-                    f"**Found {len(tasks_without_issues)} tasks without issue documentation:**")
-                for task_id in tasks_without_issues:
-                    task_title = next(
-                        item['Title'] for item in analysis_data if item['ID'] == task_id)
-                    st.markdown(f"- **{task_title}** (ID: {task_id})")
-            else:
-                st.success("✅ All tasks have issue documentation!")
+        if notes:
+            for idx, note in enumerate(notes):
+                analysis_text = _esc(getattr(note, "analysis_content", "") or "")
+                timeline_text = _esc(getattr(note, "timeline_content", "") or "")
+                note_date = getattr(note, "note_date", None)
+                note_date_str = note_date.strftime("%b %d, %Y") if note_date else ""
+                # First row: include task cell + issue + analysis + timeline + resolution
+                if idx == 0:
+                    row = "<tr>"
+                    row += f"<td class='task-cell' rowspan='{n}'><div>{task_title}</div><div class='task-meta'>{task_meta}</div></td>"
+                    # issue (merged for n rows)
+                    row += f"<td class='issue-cell' rowspan='{n}'><div class='cell-content'>{issue_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
+                    row += f"<td class='analysis-cell'><div class='cell-content'>{analysis_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
+                    row += f"<td class='timeline-cell'><div class='cell-content'>{timeline_text or '<small style=\"color:#9aa2af;\">—</small>'}<br><small style='color:#6b7280'>{note_date_str}</small></div></td>"
+                    row += f"<td class='res-cell' rowspan='{n}'><div class='cell-content'>{resolution_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
+                    row += "</tr>"
+                    table_html.append(row)
+                else:
+                    # subsequent note rows: only analysis + timeline
+                    row = "<tr>"
+                    row += f"<td class='analysis-cell'><div class='cell-content'>{analysis_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
+                    row += f"<td class='timeline-cell'><div class='cell-content'>{timeline_text or '<small style=\"color:#9aa2af;\">—</small>'}<br><small style='color:#6b7280'>{note_date_str}</small></div></td>"
+                    row += "</tr>"
+                    table_html.append(row)
+        else:
+            # No notes: single row with empty analysis/timeline
+            row = "<tr>"
+            row += f"<td class='task-cell'><div>{task_title}</div><div class='task-meta'>{task_meta}</div></td>"
+            row += f"<td class='issue-cell'><div class='cell-content'>{issue_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
+            row += f"<td class='analysis-cell'><div class='cell-content'><small style=\"color:#9aa2af;\">No analysis</small></div></td>"
+            row += f"<td class='timeline-cell'><div class='cell-content'><small style=\"color:#9aa2af;\">No timeline</small></div></td>"
+            row += f"<td class='res-cell'><div class='cell-content'>{resolution_text or '<small style=\"color:#9aa2af;\">—</small>'}</div></td>"
+            row += "</tr>"
+            table_html.append(row)
 
-    with col2:
-        if st.button("📝 Show Tasks Without Progress"):
-            tasks_without_progress = list(set(
-                item['ID'] for item in analysis_data if item['Analysis'] == 'No analysis content' and item['Timeline'] == 'No timeline content'))
-            if tasks_without_progress:
-                st.markdown(
-                    f"**Found {len(tasks_without_progress)} tasks without progress notes:**")
-                for task_id in tasks_without_progress:
-                    task_title = next(
-                        item['Title'] for item in analysis_data if item['ID'] == task_id)
-                    st.markdown(f"- **{task_title}** (ID: {task_id})")
-            else:
-                st.success("✅ All tasks have progress documentation!")
+    table_html.append("</tbody></table></div>")
+    table_final = "".join(table_html)
+    st.markdown(table_final, unsafe_allow_html=True)
 
-    with col3:
-        if st.button("✅ Show Unresolved Tasks"):
-            unresolved_tasks = list(set(
-                item['ID'] for item in analysis_data if item['Resolution Notes'] == 'No resolution documented'))
-            if unresolved_tasks:
-                st.markdown(
-                    f"**Found {len(unresolved_tasks)} tasks without resolution:**")
-                for task_id in unresolved_tasks:
-                    task_title = next(
-                        item['Title'] for item in analysis_data if item['ID'] == task_id)
-                    st.markdown(f"- **{task_title}** (ID: {task_id})")
-            else:
-                st.success("✅ All tasks have been resolved!")
+    # Small legend / tips
+    st.markdown("""
+    <div style="margin-top:0.5rem; font-size:13px; color:#6b7280;">
+        <strong>Tips:</strong> The task name, issue and resolution are merged vertically when a task has multiple analysis entries (like merged cells in Excel).
+        Use the Export button to download the flattened CSV for editing in Excel.
+    </div>
+    """, unsafe_allow_html=True)
