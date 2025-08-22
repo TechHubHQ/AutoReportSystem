@@ -13,6 +13,7 @@ from app.config.logging_config import get_logger
 from app.core.utils.datetime_utils import is_last_friday, get_date_in_timezone
 from app.core.interface.job_tracking_interface import JobExecutionTracker
 from app.core.jobs.execution_lock import JobExecutionLock
+from app.core.jobs.job_config import get_job_email_config
 
 logger = get_logger(__name__)
 
@@ -98,10 +99,32 @@ async def send_report(to_email, user_id):
     )
 
 
-async def send_weekly_report(to_email="santhosh.bommana@medicasapp.com", force=False, job_id=None):
+async def send_weekly_report(to_email=None, force=False, job_id=None):
     """Send weekly reports on every Friday except the last Friday of the month (IST)."""
     # Use provided job_id or default to 'weekly_reporter'
     actual_job_id = job_id if job_id else 'weekly_reporter'
+    
+    # Get email configuration for this job
+    email_config = get_job_email_config(actual_job_id)
+    
+    # Use email config recipient if to_email not provided
+    if to_email is None:
+        to_email = email_config.get('recipient', 'santhosh.bommana@medicasapp.com')
+    
+    # Check if email is enabled for this job
+    if not email_config.get('enabled', True):
+        logger.info(f"Email functionality is disabled for job {actual_job_id}")
+        return {
+            'job_id': actual_job_id,
+            'status': 'skipped',
+            'message': 'Email functionality is disabled for this job',
+            'details': ['Email sending is disabled in job configuration'],
+            'users_processed': 0,
+            'emails_sent': 0,
+            'errors': [],
+            'execution_time': datetime.now().isoformat(),
+            'forced': force
+        }
 
     # Use execution lock to prevent concurrent runs
     async with JobExecutionLock(actual_job_id, timeout_minutes=30) as lock:
