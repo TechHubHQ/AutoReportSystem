@@ -30,17 +30,22 @@ def log_automatic_category_change(task_id: int, old_category: str, new_category:
     )
 
 
-def should_auto_categorize_to_accomplishments(current_status: str, new_status: str) -> bool:
+def should_auto_categorize_to_accomplishments(current_status: str, new_status: str, current_category: str = None) -> bool:
     """
     Determine if a task should be automatically moved to accomplishments category.
 
     Args:
         current_status: Current task status
         new_status: New task status being set
+        current_category: Current task category (to preserve highlights)
 
     Returns:
         True if task should be moved to accomplishments
     """
+    # Don't auto-categorize if task is already in highlights category
+    if current_category == "highlights":
+        return False
+    
     return new_status == "completed" and current_status != "completed"
 
 

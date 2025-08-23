@@ -45,8 +45,18 @@ class SystemMetricsCollector:
     @staticmethod
     def get_disk_usage() -> SystemMetric:
         """Get current disk usage percentage"""
-        disk = psutil.disk_usage('/')
-        disk_percent = (disk.used / disk.total) * 100
+        try:
+            # Use appropriate path based on OS
+            import platform
+            if platform.system() == 'Windows':
+                disk = psutil.disk_usage('C:\\')
+            else:
+                disk = psutil.disk_usage('/')
+            disk_percent = (disk.used / disk.total) * 100
+        except Exception as e:
+            logger.error(f"Error getting disk usage: {e}")
+            disk_percent = 0
+        
         return SystemMetric(
             metric_type="disk",
             value=disk_percent,
@@ -233,17 +243,26 @@ async def get_system_info() -> Dict:
         cpu_count = psutil.cpu_count()
         cpu_freq = psutil.cpu_freq()
         memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        
+        # Use appropriate disk path based on OS
+        import platform
+        if platform.system() == 'Windows':
+            disk = psutil.disk_usage('C:\\')
+        else:
+            disk = psutil.disk_usage('/')
+        
         boot_time = psutil.boot_time()
 
+        import platform
+        
         return {
             'cpu_cores': cpu_count,
             'cpu_frequency': f"{cpu_freq.current:.0f} MHz" if cpu_freq else "Unknown",
             'total_memory': f"{memory.total / (1024**3):.1f} GB",
             'total_disk': f"{disk.total / (1024**3):.1f} GB",
             'system_uptime': str(timedelta(seconds=datetime.now().timestamp() - boot_time)),
-            'python_version': f"{psutil.version_info}",
-            'platform': psutil.WINDOWS if hasattr(psutil, 'WINDOWS') else 'Unix-like'
+            'python_version': f"Python {platform.python_version()}",
+            'platform': f"{platform.system()} {platform.release()}"
         }
 
     except Exception as e:

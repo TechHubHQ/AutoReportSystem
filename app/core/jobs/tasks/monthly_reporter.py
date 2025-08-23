@@ -47,7 +47,7 @@ async def generate_report(user_id):
         'recipient_name': 'Santosh',
         'accomplishments': accomplishments,
         'in_progress': in_progress,
-        'highlights': accomplishments,  # basic highlight = accomplishments
+        'highlights': [task for task in tasks if task.category == "highlights"],  # Separate highlights category
         'sender_name': user.username,
         'sender_title': user.userrole,
         'month': month_name,
@@ -130,20 +130,49 @@ async def send_monthly_report(to_email=None, force=False, job_id=None, user_id=N
             await db.close()
     
     # Get email configuration for this job and user
-    email_config = await get_job_email_config_dict(actual_job_id, user_id)
+    # Use base job ID for email config lookup (strip manual execution suffix)
+    base_job_id = 'monthly_reporter'  # Always use base job ID for email config
+    if '_manual_' in actual_job_id:
+        base_job_id = actual_job_id.split('_manual_')[0]
+    
+    logger.info(f"Looking up email configuration for base job {base_job_id} and user {user_id} (actual job: {actual_job_id})")
+    email_config = await get_job_email_config_dict(base_job_id, user_id)
+    logger.info(f"Email config retrieved: enabled={email_config.get('enabled')}, recipient={email_config.get('recipient')}")
+    
+    # Update error messages to reference the base job ID
+    config_job_id = base_job_id
     
     # Use email config recipient if to_email not provided
     if to_email is None:
-        to_email = email_config.get('recipient', 'santhosh.bommana@medicasapp.com')
+        to_email = email_config.get('recipient')
+        if not to_email:
+            logger.error(f"No recipient email configured for job {config_job_id} and user {user_id}")
+            return {
+                'job_id': actual_job_id,
+                'status': 'error',
+                'message': f'No recipient email configured for job {config_job_id}',
+                'details': [
+                    f'Please configure recipient email in Job Email Configuration for user ID {user_id}',
+                    f'Base Job ID: {config_job_id} (configure this one, not the manual execution ID)',
+                    f'User ID: {user_id}',
+                    'Go to Job Email Configuration page to set up email settings',
+                    f'Note: Manual execution ID was {actual_job_id}'
+                ],
+                'users_processed': 0,
+                'emails_sent': 0,
+                'errors': [f'No recipient email configured for job {config_job_id} and user {user_id}'],
+                'execution_time': datetime.now().isoformat(),
+                'forced': force
+            }
     
     # Check if email is enabled for this job
     if not email_config.get('enabled', True):
-        logger.info(f"Email functionality is disabled for job {actual_job_id}")
+        logger.info(f"Email functionality is disabled for job {config_job_id}")
         return {
             'job_id': actual_job_id,
             'status': 'skipped',
-            'message': 'Email functionality is disabled for this job',
-            'details': ['Email sending is disabled in job configuration'],
+            'message': f'Email functionality is disabled for job {config_job_id}',
+            'details': [f'Email sending is disabled in job configuration for {config_job_id}'],
             'users_processed': 0,
             'emails_sent': 0,
             'errors': [],

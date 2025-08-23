@@ -1174,9 +1174,24 @@ async def render_system_monitoring(dashboard_manager):
         """, unsafe_allow_html=True)
 
     with col4:
+        # Convert numeric health score to text for consistency with system monitor
+        health_score = system_status['health_score']
+        if isinstance(health_score, (int, float)):
+            if health_score >= 80:
+                health_text = "Excellent"
+            elif health_score >= 60:
+                health_text = "Good"
+            elif health_score >= 40:
+                health_text = "Fair"
+            else:
+                health_text = "Poor"
+            display_score = f"{health_text} ({health_score:.0f})"
+        else:
+            display_score = str(health_score)
+        
         st.markdown(f"""
         <div class="metric-card">
-            <h3 style="color: {system_status['status_color']}; margin: 0;">❤️ {system_status['health_score']}</h3>
+            <h3 style="color: {system_status['status_color']}; margin: 0;">❤️ {display_score}</h3>
             <p style="margin: 0.5rem 0 0 0; color: #666;">Health Score</p>
         </div>
         """, unsafe_allow_html=True)

@@ -687,6 +687,18 @@ async def render_task_analysis(dashboard_manager):
                 "notes_count": len(progress_notes)
             })
 
+    # Check if any tasks have meaningful analysis content (moved here to avoid UnboundLocalError)
+    has_any_analysis = False
+    for e in enhanced_tasks:
+        notes = e['progress_notes'] or []
+        for note in notes:
+            a = getattr(note, 'analysis_content', '') or ''
+            if a.strip() and a.strip() != "Progress note - analysis pending":
+                has_any_analysis = True
+                break
+        if has_any_analysis:
+            break
+    
     # Apply filters and search
     def _matches_search(e_task):
         if not search_query:
@@ -789,17 +801,7 @@ async def render_task_analysis(dashboard_manager):
     st.download_button("⬇ Export CSV", csv_bytes,
                        file_name="task_analysis_export.csv", mime="text/csv")
 
-    # Check if any tasks have meaningful analysis content
-    has_any_analysis = False
-    for e in display_set:
-        notes = e['progress_notes'] or []
-        for note in notes:
-            a = getattr(note, 'analysis_content', '') or ''
-            if a.strip() and a.strip() != "Progress note - analysis pending":
-                has_any_analysis = True
-                break
-        if has_any_analysis:
-            break
+    # has_any_analysis is now calculated earlier in the function
     
     # Build HTML table with rowspan for merged task cells — now grouping progress notes by date
     table_html = [

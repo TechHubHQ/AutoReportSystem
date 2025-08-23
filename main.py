@@ -38,8 +38,15 @@ if "db_initialized" not in st.session_state:
     BackendSessionManager.cleanup_expired_sessions()
     st.session_state.db_initialized = True
 
-# Ensure scheduler is always running on every page load
-ensure_scheduler_running()
+# Initialize scheduler immediately on first load
+if "scheduler_initialized" not in st.session_state:
+    logger.info("🚀 Initializing scheduler on application startup...")
+    ensure_scheduler_running()
+    st.session_state.scheduler_initialized = True
+    logger.info("✅ Scheduler initialization completed")
+else:
+    # Ensure scheduler is still running on subsequent page loads
+    ensure_scheduler_running()
 
 # Always attempt to restore session from URL parameters or existing state
 BackendSessionManager.restore_session()

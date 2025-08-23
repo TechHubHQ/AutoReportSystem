@@ -88,6 +88,64 @@ def apply_email_config_css():
         border: 1px solid rgba(102, 126, 234, 0.1);
         margin-bottom: 2rem;
     }
+    
+    /* Modal styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        max-width: 800px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        position: relative;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .modal-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #333;
+        margin: 0;
+    }
+    
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #666;
+        padding: 0.5rem;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+    }
+    
+    .modal-close:hover {
+        background: #f0f0f0;
+        color: #333;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -111,6 +169,148 @@ def render_job_type_badge(job_id: str) -> str:
     display_name = job_id.replace("_", " ").title()
 
     return f'<span class="job-type-badge {badge_class}">{badge_icon} {display_name}</span>'
+
+
+@st.dialog("Edit Email Configuration")
+def edit_config_modal(job_id: str, config):
+    """Modal dialog for editing email configuration."""
+    user = st.session_state.get("user", {})
+    user_id = user.get("id")
+    
+    if not user_id:
+        st.error("❌ User not found in session")
+        return
+    
+    # Get job info
+    job_types = get_available_job_types()
+    job_info = next((jt for jt in job_types if jt["id"] == job_id), {"name": job_id})
+    
+    st.markdown(f"**Editing configuration for:** {job_info['name']}")
+    
+    with st.form("edit_email_config_modal"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            enabled = st.checkbox(
+                "✅ Enable Email Notifications",
+                value=config.enabled,
+                help="Enable or disable email notifications for this job"
+            )
+            
+            recipient = st.text_input(
+                "📧 Recipient Email *",
+                value=config.recipient,
+                placeholder="recipient@example.com",
+                help="Email address to send reports to"
+            )
+            
+            recipient_name = st.text_input(
+                "👤 Recipient Name",
+                value=config.recipient_name or "",
+                placeholder="John Doe",
+                help="Name of the recipient for personalization"
+            )
+        
+        with col2:
+            subject = st.text_input(
+                "📝 Email Subject *",
+                value=config.subject,
+                help="Subject line for the email"
+            )
+            
+            template = st.text_input(
+                "📄 Template File",
+                value=config.template or "",
+                help="Email template file name (optional)"
+            )
+            
+            max_retries = st.number_input(
+                "🔄 Max Retries",
+                min_value=0,
+                max_value=10,
+                value=config.max_retries,
+                help="Maximum number of retry attempts for failed sends"
+            )
+        
+        st.markdown("#### ⚙️ Advanced Settings")
+        
+        adv_col1, adv_col2 = st.columns(2)
+        
+        with adv_col1:
+            send_empty_reports = st.checkbox(
+                "📭 Send Empty Reports",
+                value=config.send_empty_reports,
+                help="Send reports even when no data is available"
+            )
+            
+            html_format = st.checkbox(
+                "🎨 HTML Format",
+                value=config.html_format,
+                help="Send emails in HTML format"
+            )
+        
+        with adv_col2:
+            retry_failed_sends = st.checkbox(
+                "🔄 Retry Failed Sends",
+                value=config.retry_failed_sends,
+                help="Automatically retry failed email sends"
+            )
+        
+        # Form buttons
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            submit_button = st.form_submit_button("💾 Update Configuration", type="primary")
+        
+        with col2:
+            cancel_button = st.form_submit_button("❌ Cancel")
+        
+        with col3:
+            if st.form_submit_button("🗑️ Delete", type="secondary"):
+                if st.session_state.get(f"confirm_delete_modal_{job_id}", False):
+                    try:
+                        asyncio.run(delete_job_email_config(job_id, user_id))
+                        st.success("✅ Configuration deleted successfully!")
+                        st.session_state[f"confirm_delete_modal_{job_id}"] = False
+                        st.session_state[f"show_edit_modal_{job_id}"] = False
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error deleting configuration: {str(e)}")
+                else:
+                    st.session_state[f"confirm_delete_modal_{job_id}"] = True
+                    st.warning("⚠️ Click again to confirm deletion")
+    
+    # Handle form submission
+    if submit_button:
+        if not recipient or not subject:
+            st.error("⚠️ Please fill in all required fields (marked with *)")
+            return
+        
+        try:
+            with LoaderContext("Updating email configuration...", "inline"):
+                asyncio.run(update_job_email_config(
+                    job_id,
+                    user_id,
+                    enabled=enabled,
+                    recipient=recipient,
+                    subject=subject,
+                    template=template or None,
+                    recipient_name=recipient_name or None,
+                    send_empty_reports=send_empty_reports,
+                    html_format=html_format,
+                    retry_failed_sends=retry_failed_sends,
+                    max_retries=max_retries
+                ))
+                st.success("✅ Email configuration updated successfully!")
+                st.session_state[f"show_edit_modal_{job_id}"] = False
+                st.rerun()
+        
+        except Exception as e:
+            st.error(f"❌ Error updating configuration: {str(e)}")
+    
+    if cancel_button:
+        st.session_state[f"show_edit_modal_{job_id}"] = False
+        st.rerun()
 
 
 async def render_existing_configs():
@@ -197,7 +397,7 @@ async def render_existing_configs():
 
         with action_col1:
             if st.button("✏️ Edit", key=f"edit_{config.id}"):
-                st.session_state[f"edit_config_{config.job_id}"] = True
+                st.session_state[f"show_edit_modal_{config.job_id}"] = True
                 st.rerun()
 
         with action_col2:
@@ -218,8 +418,8 @@ async def render_existing_configs():
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-async def render_config_form(job_id: str = None, edit_mode: bool = False):
-    """Render the email configuration form."""
+async def render_config_form():
+    """Render the email configuration form for new configurations."""
     user = st.session_state.get("user", {})
     user_id = user.get("id")
 
@@ -227,47 +427,34 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
         st.error("❌ User not found in session")
         return
 
-    # Get existing config if in edit mode
-    existing_config = None
-    if edit_mode and job_id:
-        existing_config = await get_job_email_config(job_id, user_id)
-
-    form_title = "✏️ Edit Email Configuration" if edit_mode else "➕ Add New Email Configuration"
-    st.markdown(f"### {form_title}")
+    st.markdown("### ➕ Add New Email Configuration")
 
     with st.form("email_config_form"):
         st.markdown('<div class="form-section">', unsafe_allow_html=True)
 
         # Job selection
-        if not edit_mode:
-            job_types = get_available_job_types()
-            job_options = {
-                jt["id"]: f"{jt['name']} - {jt['description']}" for jt in job_types}
+        job_types = get_available_job_types()
+        job_options = {
+            jt["id"]: f"{jt['name']} - {jt['description']}" for jt in job_types}
 
-            # Filter out jobs that already have configurations
-            existing_configs = await get_all_job_email_configs(user_id)
-            existing_job_ids = {config.job_id for config in existing_configs}
-            available_jobs = {
-                k: v for k, v in job_options.items() if k not in existing_job_ids}
+        # Filter out jobs that already have configurations
+        existing_configs = await get_all_job_email_configs(user_id)
+        existing_job_ids = {config.job_id for config in existing_configs}
+        available_jobs = {
+            k: v for k, v in job_options.items() if k not in existing_job_ids}
 
-            if not available_jobs:
-                st.warning(
-                    "⚠️ All available job types already have email configurations.")
-                st.markdown("</div>", unsafe_allow_html=True)
-                return
+        if not available_jobs:
+            st.warning(
+                "⚠️ All available job types already have email configurations.")
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
 
-            selected_job_id = st.selectbox(
-                "📋 Select Job Type",
-                options=list(available_jobs.keys()),
-                format_func=lambda x: available_jobs[x],
-                help="Choose which job you want to configure email settings for"
-            )
-        else:
-            selected_job_id = job_id
-            job_types = get_available_job_types()
-            job_info = next(
-                (jt for jt in job_types if jt["id"] == job_id), {"name": job_id})
-            st.info(f"📋 Editing configuration for: **{job_info['name']}**")
+        selected_job_id = st.selectbox(
+            "📋 Select Job Type",
+            options=list(available_jobs.keys()),
+            format_func=lambda x: available_jobs[x],
+            help="Choose which job you want to configure email settings for"
+        )
 
         st.markdown("#### 📧 Email Settings")
 
@@ -276,20 +463,20 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
         with col1:
             enabled = st.checkbox(
                 "✅ Enable Email Notifications",
-                value=existing_config.enabled if existing_config else True,
+                value=True,
                 help="Enable or disable email notifications for this job"
             )
 
             recipient = st.text_input(
                 "📧 Recipient Email *",
-                value=existing_config.recipient if existing_config else "",
+                value="",
                 placeholder="recipient@example.com",
                 help="Email address to send reports to"
             )
 
             recipient_name = st.text_input(
                 "👤 Recipient Name",
-                value=existing_config.recipient_name if existing_config else "",
+                value="",
                 placeholder="John Doe",
                 help="Name of the recipient for personalization"
             )
@@ -297,13 +484,13 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
         with col2:
             subject = st.text_input(
                 "📝 Email Subject *",
-                value=existing_config.subject if existing_config else f"{selected_job_id.replace('_', ' ').title()} Report",
+                value=f"{selected_job_id.replace('_', ' ').title()} Report",
                 help="Subject line for the email"
             )
 
             template = st.text_input(
                 "📄 Template File",
-                value=existing_config.template if existing_config else f"{selected_job_id}_template.html",
+                value=f"{selected_job_id}_template.html",
                 help="Email template file name (optional)"
             )
 
@@ -311,7 +498,7 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
                 "🔄 Max Retries",
                 min_value=0,
                 max_value=10,
-                value=existing_config.max_retries if existing_config else 3,
+                value=3,
                 help="Maximum number of retry attempts for failed sends"
             )
 
@@ -322,20 +509,20 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
         with adv_col1:
             send_empty_reports = st.checkbox(
                 "📭 Send Empty Reports",
-                value=existing_config.send_empty_reports if existing_config else False,
+                value=False,
                 help="Send reports even when no data is available"
             )
 
             html_format = st.checkbox(
                 "🎨 HTML Format",
-                value=existing_config.html_format if existing_config else True,
+                value=True,
                 help="Send emails in HTML format"
             )
 
         with adv_col2:
             retry_failed_sends = st.checkbox(
                 "🔄 Retry Failed Sends",
-                value=existing_config.retry_failed_sends if existing_config else True,
+                value=True,
                 help="Automatically retry failed email sends"
             )
 
@@ -345,12 +532,8 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
         button_col1, button_col2, button_col3 = st.columns([1, 1, 1])
 
         with button_col1:
-            if edit_mode:
-                submit_button = st.form_submit_button(
-                    "💾 Update Configuration", type="primary")
-            else:
-                submit_button = st.form_submit_button(
-                    "➕ Create Configuration", type="primary")
+            submit_button = st.form_submit_button(
+                "➕ Create Configuration", type="primary")
 
         with button_col2:
             cancel_button = st.form_submit_button("❌ Cancel")
@@ -365,48 +548,27 @@ async def render_config_form(job_id: str = None, edit_mode: bool = False):
             return
 
         try:
-            action_text = "Updating" if edit_mode else "Creating"
-            with LoaderContext(f"{action_text} email configuration...", "inline"):
-                if edit_mode:
-                    await update_job_email_config(
-                        selected_job_id,
-                        user_id,
-                        enabled=enabled,
-                        recipient=recipient,
-                        subject=subject,
-                        template=template or None,
-                        recipient_name=recipient_name or None,
-                        send_empty_reports=send_empty_reports,
-                        html_format=html_format,
-                        retry_failed_sends=retry_failed_sends,
-                        max_retries=max_retries
-                    )
-                    st.success("✅ Email configuration updated successfully!")
-                    st.session_state[f"edit_config_{selected_job_id}"] = False
-                else:
-                    await create_job_email_config(
-                        selected_job_id,
-                        user_id,
-                        recipient,
-                        subject,
-                        template or None,
-                        recipient_name or None,
-                        enabled,
-                        send_empty_reports,
-                        html_format,
-                        retry_failed_sends,
-                        max_retries
-                    )
-                    st.success("✅ Email configuration created successfully!")
-
+            with LoaderContext("Creating email configuration...", "inline"):
+                await create_job_email_config(
+                    selected_job_id,
+                    user_id,
+                    recipient,
+                    subject,
+                    template or None,
+                    recipient_name or None,
+                    enabled,
+                    send_empty_reports,
+                    html_format,
+                    retry_failed_sends,
+                    max_retries
+                )
+                st.success("✅ Email configuration created successfully!")
                 st.rerun()
 
         except Exception as e:
-            st.error(f"❌ Error {action_text.lower()} configuration: {str(e)}")
+            st.error(f"❌ Error creating configuration: {str(e)}")
 
     if cancel_button:
-        if edit_mode:
-            st.session_state[f"edit_config_{selected_job_id}"] = False
         st.rerun()
 
     if clear_button:
@@ -435,6 +597,24 @@ def job_email_config(go_to_page):
         st.error("❌ Please log in to access email configuration settings")
         return
 
+    # Check for modal display
+    user_id = user.get("id")
+    modal_job_id = None
+    for key in st.session_state:
+        if key.startswith("show_edit_modal_") and st.session_state[key]:
+            modal_job_id = key.replace("show_edit_modal_", "")
+            break
+    
+    if modal_job_id:
+        # Get the configuration for the modal
+        try:
+            config = asyncio.run(get_job_email_config(modal_job_id, user_id))
+            if config:
+                edit_config_modal(modal_job_id, config)
+        except Exception as e:
+            st.error(f"❌ Error loading configuration: {str(e)}")
+            st.session_state[f"show_edit_modal_{modal_job_id}"] = False
+
     # Main content
     tab1, tab2 = st.tabs(["📋 Current Configurations", "➕ Add Configuration"])
 
@@ -442,17 +622,7 @@ def job_email_config(go_to_page):
         asyncio.run(render_existing_configs())
 
     with tab2:
-        # Check if we're in edit mode
-        edit_job_id = None
-        for key in st.session_state:
-            if key.startswith("edit_config_") and st.session_state[key]:
-                edit_job_id = key.replace("edit_config_", "")
-                break
-
-        if edit_job_id:
-            asyncio.run(render_config_form(edit_job_id, edit_mode=True))
-        else:
-            asyncio.run(render_config_form())
+        asyncio.run(render_config_form())
 
 
 if __name__ == "__main__":

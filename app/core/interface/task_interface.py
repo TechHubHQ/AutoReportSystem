@@ -164,7 +164,8 @@ async def update_task(task_id: int, title: str = None, description: str = None,
             f"Updating task {task_id}: current_status='{current_task.status}', new_status='{status}', current_category='{current_task.category}'")
 
         # 1. If status is being changed to "completed", automatically set category to "accomplishments"
-        if should_auto_categorize_to_accomplishments(current_task.status, status):
+        # (but preserve highlights category)
+        if should_auto_categorize_to_accomplishments(current_task.status, status, current_task.category):
             logger.info(
                 f"Auto-categorizing task {task_id} to 'accomplishments' (status: {current_task.status} -> {status})")
             update_data['category'] = "accomplishments"

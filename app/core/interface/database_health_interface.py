@@ -194,6 +194,118 @@ async def check_alembic_migration_status() -> Dict[str, Any]:
             await db.close()
 
 
+async def get_database_performance_metrics() -> Dict[str, Any]:
+    """Get database performance metrics for graphing."""
+    db = None
+    
+    try:
+        db = await get_db()
+        
+        # Connection time test
+        start_time = time.time()
+        await db.execute(text("SELECT 1"))
+        connection_time = (time.time() - start_time) * 1000
+        
+        # Query performance tests
+        performance_tests = {}
+        
+        # Test simple query
+        start_time = time.time()
+        await db.execute(text("SELECT COUNT(*) FROM users"))
+        performance_tests['simple_query'] = (time.time() - start_time) * 1000
+        
+        # Test complex query (if tasks table exists)
+        try:
+            start_time = time.time()
+            await db.execute(text("""
+                SELECT status, COUNT(*) 
+                FROM tasks 
+                GROUP BY status
+            """))
+            performance_tests['complex_query'] = (time.time() - start_time) * 1000
+        except:
+            performance_tests['complex_query'] = None
+        
+        # Test join query (if multiple tables exist)
+        try:
+            start_time = time.time()
+            await db.execute(text("""
+                SELECT u.username, COUNT(t.id) as task_count
+                FROM users u
+                LEFT JOIN tasks t ON u.id = t.created_by
+                GROUP BY u.id, u.username
+                LIMIT 10
+            """))
+            performance_tests['join_query'] = (time.time() - start_time) * 1000
+        except:
+            performance_tests['join_query'] = None
+        
+        return {
+            "timestamp": datetime.now(),
+            "connection_time_ms": round(connection_time, 2),
+            "query_performance": {k: round(v, 2) if v is not None else None for k, v in performance_tests.items()}
+        }
+        
+    except Exception as e:
+        logger.error(f"Database performance check failed: {e}")
+        return {
+            "timestamp": datetime.now(),
+            "connection_time_ms": 0,
+            "query_performance": {},
+            "error": str(e)
+        }
+    finally:
+        if db:
+            await db.close()
+
+
+async def get_database_metrics_history(hours: int = 24) -> Dict[str, Any]:
+    """Get simulated historical database metrics for graphing."""
+    try:
+        # Generate sample historical data for database metrics
+        # In a real implementation, this would fetch from a metrics storage system
+        current_time = datetime.now()
+        historical_data = []
+        
+        import random
+        
+        for i in range(hours):
+            timestamp = current_time - timedelta(hours=i)
+            
+            # Simulate connection time variations (20-200ms)
+            base_connection_time = 50 + random.randint(-30, 150)
+            
+            # Simulate query performance variations
+            simple_query_time = 10 + random.randint(-5, 40)
+            complex_query_time = 50 + random.randint(-20, 100)
+            join_query_time = 80 + random.randint(-30, 150)
+            
+            historical_data.append({
+                'timestamp': timestamp.isoformat(),
+                'connection_time_ms': max(1, base_connection_time),
+                'simple_query_ms': max(1, simple_query_time),
+                'complex_query_ms': max(1, complex_query_time),
+                'join_query_ms': max(1, join_query_time)
+            })
+        
+        # Reverse to get chronological order
+        historical_data.reverse()
+        
+        return {
+            'data': historical_data,
+            'period_hours': hours,
+            'data_points': len(historical_data)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting database metrics history: {e}")
+        return {
+            'data': [],
+            'period_hours': hours,
+            'data_points': 0
+        }
+
+
 async def get_comprehensive_database_health() -> Dict[str, Any]:
     """Get comprehensive database health report."""
     try:

@@ -155,7 +155,33 @@ def render_job_result(job_result):
     with col4:
         execution_time = job_result.get('execution_time')
         if execution_time:
-            st.metric("Executed At", execution_time.strftime('%H:%M:%S'))
+            # Handle both string and datetime objects
+            if isinstance(execution_time, str):
+                try:
+                    # Try parsing ISO format string
+                    from datetime import datetime
+                    if 'T' in execution_time:
+                        # ISO format with T separator
+                        dt = datetime.fromisoformat(execution_time.replace('Z', '+00:00'))
+                    else:
+                        # Try other common formats
+                        try:
+                            dt = datetime.strptime(execution_time, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            dt = datetime.strptime(execution_time, '%H:%M:%S')
+                    time_str = dt.strftime('%H:%M:%S')
+                except (ValueError, AttributeError) as e:
+                    # If parsing fails, just show the string
+                    time_str = str(execution_time)[:8] if len(str(execution_time)) > 8 else str(execution_time)
+            elif hasattr(execution_time, 'strftime'):
+                # It's already a datetime object
+                time_str = execution_time.strftime('%H:%M:%S')
+            else:
+                # Fallback for any other type
+                time_str = str(execution_time)[:8] if len(str(execution_time)) > 8 else str(execution_time)
+            st.metric("Executed At", time_str)
+        else:
+            st.metric("Executed At", "N/A")
     
     # Main message
     st.markdown(f"""
@@ -463,11 +489,14 @@ def apply_jobs_css():
     .status-indicator {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         padding: 0.5rem 1rem;
         border-radius: 25px;
         font-size: 0.9rem;
         font-weight: 600;
         margin: 0.5rem 0;
+        text-align: center;
+        width: 100%;
     }
     
     .status-running {
@@ -862,8 +891,27 @@ async def render_jobs_list():
             next_run = "Not scheduled"
             countdown = "N/A"
 
-        last_run = job['last_run'].strftime(
-            '%Y-%m-%d %H:%M:%S') if job['last_run'] else "Never executed"
+        # Handle last_run safely
+        last_run_value = job.get('last_run')
+        if last_run_value:
+            if hasattr(last_run_value, 'strftime'):
+                last_run = last_run_value.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                # It's a string, try to parse and format it
+                try:
+                    if isinstance(last_run_value, str):
+                        from datetime import datetime
+                        if 'T' in last_run_value:
+                            dt = datetime.fromisoformat(last_run_value.replace('Z', '+00:00'))
+                        else:
+                            dt = datetime.strptime(last_run_value, '%Y-%m-%d %H:%M:%S')
+                        last_run = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        last_run = str(last_run_value)
+                except (ValueError, AttributeError):
+                    last_run = str(last_run_value)
+        else:
+            last_run = "Never executed"
 
         # Enhanced job card - broken into smaller parts to avoid HTML escaping
         # Job header with title and badges
@@ -929,10 +977,33 @@ async def render_jobs_list():
                             st.success(f"✅ {result.get('message')}")
                             # Set flag to show results
                             st.session_state[f"show_results_{job['id']}"] = True
+                            # Force refresh to show updated results
+                            st.rerun()
                         else:
                             st.error(f"❌ {result.get('message')}")
+                            # Show error details if available
+                            if result.get('error'):
+                                st.error(f"Error details: {result.get('error')}")
                     except Exception as e:
                         st.error(f"❌ Failed to execute job: {e}")
+                        import traceback
+                        st.error(f"Traceback: {traceback.format_exc()}")
+                        
+                        # Store error result for display
+                        error_result = {
+                            'job_id': job['id'],
+                            'status': 'error',
+                            'message': f'Job execution failed: {str(e)}',
+                            'details': [f'Error: {str(e)}', f'Traceback: {traceback.format_exc()}'],
+                            'users_processed': 0,
+                            'emails_sent': 0,
+                            'errors': [str(e)],
+                            'execution_time': datetime.now().isoformat(),
+                            'forced': True
+                        }
+                        
+                        from app.core.jobs.job_results_store import store_job_result
+                        store_job_result(job['id'], error_result)
         
         with action_col2:
             # Check if results are available in global storage

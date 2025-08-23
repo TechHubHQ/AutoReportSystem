@@ -1,5 +1,8 @@
 import aiosmtplib
 from email.mime.text import MIMEText
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class EmailService:
@@ -13,21 +16,35 @@ class EmailService:
         self.host = host
         self.pwd = pwd
         self.port = port
+        
+        logger.info(f"EmailService initialized: host={host}, port={port}, from={from_email}, username={self.username}")
 
     async def send_email(self, to_address, subject, content, html=False):
-        msg = MIMEText(content, 'html' if html else 'plain')
-        msg['Subject'] = subject
-        msg['From'] = self.from_email
-        msg['To'] = to_address
-
-        await aiosmtplib.send(
-            msg,
-            hostname=self.host,
-            port=self.port,
-            username=self.username,
-            password=self.pwd,
-            start_tls=True,
-        )
+        try:
+            logger.info(f"Attempting to send email to {to_address} with subject: {subject}")
+            
+            msg = MIMEText(content, 'html' if html else 'plain')
+            msg['Subject'] = subject
+            msg['From'] = self.from_email
+            msg['To'] = to_address
+            
+            logger.debug(f"Email message created. Content length: {len(content)} chars")
+            
+            await aiosmtplib.send(
+                msg,
+                hostname=self.host,
+                port=self.port,
+                username=self.username,
+                password=self.pwd,
+                start_tls=True,
+            )
+            
+            logger.info(f"Email sent successfully to {to_address}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send email to {to_address}: {str(e)}")
+            logger.error(f"SMTP config: host={self.host}, port={self.port}, username={self.username}")
+            raise e
 
 # Example Usage
 # import asyncio

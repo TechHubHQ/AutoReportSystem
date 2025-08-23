@@ -7,6 +7,9 @@ import pytz
 import inspect
 from apscheduler.triggers.date import DateTrigger
 from app.core.jobs.scheduler import get_scheduler_instance, is_scheduler_running, ensure_scheduler_running, get_scheduler_uptime, execution_history
+from app.config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def get_all_jobs() -> List[Dict[str, Any]]:
@@ -57,6 +60,15 @@ async def get_all_jobs() -> List[Dict[str, Any]]:
         job_history = execution_history.get(job_config['id'], [])
         last_execution = job_history[-1] if job_history else None
 
+        # Safely get next_run_time from scheduled job
+        next_run_time = None
+        if scheduled_job:
+            try:
+                next_run_time = getattr(scheduled_job, 'next_run_time', None)
+            except AttributeError:
+                logger.warning(f"Scheduled job {job_config['id']} has no next_run_time attribute")
+                next_run_time = None
+        
         job_data = {
             'id': job_config['id'],
             'name': job_config['id'].replace('_', ' ').title(),
@@ -65,7 +77,7 @@ async def get_all_jobs() -> List[Dict[str, Any]]:
             'is_active': scheduled_job is not None,
             'is_custom': False,
             'last_run': last_execution.execution_time if last_execution else None,
-            'next_run': scheduled_job.next_run_time if scheduled_job else None,
+            'next_run': next_run_time,
             'created_at': datetime.now(),
             'status': 'running' if scheduled_job else 'not_scheduled'
         }
@@ -75,17 +87,13 @@ async def get_all_jobs() -> List[Dict[str, Any]]:
 
 
 async def run_job_now(job_id: str) -> Dict[str, Any]:
-    """Schedule a one-off immediate run of a configured job.
+    """Execute a job immediately and return the results.
 
-    Returns a dict with status and scheduling info.
+    Returns a dict with execution status and results.
     """
     from app.core.jobs.job_config import JOB_CONFIG
-
-    # Ensure scheduler running
-    ensure_scheduler_running()
-    scheduler = get_scheduler_instance()
-    if not scheduler:
-        return {"ok": False, "message": "Scheduler is not available"}
+    import asyncio
+    import traceback
 
     # Find job config
     job_config = next((j for j in JOB_CONFIG if j['id'] == job_id), None)
@@ -93,39 +101,88 @@ async def run_job_now(job_id: str) -> Dict[str, Any]:
         return {"ok": False, "message": f"Job '{job_id}' not found"}
 
     job_func = job_config["func"]
-
-    # Schedule a one-off run a moment in the future
-    run_date = datetime.now(pytz.utc) + timedelta(seconds=2)
     manual_id = f"{job_id}_manual_{int(time.time())}"
 
-    # Prepare kwargs to support force-run and job_id if the function accepts them
+    # Get the actual function from the lambda
+    try:
+        actual_func = job_func()
+    except Exception as e:
+        return {"ok": False, "message": f"Failed to get job function: {e}"}
+    
+    # Prepare kwargs to support force-run, job_id, and user_id if the function accepts them
     kwargs = {}
     try:
-        sig = inspect.signature(job_func)
+        sig = inspect.signature(actual_func)
         if 'force' in sig.parameters:
             kwargs['force'] = True
         if 'job_id' in sig.parameters:
             kwargs['job_id'] = manual_id
+        if 'user_id' in sig.parameters:
+            # Get current user from session
+            from app.security.route_protection import RouteProtection
+            current_user = RouteProtection.get_current_user()
+            if current_user:
+                kwargs['user_id'] = current_user.get('id')
     except Exception:
         pass
 
+    # Execute the job immediately
     try:
-        scheduler.add_job(
-            id=manual_id,
-            func=job_func,
-            trigger=DateTrigger(run_date=run_date),
-            replace_existing=False,
-            max_instances=job_config.get("max_instances", 1),
-            kwargs=kwargs if kwargs else None,
-        )
+        logger.info(f"Executing job {job_id} immediately with kwargs: {kwargs}")
+        
+        # Check if the function is async
+        if asyncio.iscoroutinefunction(actual_func):
+            result = await actual_func(**kwargs)
+        else:
+            # Run sync function in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, lambda: actual_func(**kwargs))
+        
+        logger.info(f"Job {job_id} executed successfully. Result type: {type(result)}")
+        
+        # Store the result in global storage for UI display
+        from app.core.jobs.job_results_store import store_job_result
+        if isinstance(result, dict):
+            store_job_result(job_id, result)
+            store_job_result(manual_id, result)  # Also store with manual ID
+        
         return {
             "ok": True,
-            "message": f"Job '{job_id}' scheduled to run now",
-            "scheduled_id": manual_id,
-            "run_date": run_date,
+            "message": f"Job '{job_id}' executed successfully",
+            "execution_id": manual_id,
+            "result": result,
+            "execution_time": datetime.now().isoformat()
         }
+        
     except Exception as e:
-        return {"ok": False, "message": f"Failed to schedule job: {e}"}
+        error_msg = f"Job execution failed: {str(e)}"
+        logger.error(f"Error executing job {job_id}: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Store error result
+        error_result = {
+            'job_id': manual_id,
+            'status': 'error',
+            'message': error_msg,
+            'details': [f"Error: {str(e)}"],
+            'users_processed': 0,
+            'emails_sent': 0,
+            'errors': [str(e)],
+            'execution_time': datetime.now().isoformat(),
+            'forced': True
+        }
+        
+        from app.core.jobs.job_results_store import store_job_result
+        store_job_result(job_id, error_result)
+        store_job_result(manual_id, error_result)
+        
+        return {
+            "ok": False, 
+            "message": error_msg,
+            "execution_id": manual_id,
+            "error": str(e),
+            "execution_time": datetime.now().isoformat()
+        }
 
 
 async def get_job_statistics() -> Dict[str, Any]:
@@ -179,7 +236,29 @@ async def get_scheduler_status() -> Dict[str, Any]:
 
 
 async def get_job_execution_history(job_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
-    """Get job execution history."""
+    """Get job execution history from database."""
+    try:
+        # Try to get from database first
+        from app.core.interface.job_tracking_interface import get_job_execution_history as get_db_history
+        db_history = await get_db_history(job_name=job_id, limit=limit)
+        
+        if db_history:
+            # Convert database format to expected format
+            history = []
+            for record in db_history:
+                history.append({
+                    'job_id': record['job_name'],
+                    'execution_time': record['started_at'],
+                    'scheduled_time': record['scheduled_time'],
+                    'successful': record['status'] == 'success',
+                    'error': record['error_message'],
+                    'duration': f"0:00:{record['duration'] or 0:02d}"
+                })
+            return history
+    except Exception as e:
+        logger.error(f"Error getting database execution history: {e}")
+    
+    # Fallback to in-memory history
     history = []
 
     if job_id:
