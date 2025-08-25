@@ -1,22 +1,22 @@
 """=====================================================================
-Async Scheduler to run jobs in the background.
+Enhanced Async Scheduler with Session Independence and Comprehensive Logging
 
 Version History:
-    1.0.0 (2024-12-24)
-        - Initial Release
-====================================================================="""
+    1.0.0 (2024-12-24) - Initial Release
+    1.1.0 (2025-01-27) - Enhanced startup logging with detailed job information
+    2.0.0 (2025-01-27) - Session-independent scheduler with dynamic job imports
+===================================================================="""
 
 import asyncio
 import psutil
 import logging
 import os
+import sys
 import threading
 import datetime
 from collections import defaultdict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
-
-from app.core.jobs.job_config import JOB_CONFIG
 
 logger = logging.getLogger("async_scheduler")
 
@@ -45,86 +45,152 @@ class ExecutionRecord:
 def job_executed_event_listener(event):
     record = ExecutionRecord(event.job_id, event.scheduled_run_time, True)
     execution_history[event.job_id].append(record)
-    logger.info(
-        f"Job {event.job_id} executed successfully at {record.execution_time}")
+    logger.info(f"✅ Job '{event.job_id}' executed successfully at {record.execution_time}")
+    print(f"[SCHEDULER] ✅ Job '{event.job_id}' executed successfully at {record.execution_time}")
 
 
 def job_error_event_listener(event):
     record = ExecutionRecord(
         event.job_id, event.scheduled_run_time, False, str(event.exception))
     execution_history[event.job_id].append(record)
-    logger.error(
-        f"Job {event.job_id} failed at {record.execution_time}: {event.exception}")
+    logger.error(f"❌ Job '{event.job_id}' failed at {record.execution_time}: {event.exception}")
+    print(f"[SCHEDULER] ❌ Job '{event.job_id}' failed at {record.execution_time}: {event.exception}")
     
     # Log additional details for debugging
     if hasattr(event, 'retval'):
-        logger.error(f"Job {event.job_id} return value: {event.retval}")
+        logger.error(f"📋 Job '{event.job_id}' return value: {event.retval}")
     if hasattr(event, 'traceback'):
-        logger.error(f"Job {event.job_id} traceback: {event.traceback}")
+        logger.error(f"📋 Job '{event.job_id}' traceback: {event.traceback}")
 
 
-async def health_check():
-    global execution_history
+def log_to_console_and_file(message, level="INFO"):
+    """Force log to both console and file"""
+    # Log to file
+    if level.upper() == "DEBUG":
+        logger.debug(message)
+    elif level.upper() == "INFO":
+        logger.info(message)
+    elif level.upper() == "WARNING":
+        logger.warning(message)
+    elif level.upper() == "ERROR":
+        logger.error(message)
+    else:
+        logger.info(message)
+    
+    # Also force to stdout
+    print(f"[SCHEDULER] {message}")
+    sys.stdout.flush()
 
+
+def get_session_independent_job_config():
+    """Get job configuration without importing job functions that have database dependencies"""
+    from apscheduler.triggers.cron import CronTrigger
+    import pytz
+    
+    # Session-independent job configuration
+    # Jobs will be imported dynamically only when they execute
+    return [
+        {
+            "id": "weekly_reporter",
+            "module_path": "app.core.jobs.tasks.weekly_reporter",
+            "function_name": "send_weekly_report",
+            "trigger": CronTrigger(
+                day_of_week="fri",
+                hour=21,
+                minute=50,
+                timezone=pytz.timezone('Asia/Kolkata')
+            ),
+            "max_instances": 1,
+            "replace_existing": True,
+            "coalesce": True,
+            "misfire_grace_time": 300,
+        },
+        {
+            "id": "monthly_reporter", 
+            "module_path": "app.core.jobs.tasks.monthly_reporter",
+            "function_name": "send_monthly_report",
+            "trigger": CronTrigger(
+                day_of_week="fri",
+                hour=21,
+                minute=50,
+                timezone=pytz.timezone('Asia/Kolkata')
+            ),
+            "max_instances": 1,
+            "replace_existing": True,
+            "coalesce": True,
+            "misfire_grace_time": 300,
+        },
+        {
+            "id": "task_lifecycle_manager",
+            "module_path": "app.core.jobs.tasks.task_lifecycle_manager", 
+            "function_name": "manage_task_lifecycle",
+            "trigger": CronTrigger(
+                hour=2,
+                minute=0,
+                timezone=pytz.timezone('Asia/Kolkata')
+            ),
+            "max_instances": 1,
+            "replace_existing": True,
+            "coalesce": True,
+            "misfire_grace_time": 600,
+        }
+    ]
+
+
+async def dynamic_job_wrapper(module_path, function_name, *args, **kwargs):
+    """Dynamically import and execute job function only when needed"""
+    try:
+        log_to_console_and_file(f"🔧 Dynamically importing {module_path}.{function_name}", "INFO")
+        
+        import importlib
+        module = importlib.import_module(module_path)
+        job_func = getattr(module, function_name)
+        
+        log_to_console_and_file(f"✅ Successfully imported {function_name}", "INFO")
+        
+        # Execute the job function
+        result = await job_func(*args, **kwargs)
+        
+        log_to_console_and_file(f"✅ Job {function_name} completed successfully", "INFO")
+        return result
+        
+    except Exception as e:
+        log_to_console_and_file(f"❌ Error in dynamic job execution: {e}", "ERROR")
+        raise
+
+
+async def simple_health_check():
+    """Simple health check without database dependencies"""
     scheduler = get_scheduler_instance()
     if not scheduler:
-        logger.warning("Health check: Scheduler not available")
+        log_to_console_and_file("⚠️  Health check: Scheduler not available", "WARNING")
         return
 
-    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
     pid = os.getpid()
     thread_id = threading.get_ident()
     thread_name = threading.current_thread().name
 
-    logger.info(
-        f"Async scheduler health check: ALIVE at PID: {pid}, Thread ID: {thread_id}, Thread Name: {thread_name}")
+    log_to_console_and_file(f"💓 Scheduler health check: ALIVE at PID: {pid}, Thread ID: {thread_id}, Thread Name: {thread_name}", "INFO")
 
-    cpu_usage = psutil.cpu_percent(interval=1)
-    memory_info = psutil.virtual_memory()
-    logger.info(
-        f"System resources - CPU: {cpu_usage}%, Memory: {memory_info.percent}%")
+    try:
+        cpu_usage = psutil.cpu_percent(interval=1)
+        memory_info = psutil.virtual_memory()
+        log_to_console_and_file(f"📊 System resources - CPU: {cpu_usage}%, Memory: {memory_info.percent}%", "INFO")
+    except Exception as e:
+        log_to_console_and_file(f"⚠️  Could not get system resources: {e}", "WARNING")
 
-    logger.info(f"Scheduler running: {scheduler.running}")
-    logger.info(f"Number of jobs: {len(scheduler.get_jobs())}")
+    log_to_console_and_file(f"🏃 Scheduler running: {scheduler.running}", "INFO")
+    log_to_console_and_file(f"📋 Number of jobs: {len(scheduler.get_jobs())}", "INFO")
 
     for job in scheduler.get_jobs():
-        logger.info(f"Job {job.id} next run at {job.next_run_time} (max_instances: {job.max_instances})")
+        log_to_console_and_file(f"🕐 Job '{job.id}' next run at {job.next_run_time} (max_instances: {job.max_instances})", "INFO")
 
-        job_history = execution_history.get(job.id, [])
-        if job_history:
-            recent_executions = [
-                r for r in job_history if r.execution_time >= one_hour_ago]
-            success_count = sum(
-                1 for record in recent_executions if record.successful)
-            failure_count = len(recent_executions) - success_count
-            last_run = job_history[-1].execution_time if job_history else "Never"
-
-            logger.info(
-                f"Job {job.id} stats (past hour) - Runs: {len(recent_executions)} | Success: {success_count} | Failures: {failure_count} | Last: {last_run}")
-            
-            # Warn if there are too many executions in the past hour
-            if len(recent_executions) > 2:
-                logger.warning(f"Job {job.id} has {len(recent_executions)} executions in the past hour - possible duplicate runs")
-        else:
-            logger.info(f"Job {job.id} execution stats: No executions yet")
-
+    # Schedule next health check
     scheduler.add_job(
         id="health_check",
-        func=health_check,
+        func=simple_health_check,
         trigger="interval",
         hours=1,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True
-    )
-    
-    # Add cleanup task for stale locks
-    from app.core.jobs.execution_lock import cleanup_stale_locks
-    scheduler.add_job(
-        id="cleanup_stale_locks",
-        func=cleanup_stale_locks,
-        trigger="interval",
-        hours=2,
         replace_existing=True,
         max_instances=1,
         coalesce=True
@@ -134,13 +200,24 @@ async def health_check():
 async def start_scheduler():
     global _scheduler_instance, _scheduler_start_time
 
+    startup_time = datetime.datetime.now()
     pid = os.getpid()
     thread_id = threading.get_ident()
     thread_name = threading.current_thread().name
-    logger.info(
-        f"Starting async scheduler. PID: {pid}, Thread ID: {thread_id}, Thread Name: {thread_name}")
+
+    log_to_console_and_file("="*80, "INFO")
+    log_to_console_and_file("🚀 ENHANCED SCHEDULER STARTUP INITIATED", "INFO")
+    log_to_console_and_file("="*80, "INFO")
+    log_to_console_and_file(f"📅 Startup Time: {startup_time.strftime('%Y-%m-%d %H:%M:%S %Z')}", "INFO")
+    log_to_console_and_file(f"🔧 Process ID: {pid}", "INFO")
+    log_to_console_and_file(f"🧵 Thread ID: {thread_id}", "INFO")
+    log_to_console_and_file(f"📛 Thread Name: {thread_name}", "INFO")
+    log_to_console_and_file(f"🐍 Python Version: {os.sys.version.split()[0]}", "INFO")
+    log_to_console_and_file("💡 Session-independent scheduler - no database dependencies at startup", "INFO")
+    log_to_console_and_file("-"*80, "INFO")
 
     # Create scheduler instance with improved configuration
+    log_to_console_and_file("⚙️  Creating AsyncIOScheduler instance...", "INFO")
     scheduler = AsyncIOScheduler(
         job_defaults={
             'coalesce': True,
@@ -148,50 +225,136 @@ async def start_scheduler():
             'misfire_grace_time': 300
         }
     )
+    log_to_console_and_file("✅ Scheduler instance created successfully", "INFO")
+    log_to_console_and_file("   📋 Default job settings:", "INFO")
+    log_to_console_and_file("      • Coalesce: True (combine multiple pending executions)", "INFO")
+    log_to_console_and_file("      • Max Instances: 1 (prevent concurrent runs)", "INFO")
+    log_to_console_and_file("      • Misfire Grace Time: 300s (5 minutes)", "INFO")
 
     # Set the global instance and start time in a thread-safe way
     with _scheduler_lock:
         _scheduler_instance = scheduler
-        _scheduler_start_time = datetime.datetime.now()
-        logger.info(f"Scheduler instance set: {_scheduler_instance}")
-        logger.info(f"Scheduler start time: {_scheduler_start_time}")
+        _scheduler_start_time = startup_time
+        log_to_console_and_file("🔒 Scheduler instance set in thread-safe context", "INFO")
+        log_to_console_and_file(f"⏰ Scheduler start time recorded: {_scheduler_start_time}", "INFO")
 
+    # Add event listeners
+    log_to_console_and_file("🎧 Adding event listeners...", "INFO")
     scheduler.add_listener(job_executed_event_listener, EVENT_JOB_EXECUTED)
     scheduler.add_listener(job_error_event_listener, EVENT_JOB_ERROR)
+    log_to_console_and_file("✅ Event listeners added (job execution & error tracking)", "INFO")
 
-    for job_config in JOB_CONFIG:
-        # Get the actual function from the lambda
-        job_func = job_config["func"]()
-        
-        scheduler.add_job(
-            id=job_config["id"],
-            func=job_func,
-            trigger=job_config["trigger"],
-            max_instances=job_config.get("max_instances", 1),
-            replace_existing=job_config.get("replace_existing", True),
-            coalesce=job_config.get("coalesce", True),
-            misfire_grace_time=job_config.get("misfire_grace_time", 300),
-        )
-        logger.info(
-            f"Scheduled async job {job_config['id']} with trigger {job_config['trigger']} "
-            f"(max_instances={job_config.get('max_instances', 1)}, "
-            f"coalesce={job_config.get('coalesce', True)}, "
-            f"misfire_grace_time={job_config.get('misfire_grace_time', 300)}s)")
+    # Add jobs from session-independent configuration
+    job_configs = get_session_independent_job_config()
+    log_to_console_and_file("-"*80, "INFO")
+    log_to_console_and_file(f"📋 CONFIGURING SCHEDULED JOBS ({len(job_configs)} jobs found)", "INFO")
+    log_to_console_and_file("-"*80, "INFO")
 
-    scheduler.start()
-    logger.info("Scheduler started successfully.")
+    for i, job_config in enumerate(job_configs, 1):
+        log_to_console_and_file(f"🔧 [{i}/{len(job_configs)}] Configuring job: {job_config['id']}", "INFO")
 
-    await health_check()
+        try:
+            # Extract trigger details for logging
+            trigger = job_config["trigger"]
+            trigger_info = []
+
+            if hasattr(trigger, 'day_of_week') and trigger.day_of_week:
+                trigger_info.append(f"Day: {trigger.day_of_week}")
+            if hasattr(trigger, 'hour') and trigger.hour is not None:
+                trigger_info.append(f"Hour: {trigger.hour:02d}")
+            if hasattr(trigger, 'minute') and trigger.minute is not None:
+                trigger_info.append(f"Minute: {trigger.minute:02d}")
+            if hasattr(trigger, 'timezone') and trigger.timezone:
+                trigger_info.append(f"Timezone: {trigger.timezone}")
+
+            trigger_desc = ", ".join(trigger_info) if trigger_info else str(trigger)
+
+            # Add job with dynamic wrapper
+            scheduler.add_job(
+                id=job_config["id"],
+                func=dynamic_job_wrapper,
+                args=[job_config["module_path"], job_config["function_name"]],
+                trigger=job_config["trigger"],
+                max_instances=job_config.get("max_instances", 1),
+                replace_existing=job_config.get("replace_existing", True),
+                coalesce=job_config.get("coalesce", True),
+                misfire_grace_time=job_config.get("misfire_grace_time", 300),
+            )
+
+            log_to_console_and_file(f"   ✅ Function: {job_config['function_name']} (dynamic import)", "INFO")
+            log_to_console_and_file(f"   📅 Schedule: {trigger_desc}", "INFO")
+            log_to_console_and_file(f"   ⚙️  Max Instances: {job_config.get('max_instances', 1)}", "INFO")
+            log_to_console_and_file(f"   🔄 Coalesce: {job_config.get('coalesce', True)}", "INFO")
+            log_to_console_and_file(f"   ⏱️  Misfire Grace: {job_config.get('misfire_grace_time', 300)}s", "INFO")
+            log_to_console_and_file(f"   ✅ Job '{job_config['id']}' scheduled successfully", "INFO")
+
+        except Exception as e:
+            log_to_console_and_file(f"   ❌ Failed to configure job '{job_config['id']}': {e}", "ERROR")
+            log_to_console_and_file(f"   📋 Job config: {job_config}", "ERROR")
+
+        if i < len(job_configs):
+            log_to_console_and_file("   " + "-"*50, "INFO")
+
+    # Start the scheduler
+    log_to_console_and_file("-"*80, "INFO")
+    log_to_console_and_file("🚀 STARTING SCHEDULER ENGINE", "INFO")
+    log_to_console_and_file("-"*80, "INFO")
+
+    try:
+        scheduler.start()
+        actual_start_time = datetime.datetime.now()
+        startup_duration = (actual_start_time - startup_time).total_seconds()
+
+        log_to_console_and_file("✅ Scheduler engine started successfully!", "INFO")
+        log_to_console_and_file(f"⏱️  Startup duration: {startup_duration:.2f} seconds", "INFO")
+        log_to_console_and_file("🏃 Scheduler is now running and ready to execute jobs", "INFO")
+
+        # Log next run times for all jobs
+        log_to_console_and_file("-"*80, "INFO")
+        log_to_console_and_file("📅 NEXT SCHEDULED EXECUTIONS", "INFO")
+        log_to_console_and_file("-"*80, "INFO")
+
+        jobs = scheduler.get_jobs()
+        if jobs:
+            for job in sorted(jobs, key=lambda j: j.next_run_time or datetime.datetime.max):
+                if job.next_run_time:
+                    log_to_console_and_file(f"🕐 {job.id}: {job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z')}", "INFO")
+                else:
+                    log_to_console_and_file(f"⏸️  {job.id}: No next run time scheduled", "INFO")
+        else:
+            log_to_console_and_file("⚠️  No jobs found in scheduler!", "WARNING")
+
+    except Exception as e:
+        log_to_console_and_file(f"❌ Failed to start scheduler: {e}", "ERROR")
+        raise
+
+    log_to_console_and_file("="*80, "INFO")
+    log_to_console_and_file("🎉 ENHANCED SCHEDULER STARTUP COMPLETED SUCCESSFULLY", "INFO")
+    log_to_console_and_file("="*80, "INFO")
+
+    # Run initial health check
+    await simple_health_check()
 
     try:
         while True:
             await asyncio.sleep(3600)  # Sleep for 1 hour
     except (KeyboardInterrupt, SystemExit):
+        log_to_console_and_file("-"*80, "INFO")
+        log_to_console_and_file("🛑 SCHEDULER SHUTDOWN INITIATED", "INFO")
+        log_to_console_and_file("-"*80, "INFO")
+        shutdown_time = datetime.datetime.now()
+
         with _scheduler_lock:
             if _scheduler_instance:
+                uptime = get_scheduler_uptime()
+                log_to_console_and_file(f"⏰ Shutdown time: {shutdown_time.strftime('%Y-%m-%d %H:%M:%S %Z')}", "INFO")
+                log_to_console_and_file(f"⏱️  Total uptime: {uptime}", "INFO")
+                log_to_console_and_file("🔧 Shutting down scheduler instance...", "INFO")
                 _scheduler_instance.shutdown()
                 _scheduler_instance = None
-        logger.info("Scheduler shutdown successfully.")
+                log_to_console_and_file("✅ Scheduler shutdown completed successfully", "INFO")
+
+        log_to_console_and_file("="*80, "INFO")
 
 
 def get_scheduler_instance():
@@ -199,8 +362,7 @@ def get_scheduler_instance():
     global _scheduler_instance
     with _scheduler_lock:
         if _scheduler_instance:
-            logger.debug(
-                f"Scheduler instance found: running={_scheduler_instance.running}")
+            logger.debug(f"Scheduler instance found: running={_scheduler_instance.running}")
         else:
             logger.debug("No scheduler instance found")
         return _scheduler_instance
@@ -216,20 +378,20 @@ def is_scheduler_running():
 def get_scheduler_uptime():
     """Get scheduler uptime as a formatted string."""
     global _scheduler_start_time, _scheduler_instance
-    
+
     with _scheduler_lock:
         if not _scheduler_instance or not _scheduler_instance.running or not _scheduler_start_time:
             return "0:00:00"
-        
+
         uptime_delta = datetime.datetime.now() - _scheduler_start_time
-        
+
         # Format uptime as HH:MM:SS or D days, HH:MM:SS
         total_seconds = int(uptime_delta.total_seconds())
         days = total_seconds // 86400
         hours = (total_seconds % 86400) // 3600
         minutes = (total_seconds % 3600) // 60
         seconds = total_seconds % 60
-        
+
         if days > 0:
             return f"{days}d {hours:02d}:{minutes:02d}:{seconds:02d}"
         else:
@@ -259,27 +421,37 @@ def ensure_scheduler_running():
     with _scheduler_lock:
         # Check if scheduler is already running
         if _scheduler_instance and _scheduler_instance.running:
+            log_to_console_and_file("🏃 Scheduler is already running", "DEBUG")
             return True
 
         # Check if we already started the scheduler thread
         if _scheduler_started and _scheduler_thread and _scheduler_thread.is_alive():
-            logger.info(
-                "Scheduler thread is alive, waiting for initialization...")
-            return True
+            log_to_console_and_file("🧵 Scheduler thread is alive, waiting for initialization...", "INFO")
+            # Wait a bit longer for the scheduler to fully initialize
+            import time
+            time.sleep(3)
+            # Check again if scheduler instance is available
+            return _scheduler_instance is not None
 
         # Start new scheduler thread
         if not _scheduler_started or not _scheduler_thread or not _scheduler_thread.is_alive():
-            logger.info("Starting new scheduler thread...")
+            log_to_console_and_file("🚀 Starting new enhanced scheduler thread...", "INFO")
             _scheduler_thread = threading.Thread(
                 target=run_scheduler, daemon=True)
             _scheduler_thread.start()
             _scheduler_started = True
 
-            # Wait a bit for the scheduler to initialize
+            # Wait longer for the scheduler to initialize
             import time
-            time.sleep(2)
+            time.sleep(5)  # Increased wait time
 
-            return _scheduler_instance is not None
+            # Check if scheduler instance is available
+            if _scheduler_instance is not None:
+                log_to_console_and_file("✅ Scheduler thread started and instance is available", "INFO")
+                return True
+            else:
+                log_to_console_and_file("⚠️  Scheduler thread started but instance not yet available", "WARNING")
+                return False
 
     return False
 
@@ -289,6 +461,6 @@ def run_scheduler():
     try:
         asyncio.run(start_scheduler())
     except Exception as e:
-        logger.error(f"Scheduler thread failed: {e}")
+        log_to_console_and_file(f"❌ Scheduler thread failed: {e}", "ERROR")
         global _scheduler_started
         _scheduler_started = False

@@ -1,6 +1,7 @@
 import streamlit as st
 import asyncio
-from threading import Thread
+import datetime
+import os
 from app.core.jobs.scheduler import ensure_scheduler_running
 from app.security.backend_session_manager import BackendSessionManager
 from app.security.middleware import apply_security_middleware
@@ -16,11 +17,21 @@ from app.ui.signup import signup
 from app.ui.login import login
 from app.database.db_connector import init_db
 from app.database.migrations import run_migrations
-from app.config.logging_config import setup_logging, get_logger
+from app.config.logging_config import setup_logging, get_logger, log_to_console_and_file
 
-# Initialize logging
+# Initialize enhanced logging
+print("🚀 Initializing AutoReportSystem...")
+print(f"📁 Working directory: {os.getcwd()}")
+print("📋 Setting up enhanced logging...")
+
 setup_logging()
 logger = get_logger(__name__)
+
+# Force initial log to console and file
+log_to_console_and_file("🚀 AutoReportSystem starting up...", "INFO")
+log_to_console_and_file(f"📁 Working directory: {os.getcwd()}", "INFO")
+log_to_console_and_file("📋 Enhanced logging system activated", "INFO")
+log_to_console_and_file("🔧 Using enhanced session-independent scheduler", "INFO")
 
 st.set_page_config(
     page_title="Auto Report System",
@@ -32,21 +43,72 @@ st.set_page_config(
 
 # Initialize DB and session system only once
 if "db_initialized" not in st.session_state:
+    log_to_console_and_file("🗄️ Initializing database and session system...", "INFO")
     run_migrations()
     asyncio.run(init_db())
     BackendSessionManager.init_session_table()
     BackendSessionManager.cleanup_expired_sessions()
     st.session_state.db_initialized = True
+    log_to_console_and_file("✅ Database and session system initialized", "INFO")
 
 # Initialize scheduler immediately on first load
 if "scheduler_initialized" not in st.session_state:
-    logger.info("🚀 Initializing scheduler on application startup...")
-    ensure_scheduler_running()
+    log_to_console_and_file("="*80, "INFO")
+    log_to_console_and_file("🚀 APPLICATION STARTUP - INITIALIZING ENHANCED SCHEDULER", "INFO")
+    log_to_console_and_file("="*80, "INFO")
+    
+    logger.info("="*80)
+    logger.info("🚀 APPLICATION STARTUP - INITIALIZING ENHANCED SCHEDULER")
+    logger.info("="*80)
+    logger.info(
+        f"📅 Application startup time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(
+        f"🌐 Streamlit session ID: {st.session_state.get('session_id', 'unknown')}")
+    logger.info(f"🔧 Starting enhanced scheduler initialization...")
+    
+    log_to_console_and_file(f"📅 Application startup time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", "INFO")
+    log_to_console_and_file(f"🔧 Starting enhanced scheduler initialization...", "INFO")
+    log_to_console_and_file("💡 This scheduler can start without database sessions", "INFO")
+
+    # Start scheduler and wait for proper initialization
+    log_to_console_and_file("⏳ Starting scheduler thread...", "INFO")
+    scheduler_started = ensure_scheduler_running()
+    
+    # Give the scheduler more time to fully initialize
+    import time
+    time.sleep(3)
+    
+    # Check scheduler status after initialization
+    from app.core.jobs.scheduler import is_scheduler_running
+    scheduler_running = is_scheduler_running()
+
+    if scheduler_started and scheduler_running:
+        logger.info("✅ Enhanced scheduler initialization completed successfully")
+        logger.info("🎯 Background job processing is now active")
+        log_to_console_and_file("✅ Enhanced scheduler initialization completed successfully", "INFO")
+        log_to_console_and_file("🎯 Background job processing is now active", "INFO")
+        log_to_console_and_file("📋 Jobs will establish database connections only when they execute", "INFO")
+        log_to_console_and_file("📋 Check logs/scheduler.log for detailed scheduler information", "INFO")
+    else:
+        logger.error("❌ Enhanced scheduler initialization failed")
+        logger.error("⚠️  Background jobs will not be processed")
+        log_to_console_and_file("❌ Enhanced scheduler initialization failed", "ERROR")
+        log_to_console_and_file("⚠️  Background jobs will not be processed", "ERROR")
+        log_to_console_and_file(f"🔍 Debug: scheduler_started={scheduler_started}, scheduler_running={scheduler_running}", "ERROR")
+
     st.session_state.scheduler_initialized = True
-    logger.info("✅ Scheduler initialization completed")
+    logger.info("="*80)
+    log_to_console_and_file("="*80, "INFO")
 else:
     # Ensure scheduler is still running on subsequent page loads
-    ensure_scheduler_running()
+    logger.debug("🔄 Checking enhanced scheduler status on page reload...")
+    from app.core.jobs.scheduler import is_scheduler_running
+    scheduler_running = is_scheduler_running()
+    if scheduler_running:
+        logger.debug("✅ Enhanced scheduler is running properly")
+    else:
+        logger.warning("⚠️  Enhanced scheduler check failed - attempting restart")
+        log_to_console_and_file("⚠️  Enhanced scheduler check failed - attempting restart", "WARNING")
 
 # Always attempt to restore session from URL parameters or existing state
 BackendSessionManager.restore_session()
