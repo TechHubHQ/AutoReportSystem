@@ -178,7 +178,7 @@ def apply_custom_css():
     .priority-low { border-left-color: #4caf50 !important; }
 
     /* Enhanced Color Scheme Implementation */
-    
+
     /* COMPLETED TASKS - Enhanced green with better gradient */
     .status-completed {
         background: linear-gradient(135deg, #E8F5E8 0%, #A5D6A7 100%) !important;
@@ -204,7 +204,7 @@ def apply_custom_css():
         box-shadow: -6px 6px 25px rgba(38, 166, 154, 0.3) !important;
         border-left-width: 5px !important;
     }
-    
+
     /* Overdue TODO: Enhanced Red + Blue */
     .due-overdue.status-todo {
         background: linear-gradient(135deg, #FFCDD2 0%, #E1F5FE 100%) !important;
@@ -212,7 +212,7 @@ def apply_custom_css():
         box-shadow: -8px 8px 30px rgba(244, 67, 54, 0.35) !important;
         border-left-width: 6px !important;
     }
-    
+
     /* Urgent TODO (today/tomorrow): Enhanced Orange + Blue */
     .due-urgent.status-todo {
         background: linear-gradient(135deg, #FFE0B2 0%, #E3F2FD 100%) !important;
@@ -220,7 +220,7 @@ def apply_custom_css():
         box-shadow: -7px 7px 28px rgba(255, 152, 0, 0.3) !important;
         border-left-width: 5px !important;
     }
-    
+
     /* Safe TODO (far away): Enhanced Green + Blue */
     .due-safe.status-todo {
         background: linear-gradient(135deg, #C8E6C9 0%, #E3F2FD 100%) !important;
@@ -237,7 +237,7 @@ def apply_custom_css():
         box-shadow: -6px 6px 25px rgba(38, 166, 154, 0.3) !important;
         border-left-width: 5px !important;
     }
-    
+
     /* Overdue IN PROGRESS: Enhanced Red + Purple */
     .due-overdue.status-inprogress {
         background: linear-gradient(135deg, #FFCDD2 0%, #F8E1FF 100%) !important;
@@ -245,7 +245,7 @@ def apply_custom_css():
         box-shadow: -8px 8px 30px rgba(244, 67, 54, 0.35) !important;
         border-left-width: 6px !important;
     }
-    
+
     /* Urgent IN PROGRESS (today/tomorrow): Enhanced Orange + Purple */
     .due-urgent.status-inprogress {
         background: linear-gradient(135deg, #FFE0B2 0%, #F3E5F5 100%) !important;
@@ -253,7 +253,7 @@ def apply_custom_css():
         box-shadow: -7px 7px 28px rgba(255, 152, 0, 0.3) !important;
         border-left-width: 5px !important;
     }
-    
+
     /* Safe IN PROGRESS (far away): Enhanced Green + Purple */
     .due-safe.status-inprogress {
         background: linear-gradient(135deg, #C8E6C9 0%, #F3E5F5 100%) !important;
@@ -525,7 +525,7 @@ async def render_kanban_board(dashboard_manager):
             # Enhanced Color examples
             st.markdown("#### 🎨 Color Examples:")
             col1, col2, col3, col4, col5 = st.columns(5)
-            
+
             with col1:
                 st.markdown("""
                 <div style="background: linear-gradient(135deg, #B2DFDB 0%, #E3F2FD 100%); 
@@ -1140,7 +1140,7 @@ async def render_productivity_analytics(dashboard_manager):
 async def render_system_monitoring(dashboard_manager):
     """Render basic system monitoring dashboard"""
     st.markdown("### 🖥️ System Overview")
-    
+
     # Get current system status with loader
     with LoaderContext("Collecting system metrics...", "inline"):
         system_status = await get_current_system_status()
@@ -1188,14 +1188,14 @@ async def render_system_monitoring(dashboard_manager):
             display_score = f"{health_text} ({health_score:.0f})"
         else:
             display_score = str(health_score)
-        
+
         st.markdown(f"""
         <div class="metric-card">
             <h3 style="color: {system_status['status_color']}; margin: 0;">❤️ {display_score}</h3>
             <p style="margin: 0.5rem 0 0 0; color: #666;">Health Score</p>
         </div>
         """, unsafe_allow_html=True)
-    
+
     # Link to full system monitor
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 1, 1])
