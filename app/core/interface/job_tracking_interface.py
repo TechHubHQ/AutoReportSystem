@@ -160,16 +160,18 @@ class JobExecutionTracker:
             except IntegrityError:
                 # Handle race condition - another process created the job
                 await db.rollback()
-                logger.info(f"Job {self.job_name} was created by another process, fetching existing record")
-                
+                logger.info(
+                    f"Job {self.job_name} was created by another process, fetching existing record")
+
                 # Fetch the existing job created by another process
                 result = await db.execute(select(Job).where(Job.name == self.job_name))
                 job = result.scalar_one_or_none()
-                
+
                 if job:
                     return job.id
                 else:
-                    raise Exception(f"Failed to create or find job {self.job_name}")
+                    raise Exception(
+                        f"Failed to create or find job {self.job_name}")
 
         except Exception as e:
             logger.error(f"Error getting/creating job record: {e}")

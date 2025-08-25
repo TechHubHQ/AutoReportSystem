@@ -20,6 +20,7 @@ def _import_job_function(module_path: str, function_name: str):
     module = importlib.import_module(module_path)
     return getattr(module, function_name)
 
+
 # Policy:
 # - Weekly: every Friday except the last Friday of the month (handled in task)
 # - Monthly: only the last Friday of the month (handled in task)
@@ -71,7 +72,3 @@ JOB_CONFIG = [
         "notification_config": NOTIFICATION_SETTINGS,
     }
 ]
-
-# Note: Email configuration is now handled through the UI and database
-# See app.core.interface.job_email_config_interface for email configuration management
-# This removes the circular import dependency that existed before

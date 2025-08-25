@@ -8,6 +8,18 @@ from app.config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Global default job email configuration (used for all jobs if user has no config)
+GLOBAL_DEFAULT_JOB_EMAIL_CONFIG = {
+    "enabled": True,
+    "recipient": "santosh.bommana@medicasapp.com",
+    "subject": "Progress Report",
+    "template": "default_template.html",
+    "recipient_name": "User",
+    "send_empty_reports": False,
+    "html_format": True,
+    "retry_failed_sends": True,
+    "max_retries": 3,
+}
 
 async def create_job_email_config(
     job_id: str,
@@ -27,7 +39,8 @@ async def create_job_email_config(
     try:
         # Validate inputs
         if not all([job_id, user_id, recipient, subject]):
-            raise ValueError("job_id, user_id, recipient, and subject are required")
+            raise ValueError(
+                "job_id, user_id, recipient, and subject are required")
 
         db = await get_db()
 
@@ -46,7 +59,8 @@ async def create_job_email_config(
         )
         existing_config = existing_result.scalar_one_or_none()
         if existing_config:
-            raise ValueError(f"Email configuration for job '{job_id}' already exists for this user")
+            raise ValueError(
+                f"Email configuration for job '{job_id}' already exists for this user")
 
         # Create new configuration
         new_config = JobEmailConfig(
@@ -62,7 +76,7 @@ async def create_job_email_config(
             retry_failed_sends=retry_failed_sends,
             max_retries=max_retries
         )
-        
+
         db.add(new_config)
         await db.commit()
         await db.refresh(new_config)
@@ -85,7 +99,7 @@ async def get_job_email_config(job_id: str, user_id: int) -> Optional[JobEmailCo
     """Get email configuration for a specific job and user."""
     try:
         db = await get_db()
-        
+
         result = await db.execute(
             select(JobEmailConfig).where(
                 JobEmailConfig.job_id == job_id,
@@ -103,15 +117,16 @@ async def get_job_email_config(job_id: str, user_id: int) -> Optional[JobEmailCo
 
 
 async def get_all_job_email_configs(user_id: int) -> List[JobEmailConfig]:
-    """Get all email configurations for a user."""
+    """Get all email configurations for a user. If none, return an empty list (default config is used elsewhere)."""
     try:
         db = await get_db()
-        
+
         result = await db.execute(
             select(JobEmailConfig).where(JobEmailConfig.user_id == user_id)
         )
         configs = result.scalars().all()
-        return list(configs)
+        configs_list = list(configs)
+        return configs_list
 
     except Exception as e:
         logger.error(f"Error getting all job email configurations: {e}")
@@ -129,7 +144,7 @@ async def update_job_email_config(
     db = None
     try:
         db = await get_db()
-        
+
         # Get existing configuration
         result = await db.execute(
             select(JobEmailConfig).where(
@@ -139,7 +154,8 @@ async def update_job_email_config(
         )
         config = result.scalar_one_or_none()
         if not config:
-            raise ValueError(f"Email configuration for job '{job_id}' not found for this user")
+            raise ValueError(
+                f"Email configuration for job '{job_id}' not found for this user")
 
         # Update fields
         for field, value in kwargs.items():
@@ -168,7 +184,7 @@ async def delete_job_email_config(job_id: str, user_id: int) -> bool:
     db = None
     try:
         db = await get_db()
-        
+
         # Get existing configuration
         result = await db.execute(
             select(JobEmailConfig).where(
@@ -178,7 +194,8 @@ async def delete_job_email_config(job_id: str, user_id: int) -> bool:
         )
         config = result.scalar_one_or_none()
         if not config:
-            raise ValueError(f"Email configuration for job '{job_id}' not found for this user")
+            raise ValueError(
+                f"Email configuration for job '{job_id}' not found for this user")
 
         await db.delete(config)
         await db.commit()
@@ -198,23 +215,25 @@ async def delete_job_email_config(job_id: str, user_id: int) -> bool:
 
 
 async def get_job_email_config_dict(job_id: str, user_id: int) -> Dict[str, Any]:
-    """Get job email configuration as a dictionary (for backward compatibility)."""
+    """Get job email configuration as a dictionary (for backward compatibility).
+    If no config exists, return the same global default config for all jobs.
+    """
     try:
         config = await get_job_email_config(job_id, user_id)
         if not config:
-            # Return default configuration
+            # Use the same global default config for all jobs
             return {
-                "enabled": True,
-                "recipient": "",
-                "subject": f"{job_id.replace('_', ' ').title()} Report",
-                "template": f"{job_id}_template.html",
-                "recipient_name": "User",
-                "send_empty_reports": False,
-                "html_format": True,
-                "retry_failed_sends": True,
-                "max_retries": 3,
+                "enabled": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["enabled"],
+                "recipient": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["recipient"],
+                "subject": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["subject"],
+                "template": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["template"],
+                "recipient_name": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["recipient_name"],
+                "send_empty_reports": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["send_empty_reports"],
+                "html_format": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["html_format"],
+                "retry_failed_sends": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["retry_failed_sends"],
+                "max_retries": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["max_retries"],
             }
-        
+
         return {
             "enabled": config.enabled,
             "recipient": config.recipient,
@@ -229,17 +248,17 @@ async def get_job_email_config_dict(job_id: str, user_id: int) -> Dict[str, Any]
 
     except Exception as e:
         logger.error(f"Error getting job email configuration as dict: {e}")
-        # Return default configuration on error
+        # Return global default configuration on error
         return {
-            "enabled": True,
-            "recipient": "",
-            "subject": f"{job_id.replace('_', ' ').title()} Report",
-            "template": f"{job_id}_template.html",
-            "recipient_name": "User",
-            "send_empty_reports": False,
-            "html_format": True,
-            "retry_failed_sends": True,
-            "max_retries": 3,
+            "enabled": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["enabled"],
+            "recipient": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["recipient"],
+            "subject": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["subject"],
+            "template": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["template"],
+            "recipient_name": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["recipient_name"],
+            "send_empty_reports": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["send_empty_reports"],
+            "html_format": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["html_format"],
+            "retry_failed_sends": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["retry_failed_sends"],
+            "max_retries": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["max_retries"],
         }
 
 
@@ -252,7 +271,7 @@ def get_available_job_types() -> List[Dict[str, str]]:
             "description": "Sends weekly progress reports every Friday (except last Friday of month)"
         },
         {
-            "id": "monthly_reporter", 
+            "id": "monthly_reporter",
             "name": "Monthly Reporter",
             "description": "Sends monthly progress reports on the last Friday of each month"
         },
@@ -269,49 +288,49 @@ def get_email_config_schema() -> Dict[str, Dict[str, Any]]:
     return {
         "enabled": {
             "type": "boolean",
-            "default": True,
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["enabled"],
             "description": "Enable or disable email functionality for this job"
         },
         "recipient": {
             "type": "string",
-            "default": "",
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["recipient"],
             "description": "Email address to send reports to",
             "required": True
         },
         "subject": {
             "type": "string",
-            "default": "Progress Report",
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["subject"],
             "description": "Email subject line",
             "required": True
         },
         "template": {
             "type": "string",
-            "default": "default_template.html",
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["template"],
             "description": "Email template file name"
         },
         "recipient_name": {
             "type": "string",
-            "default": "User",
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["recipient_name"],
             "description": "Recipient name for personalization"
         },
         "send_empty_reports": {
             "type": "boolean",
-            "default": False,
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["send_empty_reports"],
             "description": "Send reports even when no tasks are found"
         },
         "html_format": {
             "type": "boolean",
-            "default": True,
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["html_format"],
             "description": "Send emails in HTML format"
         },
         "retry_failed_sends": {
             "type": "boolean",
-            "default": True,
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["retry_failed_sends"],
             "description": "Retry failed email sends"
         },
         "max_retries": {
             "type": "integer",
-            "default": 3,
+            "default": GLOBAL_DEFAULT_JOB_EMAIL_CONFIG["max_retries"],
             "description": "Maximum number of retry attempts for failed sends"
         }
     }

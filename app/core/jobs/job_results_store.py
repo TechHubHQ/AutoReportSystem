@@ -22,25 +22,26 @@ MAX_HISTORY_SIZE = 100
 def store_job_result(job_id: str, result: Dict[str, Any]) -> None:
     """Store a job execution result globally."""
     global _job_results, _job_results_history
-    
+
     # Add logging to debug storage
     import logging
     logger = logging.getLogger("job_results_store")
-    
+
     with _job_results_lock:
         # Store latest result for this job
         _job_results[job_id] = result.copy()
-        
+
         # Add to history
         history_entry = result.copy()
         history_entry['stored_at'] = datetime.now()
         _job_results_history.append(history_entry)
-        
+
         # Keep only the most recent results
         if len(_job_results_history) > MAX_HISTORY_SIZE:
             _job_results_history = _job_results_history[-MAX_HISTORY_SIZE:]
-        
-        logger.info(f"Stored job result for {job_id}: status={result.get('status')}, total_stored={len(_job_results)}")
+
+        logger.info(
+            f"Stored job result for {job_id}: status={result.get('status')}, total_stored={len(_job_results)}")
         logger.debug(f"Job result details: {result}")
 
 
@@ -71,7 +72,7 @@ def get_job_results_history(limit: int = 50) -> List[Dict[str, Any]]:
 def clear_job_results() -> None:
     """Clear all job results."""
     global _job_results, _job_results_history
-    
+
     with _job_results_lock:
         _job_results.clear()
         _job_results_history.clear()
@@ -90,7 +91,7 @@ def get_job_results_summary() -> Dict[str, Any]:
     """Get a summary of job results."""
     with _job_results_lock:
         total_results = len(_job_results)
-        
+
         if not _job_results:
             return {
                 'total_jobs': 0,
@@ -100,18 +101,18 @@ def get_job_results_summary() -> Dict[str, Any]:
                 'partial_success': 0,
                 'last_execution': None
             }
-        
+
         status_counts = defaultdict(int)
         latest_execution = None
-        
+
         for result in _job_results.values():
             status = result.get('status', 'unknown')
             status_counts[status] += 1
-            
+
             execution_time = result.get('execution_time')
             if execution_time and (latest_execution is None or execution_time > latest_execution):
                 latest_execution = execution_time
-        
+
         return {
             'total_jobs': total_results,
             'successful': status_counts.get('success', 0),
